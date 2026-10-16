@@ -1,0 +1,39 @@
+import { useEffect } from 'react';
+import { BuildPanel } from './components/BuildPanel';
+import { Dashboard } from './components/Dashboard';
+import { GameCanvas } from './components/GameCanvas';
+import { SidePanel } from './components/Inspector';
+import { Toast } from './components/Toast';
+import { TopBar } from './components/TopBar';
+import { useGameLoop, useKeyboard } from './hooks';
+import { useGame } from './store';
+
+export function App() {
+  useGameLoop();
+  useKeyboard();
+  const lang = useGame((s) => s.lang);
+  useEffect(() => {
+    document.documentElement.lang = lang;
+  }, [lang]);
+
+  return (
+    <div className="h-full flex flex-col">
+      <TopBar />
+      <main className="flex-1 min-h-0 grid gap-3 p-3 grid-cols-1 lg:grid-cols-[250px_1fr_300px] lg:grid-rows-[minmax(0,1fr)_auto] overflow-y-auto lg:overflow-hidden">
+        <div className="lg:row-span-1 min-h-0 flex flex-col max-lg:order-2">
+          <BuildPanel />
+        </div>
+        <div className="min-h-[55vh] lg:min-h-0 flex flex-col max-lg:order-1 [&>section]:flex-1">
+          <GameCanvas />
+        </div>
+        <div className="min-h-0 flex flex-col max-lg:order-3">
+          <SidePanel />
+        </div>
+        <div className="lg:col-span-3 max-lg:order-4">
+          <Dashboard />
+        </div>
+      </main>
+      <Toast />
+    </div>
+  );
+}

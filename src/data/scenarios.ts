@@ -1,0 +1,32 @@
+import { thb } from '../domain/money';
+import type { Cell, Satang } from '../domain/types';
+
+/**
+ * Starting scenarios. Values are fictional game balancing.
+ * The GDD's CMNH reference figures are deliberately NOT used as gameplay tuning.
+ */
+export interface ScenarioDef {
+  id: string;
+  orgName: string;
+  startingCashSatang: Satang;
+  gridWidth: number;
+  gridHeight: number;
+  entrance: Cell;
+  defaultSeed: number;
+  /** Target for the first milestone: number of operational beds. */
+  targetBeds: number;
+  /** Days the player must keep cash positive in the full MVP story. */
+  targetDays: number;
+}
+
+export const STARTER_SCENARIO: ScenarioDef = {
+  id: 'starter-nursing-home',
+  orgName: 'Healthcare Empire',
+  startingCashSatang: thb(2_000_000),
+  gridWidth: 20,
+  gridHeight: 20,
+  entrance: { x: 9, y: 19 },
+  defaultSeed: 20261016,
+  targetBeds: 10,
+  targetDays: 30,
+};

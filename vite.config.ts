@@ -1,0 +1,17 @@
+/// <reference types="vitest" />
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+import tailwindcss from '@tailwindcss/vite';
+
+export default defineConfig({
+  base: './',
+  plugins: [react(), tailwindcss()],
+  build: {
+    chunkSizeWarningLimit: 1200,
+  },
+  test: {
+    globals: true,
+    environment: 'node',
+    include: ['src/tests/**/*.test.ts'],
+  },
+});
