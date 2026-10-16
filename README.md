@@ -32,6 +32,18 @@ Add `?debug` to the URL to expose `window.__HE__` (store + renderer) for automat
 
 Everything playable today is **Chapter 1 — First Care Home** of the campaign in the concept art. Chapters 2–7 (30–80 beds, Tranquila villas, Home Care, PHC workforce, Neuro Hospital, multi-site empire) start after Phase 4.
 
+### Phone layout (screens under 1024 px)
+
+- **Layout:** the active view fills the screen. A compact top bar holds the day and time, speed, cash and today's change, occupancy, satisfaction and reputation. It also has a bell with an alert count, which opens tasks, alerts and the dashboard, and a ⋯ menu for language and new game.
+- **Bottom tab bar:** Map · Residents · Shift schedule · Finance · Manage. Manage opens build, hire and admit as a bottom sheet.
+- **Building:**
+  - Tap 🏗 สร้าง, pick a tool, and the sheet closes so you can drag on the map with one finger. A "Placing: … / Done" chip shows what you're placing.
+  - Tap a room to open its details sheet: equipment, demolish, tasks, alerts.
+- **Map controls:** pinch with two fingers to zoom and pan. A second finger cancels a half-drawn room without placing it. The map refits when the phone layout settles, and starts a little zoomed in on portrait screens.
+- **Next goal chip:** the map shows the next goal; tapping it opens the details sheet.
+- **Shift schedule:** shows one shift at a time (เช้า / บ่าย / ดึก). The "+" picker opens as a bottom panel. Event cards scroll inside the screen.
+- **Tested** at 390 × 844 with real touch events (Playwright + CDP touch): pinch zoom, finger-drag building, tapping rooms to install equipment, hiring, admitting, care plans, roster and 8 game days. No horizontal page scroll, no console errors.
+
 ### Phase 3: money and events
 
 - **Title screen** over the world-map concept art. "เริ่มเล่น" starts the game. Add `?skiptitle` to the URL to skip it.
@@ -201,7 +213,7 @@ A browser playtest (Playwright, run outside the repo) drove the production build
 - Staff don't walk. They appear at the station or at the bedside when a task starts, and travel time isn't simulated.
 - Morale is tracked and shown but doesn't yet cause resignations.
 - No save/load yet (Phase 4). Refreshing the page starts a new game. State is already JSON-serialisable and tested for round-trips, so Dexie persistence is a thin addition.
-- No touch pinch-zoom (use the +/− buttons). Room rotation and room moving aren't supported (demolish and rebuild instead).
+- Room rotation and room moving aren't supported (demolish and rebuild instead). On phones the staff table still scrolls sideways.
 - The UI font loads from Google Fonts with Thai system-font fallbacks. Offline it falls back to Noto Sans Thai, Leelawadee UI or Tahoma.
 - The renderer redraws the static layer whenever the site changes. That's fine for 20×20 but should be layered/cached before larger maps.
 - The production JS bundle is about 570 kB (PixiJS). Code-splitting can come later.

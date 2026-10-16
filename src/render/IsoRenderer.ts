@@ -41,6 +41,8 @@ export interface RendererCallbacks {
   onDragStart: (cell: Cell) => void;
   onDragMove: (cell: Cell) => void;
   onDragEnd: () => void;
+  /** A second finger landed: abandon the build drag without placing anything. */
+  onDragCancel: () => void;
 }
 
 const WALL_H = 26;
@@ -87,9 +89,13 @@ export class IsoRenderer {
   private input: RenderInput | null = null;
   private onWheel = (e: WheelEvent) => this.handleWheel(e);
   private onContext = (e: Event) => e.preventDefault();
+  private resizeObserver: ResizeObserver | null = null;
 
   // pointer state
-  private pointer: { mode: 'none' | 'pan' | 'maybe-click' | 'drag'; button: number; sx: number; sy: number; wx: number; wy: number } = {
+  /** Active touch points, for two-finger pinch-zoom and pan. */
+  private touches = new Map<number, { x: number; y: number }>();
+  private pinch: { dist: number; midX: number; midY: number; scale: number; wx: number; wy: number } | null = null;
+  private pointer: { mode: 'none' | 'pan' | 'maybe-click' | 'drag' | 'pinch'; button: number; sx: number; sy: number; wx: number; wy: number } = {
     mode: 'none',
     button: 0,
     sx: 0,
@@ -122,10 +128,34 @@ export class IsoRenderer {
     this.app.stage.addChild(this.world);
     this.app.stage.eventMode = 'static';
     this.app.stage.hitArea = this.app.screen;
-    this.app.stage.on('pointerdown', (e) => this.handleDown(e.global.x, e.global.y, e.button));
-    this.app.stage.on('pointermove', (e) => this.handleMove(e.global.x, e.global.y));
-    this.app.stage.on('pointerup', () => this.handleUp());
-    this.app.stage.on('pointerupoutside', () => this.handleUp());
+    this.app.stage.on('pointerdown', (e) => {
+      if (e.pointerType === 'touch') {
+        this.touches.set(e.pointerId, { x: e.global.x, y: e.global.y });
+        if (this.touches.size >= 2) return this.startPinch();
+      }
+      this.handleDown(e.global.x, e.global.y, e.button);
+    });
+    this.app.stage.on('pointermove', (e) => {
+      if (e.pointerType === 'touch' && this.touches.has(e.pointerId)) {
+        this.touches.set(e.pointerId, { x: e.global.x, y: e.global.y });
+        if (this.pointer.mode === 'pinch') return this.movePinch();
+      }
+      this.handleMove(e.global.x, e.global.y);
+    });
+    const up = (e: { pointerType: string; pointerId: number }) => {
+      if (e.pointerType === 'touch') {
+        this.touches.delete(e.pointerId);
+        if (this.pointer.mode === 'pinch') {
+          // Wait until every finger is lifted before accepting new gestures.
+          if (this.touches.size === 0) this.pointer.mode = 'none';
+          return;
+        }
+      }
+      this.handleUp();
+    };
+    this.app.stage.on('pointerup', up);
+    this.app.stage.on('pointerupoutside', up);
+    this.app.stage.on('pointercancel', up);
     this.app.stage.on('pointerleave', () => {
       if (this.pointer.mode === 'none') this.emitHover(null);
     });
@@ -134,6 +164,12 @@ export class IsoRenderer {
     this.app.renderer.on('resize', () => {
       if (!this.userMovedCamera) this.recenter();
     });
+    // resizeTo only listens to window resizes; also follow the host element (phone layouts settle late).
+    this.resizeObserver = new ResizeObserver(() => {
+      if (!this.ready) return;
+      this.app.resize();
+    });
+    this.resizeObserver.observe(host);
     this.ready = true;
     this.recenter();
     if (this.input) this.update(this.input);
@@ -142,6 +178,7 @@ export class IsoRenderer {
   destroy(): void {
     this.destroyed = true;
     if (!this.ready) return;
+    this.resizeObserver?.disconnect();
     this.app.canvas.removeEventListener('wheel', this.onWheel);
     this.app.canvas.removeEventListener('contextmenu', this.onContext);
     this.app.destroy(true, { children: true });
@@ -163,7 +200,10 @@ export class IsoRenderer {
     const worldH = (w + h) * (TILE_H / 2) + 140;
     const sw = this.app.screen.width;
     const sh = this.app.screen.height;
-    const scale = Math.max(0.2, Math.min(2.2, Math.min(sw / worldW, sh / worldH)));
+    let scale = Math.min(sw / worldW, sh / worldH);
+    // Portrait phones: zoom in a little so tiles are big enough for fingers (the lot's side corners crop).
+    if (sh > sw * 1.2) scale *= 1.35;
+    scale = Math.max(0.2, Math.min(2.2, scale));
     this.world.scale.set(scale);
     const centre = cellToWorld(w / 2, h / 2);
     this.world.position.set(sw / 2 - centre.x * scale, sh / 2 - centre.y * scale + 10 * scale);
@@ -190,6 +230,37 @@ export class IsoRenderer {
     e.preventDefault();
     const rect = this.app.canvas.getBoundingClientRect();
     this.zoomBy(e.deltaY < 0 ? 1.12 : 1 / 1.12, e.clientX - rect.left, e.clientY - rect.top);
+  }
+
+  // ---------- touch gestures ----------
+  private startPinch(): void {
+    if (this.pointer.mode === 'drag') this.callbacks.onDragCancel();
+    const [a, b] = [...this.touches.values()];
+    this.pointer.mode = 'pinch';
+    this.pinch = {
+      dist: Math.max(1, Math.hypot(a.x - b.x, a.y - b.y)),
+      midX: (a.x + b.x) / 2,
+      midY: (a.y + b.y) / 2,
+      scale: this.world.scale.x,
+      wx: this.world.x,
+      wy: this.world.y,
+    };
+  }
+
+  private movePinch(): void {
+    const pz = this.pinch;
+    if (!pz || this.touches.size < 2) return;
+    const [a, b] = [...this.touches.values()];
+    const dist = Math.max(1, Math.hypot(a.x - b.x, a.y - b.y));
+    const midX = (a.x + b.x) / 2;
+    const midY = (a.y + b.y) / 2;
+    const next = Math.max(0.2, Math.min(3, (pz.scale * dist) / pz.dist));
+    // Keep the world point under the starting midpoint under the fingers' current midpoint.
+    const worldX = (pz.midX - pz.wx) / pz.scale;
+    const worldY = (pz.midY - pz.wy) / pz.scale;
+    this.world.scale.set(next);
+    this.world.position.set(midX - worldX * next, midY - worldY * next);
+    this.userMovedCamera = true;
   }
 
   // ---------- pointer ----------

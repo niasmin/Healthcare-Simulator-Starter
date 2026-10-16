@@ -6,7 +6,7 @@ import { RosterView } from './RosterView';
 import { FinanceView } from './FinanceView';
 
 /** Map / Residents / Shift schedule. The Pixi canvas stays mounted underneath so it keeps its camera. */
-export function CenterArea() {
+export function CenterArea({ showTabs = true }: { showTabs?: boolean }) {
   const t = useT();
   const view = useGame((s) => s.view);
   const setView = useGame((s) => s.setView);
@@ -19,8 +19,8 @@ export function CenterArea() {
     { id: 'finance', label: t('view.finance') },
   ];
   return (
-    <div className="panel flex flex-col min-h-[420px] lg:min-h-0 h-full overflow-hidden">
-      <div className="flex gap-1 p-1.5 border-b border-line bg-paper overflow-x-auto" role="tablist">
+    <div className={`flex flex-col h-full overflow-hidden ${showTabs ? 'panel min-h-[420px] lg:min-h-0' : ''}`}>
+      <div className={`${showTabs ? "flex" : "hidden"} gap-1 p-1.5 border-b border-line bg-paper overflow-x-auto`} role="tablist">
         {tabs.map((x) => (
           <button
             key={x.id}

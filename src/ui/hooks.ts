@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { formatTHB } from '../domain/money';
 import { summarize } from '../sim/selectors';
 import { localeOf, translate } from './i18n';
@@ -67,4 +67,26 @@ export function useKeyboard() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, []);
+}
+
+export const MOBILE_QUERY = '(max-width: 1023px)';
+
+export function isMobileNow(): boolean {
+  try {
+    return window.matchMedia(MOBILE_QUERY).matches;
+  } catch {
+    return false;
+  }
+}
+
+/** True on phones and small tablets (below the desktop three-column layout). */
+export function useIsMobile(): boolean {
+  const [mobile, setMobile] = useState(isMobileNow);
+  useEffect(() => {
+    const mq = window.matchMedia(MOBILE_QUERY);
+    const on = () => setMobile(mq.matches);
+    mq.addEventListener('change', on);
+    return () => mq.removeEventListener('change', on);
+  }, []);
+  return mobile;
 }

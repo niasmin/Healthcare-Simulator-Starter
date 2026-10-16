@@ -26,6 +26,7 @@ function BuildTools() {
   const tool = useGame((s) => s.tool);
   const setTool = useGame((s) => s.setTool);
   const setView = useGame((s) => s.setView);
+  const setSheet = useGame((s) => s.setSheet);
 
   const item = (target: Tool, title: string, sub: string, swatch?: string) => {
     const active = sameTool(tool, target);
@@ -36,6 +37,7 @@ function BuildTools() {
         onClick={() => {
           setTool(target);
           setView('map');
+          setSheet(null); // phone: close the sheet so the map is free to drag on
         }}
         aria-pressed={active}
         className={`w-full text-left rounded-xl border px-3 py-2 transition-colors ${

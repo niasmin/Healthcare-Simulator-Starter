@@ -8,6 +8,8 @@ export type Tool = { kind: 'select' } | { kind: 'corridor' } | { kind: 'bulldoze
 
 export type View = 'map' | 'residents' | 'roster' | 'finance';
 export type LeftTab = 'build' | 'hire' | 'admit';
+/** Phone layout: which bottom sheet is open. */
+export type Sheet = 'tools' | 'info' | 'menu' | null;
 
 export interface Toast {
   id: number;
@@ -30,6 +32,8 @@ interface UIStore {
   leftTab: LeftTab;
   setView: (view: View) => void;
   setLeftTab: (tab: LeftTab) => void;
+  sheet: Sheet;
+  setSheet: (sheet: Sheet) => void;
 
   dispatch: (cmd: Command) => CommandResult;
   tick: (n: number) => void;
@@ -68,6 +72,8 @@ export const useGame = create<UIStore>((set, get) => ({
   leftTab: 'build',
   setView: (view) => set({ view }),
   setLeftTab: (leftTab) => set({ leftTab }),
+  sheet: null,
+  setSheet: (sheet) => set({ sheet }),
 
   dispatch: (cmd) => {
     const { state, result } = applyCommand(get().game, cmd);
@@ -105,6 +111,6 @@ export const useGame = create<UIStore>((set, get) => ({
     dispatch({ type: 'setSpeed', speed: game.speed === 0 ? lastSpeed : 0 });
   },
   newGame: () =>
-    set({ game: createInitialState(), selectedRoomId: null, drag: null, tool: { kind: 'select' }, toast: null, view: 'map', leftTab: 'build' }),
+    set({ game: createInitialState(), selectedRoomId: null, drag: null, tool: { kind: 'select' }, toast: null, view: 'map', leftTab: 'build', sheet: null }),
   dismissToast: () => set({ toast: null }),
 }));

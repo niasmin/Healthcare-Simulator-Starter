@@ -44,7 +44,7 @@ export function EventModal() {
       <button
         type="button"
         onClick={() => setHiddenId(null)}
-        className="fixed z-40 right-4 bottom-4 rounded-xl px-4 py-2.5 shadow-lg text-sm font-semibold text-white animate-pulse"
+        className="fixed z-40 right-4 bottom-20 lg:bottom-4 rounded-xl px-4 py-2.5 shadow-lg text-sm font-semibold text-white animate-pulse"
         style={{ background: tone.fg, marginBottom: 'env(safe-area-inset-bottom, 0px)' }}
       >
         ⚠ {t('event.pending')} · {t('event.open')}
@@ -52,8 +52,8 @@ export function EventModal() {
     );
 
   return (
-    <div className="fixed inset-0 z-40 grid place-items-center bg-ink/45 p-4" role="dialog" aria-modal="true" aria-labelledby="event-title">
-      <div className="w-full max-w-lg rounded-2xl bg-paper shadow-2xl overflow-hidden">
+    <div className="fixed inset-0 z-40 grid place-items-center bg-ink/45 p-3" role="dialog" aria-modal="true" aria-labelledby="event-title">
+      <div className="w-full max-w-lg max-h-[92dvh] overflow-y-auto rounded-2xl bg-paper shadow-2xl">
         <div className="flex items-start gap-3 p-4" style={{ background: tone.bg }}>
           <span className="grid place-items-center size-12 rounded-xl text-white shrink-0" style={{ background: tone.fg }} aria-hidden>
             <svg viewBox="0 0 24 24" className="size-7" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">

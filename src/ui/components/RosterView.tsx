@@ -5,7 +5,7 @@ import { slotAt } from '../../domain/rules/shifts';
 import type { Employee, ShiftSlot, StaffRole } from '../../domain/types';
 import { rosterView, staffActivity } from '../../sim/selectors';
 import { formatClock } from '../../sim/systems/time';
-import { useMoney, useT } from '../hooks';
+import { useIsMobile, useMoney, useT } from '../hooks';
 import { useGame } from '../store';
 import { Avatar, RoleChip, StatBar, useName } from './people';
 
@@ -25,7 +25,7 @@ function AddPopover({ role, slot, onClose }: { role: StaffRole; slot: ShiftSlot;
     .filter((e) => e.role === role && !game.shifts.some((s) => s.employeeId === e.id && s.slot === slot))
     .sort((a, b) => shiftCount(a.id) - shiftCount(b.id));
   return (
-    <div className="absolute z-20 left-0 top-full mt-1 w-60 rounded-xl border border-line bg-white shadow-lg p-2 flex flex-col gap-1" role="dialog">
+    <div className="absolute z-20 left-0 top-full mt-1 w-60 max-lg:fixed max-lg:inset-x-3 max-lg:top-auto max-lg:bottom-24 max-lg:w-auto max-lg:max-h-[50dvh] max-lg:overflow-y-auto rounded-xl border border-line bg-white shadow-2xl p-2 flex flex-col gap-1" role="dialog">
       <div className="text-[11px] font-semibold text-ink-soft px-1">{t('roster.pick', { role: `${role}.short`, slot })}</div>
       {options.length === 0 && <p className="text-xs text-ink-soft px-1 py-1 leading-snug">{t('roster.no_staff', { role: `${role}.short` })}</p>}
       {options.map((e) => {
@@ -121,16 +121,38 @@ export function RosterView() {
   const view = useMemo(() => rosterView(game), [game]);
   const [open, setOpen] = useState<string | null>(null);
   const current = slotAt(game.minute);
+  // Phones show one shift column at a time.
+  const mobile = useIsMobile();
+  const [pickedSlot, setPickedSlot] = useState<ShiftSlot | null>(null);
+  const mSlot = pickedSlot ?? current;
+  const slots = mobile ? [mSlot] : SLOT_ORDER;
 
   return (
     <div className="p-3 flex flex-col gap-4">
       <section className="rounded-2xl bg-white border border-line p-3 overflow-x-auto">
         <h2 className="font-bold text-base mb-2">{t('roster.title')}</h2>
-        <table className="w-full min-w-[560px] border-separate border-spacing-1.5 text-sm">
+        {mobile && (
+          <div className="grid grid-cols-3 gap-1 mb-1" role="tablist">
+            {SLOT_ORDER.map((slot) => (
+              <button
+                key={slot}
+                type="button"
+                role="tab"
+                aria-selected={mSlot === slot}
+                onClick={() => setPickedSlot(slot)}
+                className={`rounded-lg py-2 text-sm ${mSlot === slot ? 'bg-ink text-white font-semibold' : 'bg-sand text-ink-soft'}`}
+              >
+                {t(`slot.${slot}`)}
+                {slot === current ? ' •' : ''}
+              </button>
+            ))}
+          </div>
+        )}
+        <table className="w-full lg:min-w-[560px] border-separate border-spacing-1.5 text-sm">
           <thead>
             <tr>
-              <th className="text-left text-xs font-semibold text-ink-soft w-24">{t('roster.role')}</th>
-              {SLOT_ORDER.map((slot) => (
+              <th className="text-left text-xs font-semibold text-ink-soft w-20 lg:w-24">{t('roster.role')}</th>
+              {slots.map((slot) => (
                 <th key={slot} className={`text-center rounded-lg py-1.5 ${slot === current ? 'bg-teal text-white' : 'bg-sand text-ink'}`}>
                   <div className="font-semibold">{t(`slot.${slot}`)}</div>
                   <div className="text-[10px] font-normal opacity-80 tabular">
@@ -147,7 +169,7 @@ export function RosterView() {
                 <th className="text-left align-middle">
                   <RoleChip role={role} label={t(`role.${role}.short`)} />
                 </th>
-                {SLOT_ORDER.map((slot) => {
+                {slots.map((slot) => {
                   const cell = view.cells.find((c) => c.role === role && c.slot === slot)!;
                   const key = `${role}-${slot}`;
                   const short = cell.staff.length < cell.need;
@@ -185,7 +207,7 @@ export function RosterView() {
             ))}
             <tr>
               <th />
-              {view.slots.map((s) => {
+              {view.slots.filter((s) => slots.includes(s.slot)).map((s) => {
                 const wl = Number.isFinite(s.workload) ? Math.round(s.workload * 100) : null;
                 const hasDemand = s.needCount > 0 || s.missingSkills.length > 0;
                 return (

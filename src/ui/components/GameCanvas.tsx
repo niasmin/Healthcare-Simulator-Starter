@@ -6,7 +6,7 @@ import { IsoRenderer } from '../../render/IsoRenderer';
 import { ROLES } from '../../data/staff';
 import { peopleMarkers } from '../../sim/selectors';
 import type { CareGroup, StaffRole } from '../../domain/types';
-import { useMoney, useSummary, useT } from '../hooks';
+import { isMobileNow, useMoney, useSummary, useT } from '../hooks';
 import { useGame } from '../store';
 
 const GROUP_HEX: Record<CareGroup, number> = { active_aging: 0xc9822b, stroke_rehab: 0x4a6aa5, bedridden: 0x8a5a9e };
@@ -38,12 +38,14 @@ export function GameCanvas() {
         const st = useGame.getState();
         const room = st.game.site.rooms.find((rm) => rectContains(rm.rect, cell));
         st.select(room ? room.id : null);
+        if (room && isMobileNow()) st.setSheet('info');
       },
       onDragStart: (cell) => useGame.getState().setDrag({ start: cell, end: cell }),
       onDragMove: (cell) => {
         const st = useGame.getState();
         if (st.drag && (st.drag.end.x !== cell.x || st.drag.end.y !== cell.y)) st.setDrag({ start: st.drag.start, end: cell });
       },
+      onDragCancel: () => useGame.getState().setDrag(null),
       onDragEnd: () => {
         const st = useGame.getState();
         const d = st.drag;
@@ -107,7 +109,8 @@ export function GameCanvas() {
     });
   }, [game, people, summary, selectedRoomId, hover, preview, tool, t, ready, lang]);
 
-  let status: { text: string; tone: 'ok' | 'bad' | 'muted' } = { text: t('canvas.help'), tone: 'muted' };
+  const coarse = typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches;
+  let status: { text: string; tone: 'ok' | 'bad' | 'muted' } = { text: t(coarse ? 'canvas.help_touch' : 'canvas.help'), tone: 'muted' };
   if (preview) {
     const name = tool.kind === 'room' ? t(`room.${tool.roomType}`) : t('room.corridor');
     const head = `${name} ${preview.rect.w}×${preview.rect.h} · ${money(preview.check.costSatang)}`;
@@ -121,7 +124,7 @@ export function GameCanvas() {
     <section className="absolute inset-0 overflow-hidden" aria-label="site map">
       <div ref={hostRef} className="absolute inset-0" />
       {!ready && <div className="absolute inset-0 grid place-items-center text-ink-soft">{t('canvas.loading')}</div>}
-      <div className="absolute right-3 top-3 flex flex-col gap-1.5">
+      <div className="absolute right-3 top-3 max-lg:top-[4.5rem] flex flex-col gap-1.5">
         {[
           { label: '+', title: t('canvas.zoom_in'), fn: () => r?.zoomBy(1.2) },
           { label: '−', title: t('canvas.zoom_out'), fn: () => r?.zoomBy(1 / 1.2) },
