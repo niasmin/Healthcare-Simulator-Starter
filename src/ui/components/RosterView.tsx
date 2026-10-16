@@ -1,3 +1,4 @@
+import { ROLE_PORTRAIT } from '../portraits';
 import { useMemo, useState } from 'react';
 import { ROLES, ROLE_ORDER, SHIFT_SLOTS, SLOT_ORDER } from '../../data/staff';
 import { slotAt } from '../../domain/rules/shifts';
@@ -39,7 +40,7 @@ function AddPopover({ role, slot, onClose }: { role: StaffRole; slot: ShiftSlot;
             }}
             className="flex items-center gap-2 rounded-lg px-1.5 py-1 text-left hover:bg-sand"
           >
-            <Avatar name={e.name} color={ROLES[e.role].cssColor} size={26} />
+            <Avatar src={ROLE_PORTRAIT[e.role]} name={e.name} color={ROLES[e.role].cssColor} size={26} />
             <span className="flex-1 min-w-0">
               <span className="block text-sm truncate">{name(e.name, true)}</span>
               <span className="block text-[10px] text-ink-soft">{mine.length ? mine.join(' + ') : t('roster.no_shift')}</span>
@@ -77,7 +78,7 @@ function StaffRow({ e }: { e: Employee }) {
     <tr className="border-t border-line">
       <td className="py-1.5 pr-2">
         <div className="flex items-center gap-2 min-w-0">
-          <Avatar name={e.name} color={ROLES[e.role].cssColor} size={28} />
+          <Avatar src={ROLE_PORTRAIT[e.role]} name={e.name} color={ROLES[e.role].cssColor} size={28} />
           <div className="min-w-0">
             <div className="text-sm font-medium truncate">{name(e.name, true)}</div>
             <RoleChip role={e.role} label={t(`role.${e.role}.short`)} />
@@ -161,7 +162,7 @@ export function RosterView() {
                             onClick={() => dispatch({ type: 'unassignShift', employeeId: e.id, slot })}
                             className="rounded-full focus-visible:outline-2 focus-visible:outline-teal"
                           >
-                            <Avatar name={e.name} color={ROLES[e.role].cssColor} size={28} ring />
+                            <Avatar src={ROLE_PORTRAIT[e.role]} name={e.name} color={ROLES[e.role].cssColor} size={28} ring />
                           </button>
                         ))}
                         <button

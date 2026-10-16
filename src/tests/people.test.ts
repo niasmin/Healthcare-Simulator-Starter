@@ -6,7 +6,7 @@ import { freeBeds } from '../domain/rules/beds';
 import { TICKS_PER_DAY } from '../sim/constants';
 import { wellbeing } from '../sim/systems/needs';
 import type { GameState } from '../domain/types';
-import { admit, buildHome, hire, ok } from './helpers';
+import { admit, buildHome, hire, ok, quietEvents } from './helpers';
 
 const fresh = () => createInitialState(7);
 
@@ -145,7 +145,7 @@ describe('care plans and skill matching', () => {
 
 /** A fully staffed home with 6 residents of mixed groups. */
 function staffedHome(seed: number, withStaff = true): GameState {
-  let s = buildHome(createInitialState(seed));
+  let s = quietEvents(buildHome(createInitialState(seed)));
   if (withStaff) {
     [s] = hire(s, 'rn', ['morning']);
     [s] = hire(s, 'rn', ['afternoon']);

@@ -55,8 +55,10 @@ describe('time system', () => {
     for (let d = 0; d < 5; d++) {
       s = advance(s, TICKS_PER_DAY);
       expect(s.queue.filter((e) => e.kind === 'day_end')).toHaveLength(1);
-      expect(s.queue[0].at % 1440).toBe(0);
-      expect(s.queue[0].at).toBeGreaterThan(s.minute);
+      const de = s.queue.find((e) => e.kind === 'day_end')!;
+      expect(de.at % 1440).toBe(0);
+      expect(de.at).toBeGreaterThan(s.minute);
+      expect(s.queue.filter((e) => e.kind === 'event_check')).toHaveLength(1);
     }
   });
 

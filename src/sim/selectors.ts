@@ -7,6 +7,9 @@ import { ROLE_ORDER, SHIFT_SLOTS, SLOT_ORDER } from '../data/staff';
 import { inWindow, isOnShift } from '../domain/rules/shifts';
 import type { Employee, ShiftSlot, Skill, StaffRole } from '../domain/types';
 import { wellbeing } from './systems/needs';
+import { dayInMonth, monthOfDay } from '../data/finance';
+import { dayOf } from './systems/time';
+import type { Invoice, LedgerEntry, RevenueStream } from '../domain/types';
 
 export interface SiteSummary {
   statuses: Map<string, RoomStatus>;
@@ -35,7 +38,7 @@ export function summarize(state: GameState): SiteSummary {
       operationalByType[room.type]++;
     }
   }
-  const spentByCategory: Record<LedgerCategory, Satang> = { capital: 0, construction: 0, equipment: 0, refund: 0, upkeep: 0, payroll: 0 };
+  const spentByCategory: Record<LedgerCategory, Satang> = { capital: 0, construction: 0, equipment: 0, refund: 0, upkeep: 0, payroll: 0, revenue: 0, food: 0, supplies: 0, event: 0 };
   for (const e of state.ledger) spentByCategory[e.category] += e.amountSatang;
   return {
     statuses,
@@ -80,6 +83,12 @@ export function buildObjectives(state: GameState, summary: SiteSummary = summari
     { id: 'admit', key: 'goal.admit', done: state.residents.length > 0 },
     { id: 'care_plan', key: 'goal.care_plan', done: state.residents.length > 0 && state.residents.every((r) => r.carePlan) },
     { id: 'roster', key: 'goal.roster', done: state.residents.length > 0 && rosterView(state).slots.every((s) => s.ready && s.staffCount > 0) },
+    { id: 'first_revenue', key: 'goal.first_revenue', done: state.ledger.some((e) => e.category === 'revenue') },
+    {
+      id: 'positive_month',
+      key: 'goal.positive_month',
+      done: monthOfDay(dayOf(state.minute)) > 1 && totalsOf(state.ledger.filter((e) => monthOfDay(entryDay(e)) === 1)).net > 0,
+    },
   ];
 }
 
@@ -250,4 +259,107 @@ export function peopleMarkers(state: GameState): Array<{ key: string; kind: 'res
     out.push({ key: e.id, kind: 'staff', roomId: station?.id ?? null, spot: spot++, role: e.role });
   }
   return out;
+}
+
+// ---------------------------------------------------------------------------
+// Phase 3: finance view (pure)
+// ---------------------------------------------------------------------------
+
+export const OPEX_CATEGORIES: LedgerCategory[] = ['payroll', 'upkeep', 'food', 'supplies', 'event'];
+export const CAPEX_CATEGORIES: LedgerCategory[] = ['construction', 'equipment', 'refund'];
+
+/** Entries posted exactly at midnight belong to the day that just closed. */
+export function entryDay(e: LedgerEntry): number {
+  return dayOf(e.at % 1440 === 0 && e.at > 0 ? e.at - 1 : e.at);
+}
+
+export interface PeriodTotals {
+  revenue: Satang;
+  opex: Satang;
+  net: Satang;
+  capex: Satang;
+  /** Positive amounts spent per operating category. */
+  byCategory: Partial<Record<LedgerCategory, Satang>>;
+}
+
+export function totalsOf(entries: LedgerEntry[]): PeriodTotals {
+  const t: PeriodTotals = { revenue: 0, opex: 0, net: 0, capex: 0, byCategory: {} };
+  for (const e of entries) {
+    if (e.category === 'revenue') t.revenue += e.amountSatang;
+    else if (OPEX_CATEGORIES.includes(e.category)) {
+      t.opex -= e.amountSatang;
+      t.byCategory[e.category] = (t.byCategory[e.category] ?? 0) - e.amountSatang;
+    } else if (CAPEX_CATEGORIES.includes(e.category)) t.capex -= e.amountSatang;
+  }
+  t.net = t.revenue - t.opex;
+  return t;
+}
+
+export interface FinanceView {
+  month: number;
+  day: number;
+  current: PeriodTotals;
+  previous: PeriodTotals | null;
+  /** Bars: one point per day (month view) or per month (all-time view). */
+  series: Array<{ label: number; revenue: Satang; opex: Satang }>;
+  mix: Array<{ stream: RevenueStream; amount: Satang }>;
+  receivables: Satang;
+  invoices: Invoice[];
+}
+
+export function financeView(state: GameState, period: 'month' | 'all'): FinanceView {
+  const day = dayOf(state.minute);
+  const month = monthOfDay(day);
+  const entries = state.ledger.filter((e) => e.category !== 'capital');
+  const inMonth = (m: number) => entries.filter((e) => monthOfDay(entryDay(e)) === m);
+  const current = totalsOf(period === 'month' ? inMonth(month) : entries);
+  // Month-to-date is compared with the same days of the previous month.
+  const dim = dayInMonth(day);
+  const previous = period === 'month' && month > 1 ? totalsOf(inMonth(month - 1).filter((e) => dayInMonth(entryDay(e)) <= dim)) : null;
+
+  const series: FinanceView['series'] = [];
+  if (period === 'month') {
+    const first = (month - 1) * 30 + 1;
+    for (let d = first; d <= day; d++) {
+      const t = totalsOf(entries.filter((e) => entryDay(e) === d));
+      series.push({ label: d - first + 1, revenue: t.revenue, opex: t.opex });
+    }
+  } else {
+    for (let m = 1; m <= month; m++) {
+      const t = totalsOf(inMonth(m));
+      series.push({ label: m, revenue: t.revenue, opex: t.opex });
+    }
+  }
+
+  const streams: RevenueStream[] = ['room_care', 'therapy', 'activity', 'special'];
+  const mixMap: Record<RevenueStream, Satang> = { room_care: 0, therapy: 0, activity: 0, special: 0 };
+  for (const inv of state.invoices) {
+    if (inv.status !== 'paid' || inv.paidAt === null) continue;
+    const paidDay = dayOf(inv.paidAt % 1440 === 0 ? inv.paidAt - 1 : inv.paidAt);
+    if (period === 'month' && monthOfDay(paidDay) !== month) continue;
+    for (const l of inv.lines) mixMap[l.stream] += l.amountSatang;
+  }
+  return {
+    month,
+    day,
+    current,
+    previous,
+    series,
+    mix: streams.map((stream) => ({ stream, amount: mixMap[stream] })),
+    receivables: state.invoices.filter((i) => i.status === 'issued').reduce((a, i) => a + i.totalSatang, 0),
+    invoices: [...state.invoices].reverse().slice(0, 8),
+  };
+}
+
+/** Top-bar gauges. */
+export function headline(state: GameState, summary: SiteSummary = summarize(state)) {
+  const n = state.residents.length;
+  const last = state.history[state.history.length - 1];
+  const startCash = state.ledger.find((e) => e.category === 'capital')?.amountSatang ?? 0;
+  return {
+    residents: n,
+    beds: summary.bedsOperational,
+    satisfaction: n ? state.residents.reduce((a, r) => a + r.needs.satisfaction, 0) / n : null,
+    cashDelta: state.organization.cashSatang - (last ? last.cash : startCash),
+  };
 }

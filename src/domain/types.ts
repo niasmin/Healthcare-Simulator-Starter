@@ -73,7 +73,74 @@ export type LedgerCategory =
   | 'equipment'
   | 'refund'
   | 'upkeep'
-  | 'payroll';
+  | 'payroll'
+  | 'revenue'
+  | 'food'
+  | 'supplies'
+  | 'event';
+
+// ---------------------------------------------------------------------------
+// Billing (Phase 3). Fees are FICTIONAL game balancing values.
+// ---------------------------------------------------------------------------
+
+export type PriceLevel = 'value' | 'standard' | 'premium';
+
+/** Revenue streams, used for invoice lines and the revenue-mix chart. */
+export type RevenueStream = 'room_care' | 'therapy' | 'activity' | 'special';
+
+export interface InvoiceLine {
+  stream: RevenueStream;
+  /** i18n key + params describing the line. */
+  memo: string;
+  memoParams?: Record<string, string | number>;
+  qty: number;
+  unitSatang: Satang;
+  amountSatang: Satang;
+}
+
+export interface Invoice {
+  id: string;
+  /** admission = pro-rated first month; monthly = start of month; final = services at discharge. */
+  kind: 'admission' | 'monthly' | 'final';
+  /** Resident billed (the family pays). */
+  clientId: string;
+  clientName: PersonName;
+  /** Billing month number (month 1 = days 1–30). */
+  month: number;
+  lines: InvoiceLine[];
+  totalSatang: Satang;
+  status: 'issued' | 'paid';
+  issuedAt: SimMinute;
+  /** Day number on which the family pays. */
+  payDay: number;
+  paidAt: SimMinute | null;
+}
+
+// ---------------------------------------------------------------------------
+// Events (Phase 3): data-driven definitions live in data/events.ts; state only
+// stores ids so it stays JSON-serialisable.
+// ---------------------------------------------------------------------------
+
+export type EventDefId = 'family_visit' | 'resident_change' | 'staff_resign' | 'referral';
+
+export interface ActiveEvent {
+  id: string;
+  defId: EventDefId;
+  firedAt: SimMinute;
+  /** Unanswered events resolve with their default choice at this minute. */
+  expiresAt: SimMinute;
+  residentId?: string;
+  employeeIds?: string[];
+  /** Game speed before the auto-pause, restored after a choice. */
+  speedBefore: GameSpeed;
+}
+
+export interface EventsState {
+  active: ActiveEvent | null;
+  /** Day number until which each event cannot fire again. */
+  cooldownUntil: Partial<Record<EventDefId, number>>;
+  history: Array<{ defId: EventDefId; choiceId: string; day: number; auto: boolean }>;
+}
 
 // ---------------------------------------------------------------------------
 // People (Phase 2). All names and stats are fictional; no real patient data.
@@ -83,6 +150,8 @@ export type LedgerCategory =
 export interface PersonName {
   th: string;
   en: string;
+  /** Used only to pick a portrait. */
+  gender?: 'f' | 'm';
 }
 
 export type StaffRole = 'rn' | 'pn' | 'caregiver' | 'pt' | 'ot';
@@ -159,6 +228,8 @@ export interface ResidentCandidate {
   group: CareGroup;
   careLevel: number;
   needs: Needs;
+  /** Set for hospital referrals: must be admitted by this day or the partner is let down. */
+  referralDeadline?: number;
 }
 
 export type TaskKind = 'vital_signs' | 'med_round' | 'personal_care' | 'meal_assist' | 'repositioning' | 'mobility_session' | 'activity';
@@ -186,6 +257,10 @@ export interface DayStats {
   wellbeing: number;
   residents: number;
   beds: number;
+  /** Cash at the close of the day. */
+  cash: Satang;
+  /** Average resident satisfaction at day end (-1 when none). */
+  satisfaction: number;
 }
 
 /** Immutable, append-only financial record. Positive = money in. */
@@ -204,7 +279,7 @@ export interface LedgerEntry {
 
 export type GameSpeed = 0 | 1 | 2 | 4;
 
-export type ScheduledEventKind = 'day_end';
+export type ScheduledEventKind = 'day_end' | 'event_check';
 
 /** Deterministic event queue item; ordered by (at, seq). */
 export interface ScheduledEvent {
@@ -224,7 +299,7 @@ export interface LogItem {
 }
 
 export interface GameState {
-  schemaVersion: 2;
+  schemaVersion: 3;
   seed: number;
   /** Current PRNG state (mulberry32). Advancing the RNG updates this. */
   rngState: number;
@@ -251,6 +326,12 @@ export interface GameState {
   today: { done: number; missed: number };
   /** Closed days, oldest first (kept for the last 60 days). */
   history: DayStats[];
+  // Phase 3
+  priceLevel: PriceLevel;
+  invoices: Invoice[];
+  /** Billable services delivered this month, per resident, not yet invoiced. */
+  unbilled: Record<string, { therapy: number; activity: number; special: number }>;
+  events: EventsState;
 }
 
 export type ReasonCode =
@@ -273,7 +354,10 @@ export type ReasonCode =
   | 'shift_overlap'
   | 'shift_too_long'
   | 'no_assessor'
-  | 'plan_exists';
+  | 'plan_exists'
+  | 'no_event'
+  | 'invalid_choice'
+  | 'needs_rn_on_shift';
 
 export type CommandResult =
   | { ok: true; id?: string; costSatang?: Satang }

@@ -24,11 +24,40 @@ Add `?debug` to the URL to expose `window.__HE__` (store + renderer) for automat
 | **0** | Scaffold, data models, deterministic engine, tests | ✅ Done |
 | **1** | 20×20 isometric map, room building and validation, camera | ✅ Done (first playable build) |
 | **2** | Residents, staff, needs, care plans, care tasks, role × shift roster | ✅ Done |
-| 3 | Revenue and invoices, full finance dashboard, events | ⏳ Not started |
+| **3** | Pricing, monthly invoices and payments, running costs, Financial Dashboard, 4 events, title screen, character portraits | ✅ Done |
 | 4 | Save/load (Dexie), tutorial, balancing | ⏳ Not started |
 | 5–6 | Premium living, home care, workforce, hospital, multi-site | ⏳ Not started |
 
 ## What you can play now
+
+Everything playable today is **Chapter 1 — First Care Home** of the campaign in the concept art. Chapters 2–7 (30–80 beds, Tranquila villas, Home Care, PHC workforce, Neuro Hospital, multi-site empire) start after Phase 4.
+
+### Phase 3: money and events
+
+- **Title screen** over the world-map concept art. "เริ่มเล่น" starts the game. Add `?skiptitle` to the URL to skip it.
+- **Character portraits** cropped from the project's concept art: RN, PN, Caregiver, PT and OT by role; residents by gender (two female, one male portrait). They appear on hire cards, the roster, staff lists, resident profiles and event cards.
+- **Billing:**
+  - Room & care is billed in advance: a pro-rated invoice on admission, then a full one on day 1 of each 30-day month.
+  - Completed therapy sessions (฿300), group activities (฿100) and special services (฿3,000) are billed on the next month's invoice.
+  - Each family pays 1–5 days after the invoice is issued. Revenue is booked on payment, with the invoice id as the ledger reference, so it can't be counted twice.
+  - At discharge, any unbilled services go on a final invoice.
+- **Price level** (ประหยัด −10% / มาตรฐาน / พรีเมียม +20%). It applies to new invoices only. It also changes how many people join the waiting list and how demanding residents are. Reputation of 70 or more brings an extra applicant per day.
+- **Running costs:** food (฿80) and care supplies (฿20 + ฿15 × care level) per resident per day, on top of payroll and building upkeep. Upkeep was rebalanced to ฿30–40 per tile per day.
+- **Financial Dashboard (การเงิน view, step 6 in the concept art):**
+  - Revenue, operating expenses and net profit, with % change against the same days of last month; receivables; capital spent.
+  - Daily (this month) or monthly (all-time) revenue/expense bars with hover tooltips and a table view.
+  - Revenue-mix donut (room & care, physiotherapy, activities, special services).
+  - Expenses by type, a price-level selector with the fee table, and the latest invoices with paid/due status.
+- **Top bar:** occupancy (residents/beds), average satisfaction, and today's change in cash.
+- **Events (step 9 in the concept art):** four data-driven events, each with three choices.
+  - เหตุการณ์ฉุกเฉิน (a resident's condition changes)
+  - บุคลากรขอลาออก (two nurses resign)
+  - โอกาสทางธุรกิจ (a partner hospital wants to refer 10 rehab patients)
+  - เยี่ยมญาติ (family visit)
+  - **How they run:** an event can start at 09:00 each day (30% chance, at least 3 quiet days in between, plus a per-event cooldown). The game pauses on arrival and resumes at the previous speed after a choice. "Decide later" minimises the card. After 12 game hours with no answer, the default (worst) choice is applied.
+  - **Choices:** a choice can cost money, need an RN on duty, change needs, wages, morale or reputation, remove staff, or add referral candidates. Referral patients must be admitted by a deadline or reputation drops.
+  - All scenarios are fictional and non-prescriptive.
+- **Goals:** "Chapter 1: First Care Home" now has 13 goals, including first payment received and a profitable first month.
 
 ### Phase 2: residents, staff and daily care
 
@@ -80,6 +109,8 @@ src/
   data/rooms.ts            Room and equipment catalogue (fictional balancing values)
   data/staff.ts            Roles, skills, wages, shift slots, fictional staff names
   data/patients.ts         Care groups, task kinds and effects, care-plan schedules, fictional resident names
+  data/finance.ts          Fees by care level, price levels, service prices, daily costs, 30-day month calendar
+  data/events.ts           Event catalogue: eligibility windows, weights, cooldowns, choices, defaults
   data/scenarios.ts        Starter scenario (THB 2,000,000, 20×20, entrance, seed)
   sim/engine.ts            applyCommand(state, cmd) and step(state). The ONLY way state changes
   sim/systems/time.ts      Clock + deterministic event queue ordered by (minute, seq)
@@ -87,6 +118,9 @@ src/
   sim/systems/needs.ts     Resident need decay, independent meals, wellbeing
   sim/systems/staffing.ts  Applicant/waitlist generation (seeded), energy per tick, morale per day
   sim/systems/care.ts      Care Plan Engine: task generation, finish / miss / assign each tick
+  sim/systems/billing.ts   Invoices (admission / monthly / final), service counters, payments, food and supplies
+  sim/systems/events.ts    Seeded event roll, triggers, choice effects, expiry, referral deadlines
+  assets/                  Portraits and the world-map title image (from the project's own concept art)
   sim/rng.ts               Seeded mulberry32; RNG state lives inside GameState
   sim/selectors.ts         Derived summaries and build goals (never stored)
   render/iso.ts            Pure isometric projection math
@@ -111,8 +145,14 @@ src/
   - No care task goes to anyone without the required skill.
   - Only an assessment-qualified employee (RN) can write a care plan.
 - Need values are rounded to 2 decimals each tick, so floating-point noise can never make two runs drift apart.
+- **Phase 3 invariants:**
+  - At most one admission or monthly invoice per resident per month.
+  - An invoice is paid once, and every revenue entry references a unique invoice.
+  - Revenue equals the total of paid invoices.
+  - Food, supplies, upkeep and payroll are each charged once per day.
+  - An event's cost is charged once, and a resolved event can't be resolved again.
 
-## Tests (50 passing)
+## Tests (67 passing)
 
 | File | Covers |
 |---|---|
@@ -122,9 +162,13 @@ src/
 | `determinism.test.ts` | 30 simulated days twice with the same seed give byte-identical state; upkeep charged exactly 30 times with unique day refs; ledger reconciles; state survives a JSON round-trip (save-ready) |
 | `people.test.ts` | Admit up to capacity and **reject excess admission**; no admission to non-operational wards; occupied ward/bed protection; discharge frees the bed; shift overlap across midnight; **overlapping shifts rejected**; double-shift cap; dismissal hands back tasks; care plan needs an RN, once; **no care without the required skill**; off-shift staff don't work; least-specialised staff chosen; unreachable wards get no care; **30 days twice with one seed give byte-identical state**; a well-staffed home completes >95% of tasks with every resident's well-being >45; payroll charged exactly once per day; ledger reconciles; an unstaffed home declines |
 | `roster.test.ts` | Role × shift readiness (missing RN, missing skills); a covered shift becomes ready; occupancy and quality KPIs |
+| `finance.test.ts` | Pro-rated admission invoice; **monthly invoice created exactly once** (re-running billing is a no-op); each payment books revenue once and revenue equals paid invoices; therapy sessions billed on the next invoice and reset; food and supplies once per day; price level changes only new invoices; a full 10-bed home runs 30 days with cash rising and positive every day; finance view totals match the ledger and the revenue mix |
+| `events.test.ts` | Auto-pause and speed restore; no double resolve; a choice cost charged once; urgent assessment needs an RN on duty; raise (+10%) vs accept (both nurses leave); referral deadline costs reputation; default choice after 12 h; seeded and deterministic over 30 days with cooldowns; at least 3 quiet days between events |
 | `i18n-iso.test.ts` | TH/EN key parity; labels for every room, equipment and reason; Thai interpolation; iso projection inverts for all 400 cells |
 
-GDD acceptance tests covered so far: *place a room and deduct construction cost once*, *reject collisions*, *admit up to capacity*, *reject excess admission*, *schedule a qualified staff member*, *prevent overlapping shifts*, *advance 30 days deterministically with a fixed seed*, *reconcile cash ledger*, *show Thai text correctly*, *run production build without errors*. Still open: *create monthly invoice once* (Phase 3) and *save and reload identical state* (Phase 4).
+GDD acceptance tests covered so far: *place a room and deduct construction cost once*, *reject collisions*, *admit up to capacity*, *reject excess admission*, *schedule a qualified staff member*, *prevent overlapping shifts*, *advance 30 days deterministically with a fixed seed*, *reconcile cash ledger*, *show Thai text correctly*, *run production build without errors*. *Create monthly invoice once* is now covered too. Still open: *save and reload identical state* (Phase 4).
+
+The Phase 3 browser playtest started from the title screen, built and staffed the home through the UI, and admitted 6 residents. It then played 35 days, answering every event through the event card: 12 invoices issued, 11 paid, cash still positive, and no console errors.
 
 The Phase 2 browser playtest built the home with mouse drags, then used only on-screen controls:
 - Hired all 8 applicants from the Hire tab and admitted 5 residents from the Admit tab.
@@ -135,7 +179,10 @@ A browser playtest (Playwright, run outside the repo) drove the production build
 
 ## Assumptions
 
-- **Balancing (fictional):** start THB 2,000,000; corridor THB 3,000/tile; rooms THB 30–50k base + THB 12,000/tile; equipment THB 12–60k; upkeep THB 80–120/tile/day. A full 10-bed starter build costs about THB 1.1–1.4M, which leaves room for Phase 2 payroll.
+- **Balancing (fictional):**
+  - Costs: start THB 2,000,000; corridor THB 3,000/tile; rooms THB 30–50k base + THB 12,000/tile; equipment THB 12–60k; upkeep THB 30–40/tile/day.
+  - Fees: monthly room & care THB 24k / 28k / 33k / 38k for care levels 1–4.
+  - Result: a full 10-bed starter build costs about THB 1.1M. A full, well-staffed 10-bed home earns a modest monthly profit; half full, it roughly breaks even.
 - The GDD's CMNH figures are kept as scenario reference only and aren't used for tuning. Real organisation names aren't used in-game.
 - Doors are automatic, not hand-placed: the first front-facing perimeter tile that touches a reachable corridor.
 - A room can sit next to another room, but you can't walk through one room to reach another. Access is only by corridor.
@@ -146,7 +193,10 @@ A browser playtest (Playwright, run outside the repo) drove the production build
 
 ## Known limitations
 
-- No resident fees, invoices or revenue yet (Phase 3), so cash only goes down: construction, upkeep, payroll. Scripted events (family visit, burnout, referral) are Phase 3.
+- No save/load or tutorial yet (Phase 4). Refreshing the page starts a new game.
+- Months are a flat 30 game days. Discharge mid-month doesn't refund prepaid room & care. Families always pay; there are no bad debts or late fees yet.
+- Portraits are per role (and per gender for residents), so two RNs share a face. More character art can be cropped from the concept sheets later.
+- Events are generic: they don't yet react to specific causes (for example, burnout after many double shifts).
 - Shifts are a standing daily roster (the same every day). There's no weekly pattern, leave or sick days yet.
 - Staff don't walk. They appear at the station or at the bedside when a task starts, and travel time isn't simulated.
 - Morale is tracked and shown but doesn't yet cause resignations.

@@ -7,13 +7,16 @@ import { SHIFT_SLOTS } from '../data/staff';
 import { freeBeds, parseBedId, residentsInRoom } from '../domain/rules/beds';
 import { roomStatus } from '../domain/rules/rooms';
 import { validateShift } from '../domain/rules/shifts';
-import type { Cell, CommandResult, DayStats, EquipmentId, GameSpeed, GameState, Rect, Resident, Room, RoomType, ShiftSlot } from '../domain/types';
+import type { Cell, CommandResult, DayStats, EquipmentId, GameSpeed, GameState, PriceLevel, Rect, Resident, Room, RoomType, ShiftSlot } from '../domain/types';
+import { dayInMonth, monthOfDay, PRICE_LEVELS } from '../data/finance';
+import { billAdmission, billFinal, billMonth, chargeDailyResidentCosts, collectPayments } from './systems/billing';
+import { eventCheck, eventExpiryTick, expireReferrals, resolveEvent } from './systems/events';
 import { MINUTES_PER_DAY } from './constants';
 import { allocId, log, post } from './helpers';
 import { careTick, generateAllTasksForDay, generateTasksForDay, pruneTasks } from './systems/care';
 import { chargeDailyPayroll, chargeDailyUpkeep } from './systems/finance';
 import { needsTick, wellbeing } from './systems/needs';
-import { hireFromCandidate, refreshCandidates, staffEnergyTick, staffMoraleDaily } from './systems/staffing';
+import { hireFromCandidate, refreshCandidates, removeEmployee, staffEnergyTick, staffMoraleDaily } from './systems/staffing';
 import { advanceClock, dayOf, schedule } from './systems/time';
 import { summarizeBeds } from './bedsSummary';
 
@@ -35,7 +38,9 @@ export type Command =
   | { type: 'unassignShift'; employeeId: string; slot: ShiftSlot }
   | { type: 'admitResident'; candidateId: string }
   | { type: 'dischargeResident'; residentId: string }
-  | { type: 'createCarePlan'; residentId: string };
+  | { type: 'createCarePlan'; residentId: string }
+  | { type: 'setPriceLevel'; level: PriceLevel }
+  | { type: 'resolveEvent'; choiceId: string };
 
 export interface CommandOutcome {
   state: GameState;
@@ -160,14 +165,8 @@ export function applyCommand(state: GameState, cmd: Command): CommandOutcome {
     case 'dismissStaff': {
       const e = state.employees.find((x) => x.id === cmd.employeeId);
       if (!e) return fail(state, 'not_found');
-      // Hand back any task in progress so someone else can pick it up.
-      const tasks = state.tasks.map((t) => (t.assigneeId === e.id && t.status === 'in_progress' ? { ...t, status: 'pending' as const, assigneeId: null, finishAt: null } : t));
-      let s: GameState = {
-        ...state,
-        tasks,
-        employees: state.employees.filter((x) => x.id !== e.id),
-        shifts: state.shifts.filter((x) => x.employeeId !== e.id),
-      };
+      // Shifts go, and any task in progress returns to the queue for someone else.
+      let s = removeEmployee(state, e.id);
       s = log(s, 'info', 'log.dismissed', { name: e.name.th, nameEn: e.name.en, role: e.role });
       return { state: s, result: { ok: true } };
     }
@@ -195,6 +194,7 @@ export function applyCommand(state: GameState, cmd: Command): CommandOutcome {
       let [s, id] = allocId(state, 'res');
       const resident: Resident = { id, name: c.name, age: c.age, group: c.group, careLevel: c.careLevel, needs: { ...c.needs }, bedId: bed, admittedAt: s.minute, carePlan: null };
       s = { ...s, waitlist: s.waitlist.filter((x) => x.id !== c.id), residents: [...s.residents, resident] };
+      s = billAdmission(s, resident);
       s = log(s, 'good', 'log.admitted', { name: c.name.th, nameEn: c.name.en });
       return { state: s, result: { ok: true, id } };
     }
@@ -209,6 +209,7 @@ export function applyCommand(state: GameState, cmd: Command): CommandOutcome {
         tasks: state.tasks.filter((t) => t.residentId !== r.id || t.status === 'done' || t.status === 'missed'),
         employees: state.employees.map((e) => (busy.has(e.id) ? { ...e, taskId: null, busyUntil: state.minute } : e)),
       };
+      s = billFinal(s, r);
       s = log(s, 'info', 'log.discharged', { name: r.name.th, nameEn: r.name.en });
       return { state: s, result: { ok: true } };
     }
@@ -227,6 +228,14 @@ export function applyCommand(state: GameState, cmd: Command): CommandOutcome {
       s = log(s, 'good', 'log.care_plan', { name: r.name.th, nameEn: r.name.en });
       return { state: s, result: { ok: true } };
     }
+
+    case 'setPriceLevel': {
+      if (!PRICE_LEVELS.includes(cmd.level)) return fail(state, 'invalid_choice');
+      return { state: { ...state, priceLevel: cmd.level }, result: { ok: true } };
+    }
+
+    case 'resolveEvent':
+      return resolveEvent(state, cmd.choiceId);
   }
 }
 
@@ -234,7 +243,17 @@ function closeDay(state: GameState): GameState {
   const beds = summarizeBeds(state);
   const n = state.residents.length;
   const wb = n ? Math.round((state.residents.reduce((a, r) => a + wellbeing(r.needs), 0) / n) * 10) / 10 : -1;
-  const stat: DayStats = { day: dayOf(state.minute - 1), done: state.today.done, missed: state.today.missed, wellbeing: wb, residents: n, beds };
+  const sat = n ? Math.round((state.residents.reduce((a, r) => a + r.needs.satisfaction, 0) / n) * 10) / 10 : -1;
+  const stat: DayStats = {
+    day: dayOf(state.minute - 1),
+    done: state.today.done,
+    missed: state.today.missed,
+    wellbeing: wb,
+    residents: n,
+    beds,
+    cash: state.organization.cashSatang,
+    satisfaction: sat,
+  };
   const history = [...state.history, stat].slice(-60);
   // Reputation drifts with resident satisfaction (Phase 3 will add events and reviews).
   let reputation = state.organization.reputation;
@@ -252,9 +271,16 @@ export function step(state: GameState): GameState {
   for (const ev of advanced.due) {
     switch (ev.kind) {
       case 'day_end': {
-        s = closeDay(s);
+        const closingDay = dayOf(ev.at - 1);
         s = chargeDailyUpkeep(s);
         s = chargeDailyPayroll(s);
+        s = chargeDailyResidentCosts(s);
+        s = collectPayments(s, closingDay);
+        s = expireReferrals(s, closingDay);
+        s = closeDay(s);
+        // The new day starts: bill the month in advance on its first day.
+        const newDay = closingDay + 1;
+        if (dayInMonth(newDay) === 1) s = billMonth(s, monthOfDay(newDay));
         s = staffMoraleDaily(s);
         s = pruneTasks(s);
         s = generateAllTasksForDay(s, ev.at);
@@ -262,8 +288,14 @@ export function step(state: GameState): GameState {
         s = schedule(s, ev.at + MINUTES_PER_DAY, 'day_end');
         break;
       }
+      case 'event_check': {
+        s = eventCheck(s);
+        s = schedule(s, ev.at + MINUTES_PER_DAY, 'event_check');
+        break;
+      }
     }
   }
+  s = eventExpiryTick(s);
   s = careTick(s);
   s = needsTick(s);
   s = staffEnergyTick(s);

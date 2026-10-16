@@ -1,8 +1,9 @@
 import { CARE_GROUPS, GROUP_LEVELS, RESIDENT_NAMES } from '../../data/patients';
 import { ROLES, STAFF_NAMES, wageFor } from '../../data/staff';
+import { WAITLIST_ARRIVALS } from '../../data/finance';
 import { allRoomStatuses } from '../../domain/rules/rooms';
 import { isOnShift, shiftMinutes } from '../../domain/rules/shifts';
-import type { Employee, GameState, Needs, PersonName, ResidentCandidate, StaffCandidate, StaffRole } from '../../domain/types';
+import type { CareGroup, Employee, GameState, Needs, PersonName, ResidentCandidate, StaffCandidate, StaffRole } from '../../domain/types';
 import { allocId, clamp, r2, randInt } from '../helpers';
 
 export const APPLICANT_POOL_SIZE = 8;
@@ -50,13 +51,13 @@ export function randomRole(state: GameState): [GameState, StaffRole] {
   return [s, 'caregiver'];
 }
 
-export function makeResidentCandidate(state: GameState): GameState {
+export function makeResidentCandidate(state: GameState, forced?: { group: CareGroup; referralDeadline: number }): GameState {
   let s = state;
   let name: PersonName;
   [s, name] = pickName(s, RESIDENT_NAMES, usedNames(s));
   let gi: number, age: number, level: number;
   [s, gi] = randInt(s, 0, CARE_GROUPS.length - 1);
-  const group = CARE_GROUPS[gi];
+  const group = forced?.group ?? CARE_GROUPS[gi];
   [s, age] = randInt(s, 64, 92);
   [s, level] = randInt(s, GROUP_LEVELS[group][0], GROUP_LEVELS[group][1]);
   const ranges: Record<keyof Needs, [number, number]> = {
@@ -75,7 +76,7 @@ export function makeResidentCandidate(state: GameState): GameState {
   }
   let id: string;
   [s, id] = allocId(s, 'cand');
-  const c: ResidentCandidate = { id, name, age, group, careLevel: level, needs };
+  const c: ResidentCandidate = { id, name, age, group, careLevel: level, needs, ...(forced ? { referralDeadline: forced.referralDeadline } : {}) };
   return { ...s, waitlist: [...s.waitlist, c] };
 }
 
@@ -95,9 +96,11 @@ export function refreshCandidates(state: GameState): GameState {
     [s, role] = randomRole(s);
     s = makeApplicant(s, role);
   }
+  const [lo, hi] = WAITLIST_ARRIVALS[s.priceLevel];
   let add: number;
-  [s, add] = randInt(s, 1, 2);
-  for (let i = 0; i < add && s.waitlist.length < WAITLIST_SIZE; i++) s = makeResidentCandidate(s);
+  [s, add] = randInt(s, lo, hi);
+  if (s.organization.reputation >= 70) add++;
+  for (let i = 0; i < add && s.waitlist.filter((c) => !c.referralDeadline).length < WAITLIST_SIZE; i++) s = makeResidentCandidate(s);
   return s;
 }
 
@@ -145,4 +148,15 @@ export function staffMoraleDaily(state: GameState): GameState {
     return { ...e, morale: r2(clamp(e.morale + d)) };
   });
   return { ...state, employees };
+}
+
+/** Remove an employee, their shifts, and hand any in-progress task back to the queue. */
+export function removeEmployee(state: GameState, employeeId: string): GameState {
+  const tasks = state.tasks.map((t) => (t.assigneeId === employeeId && t.status === 'in_progress' ? { ...t, status: 'pending' as const, assigneeId: null, finishAt: null } : t));
+  return {
+    ...state,
+    tasks,
+    employees: state.employees.filter((x) => x.id !== employeeId),
+    shifts: state.shifts.filter((x) => x.employeeId !== employeeId),
+  };
 }

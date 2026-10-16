@@ -3,6 +3,7 @@ import { useGame, type View } from '../store';
 import { GameCanvas } from './GameCanvas';
 import { ResidentsView } from './ResidentsView';
 import { RosterView } from './RosterView';
+import { FinanceView } from './FinanceView';
 
 /** Map / Residents / Shift schedule. The Pixi canvas stays mounted underneath so it keeps its camera. */
 export function CenterArea() {
@@ -15,10 +16,11 @@ export function CenterArea() {
     { id: 'map', label: t('view.map') },
     { id: 'residents', label: t('view.residents'), count: residents },
     { id: 'roster', label: t('view.roster'), count: staff },
+    { id: 'finance', label: t('view.finance') },
   ];
   return (
     <div className="panel flex flex-col min-h-[420px] lg:min-h-0 h-full overflow-hidden">
-      <div className="flex gap-1 p-1.5 border-b border-line bg-paper" role="tablist">
+      <div className="flex gap-1 p-1.5 border-b border-line bg-paper overflow-x-auto" role="tablist">
         {tabs.map((x) => (
           <button
             key={x.id}
@@ -36,7 +38,7 @@ export function CenterArea() {
       <div className="relative flex-1 min-h-0">
         <GameCanvas />
         {view !== 'map' && (
-          <div className="absolute inset-0 z-10 overflow-y-auto scroll-thin bg-[#f3efe6]">{view === 'residents' ? <ResidentsView /> : <RosterView />}</div>
+          <div className="absolute inset-0 z-10 overflow-y-auto scroll-thin bg-[#f3efe6]">{view === 'residents' ? <ResidentsView /> : view === 'roster' ? <RosterView /> : <FinanceView />}</div>
         )}
       </div>
     </div>

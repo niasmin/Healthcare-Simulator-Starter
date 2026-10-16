@@ -1,5 +1,6 @@
 import { MEAL_TIMES, SELF_MEAL_NUTRITION, selfFeeds } from '../../data/patients';
 import { minuteOfDay } from '../../domain/rules/shifts';
+import { PRICE_SATISFACTION_DRIFT } from '../../data/finance';
 import type { CareGroup, GameState, NeedKey, Needs, Resident } from '../../domain/types';
 import { clamp, r2 } from '../helpers';
 
@@ -17,7 +18,7 @@ export function wellbeing(n: Needs): number {
   return (n.physical + n.mobility + n.mental + n.happiness + n.nutrition) / 5;
 }
 
-function decayResident(r: Resident, minute: number): Resident {
+function decayResident(r: Resident, minute: number, priceDrift: number): Resident {
   const n = r.needs;
   const lvl = r.careLevel;
   const d: Partial<Record<NeedKey, number>> = {
@@ -27,10 +28,11 @@ function decayResident(r: Resident, minute: number): Resident {
     mental: -0.05,
     happiness: -0.07,
   };
+  if (priceDrift) d.satisfaction = (d.satisfaction ?? 0) + priceDrift;
   if (!r.carePlan) {
     // Without a care plan residents feel unattended.
     d.happiness! -= 0.05;
-    d.satisfaction = -0.08;
+    d.satisfaction = (d.satisfaction ?? 0) - 0.08;
   }
   let needs = applyNeedDelta(n, d);
   // Satisfaction drifts slowly toward overall wellbeing.
@@ -42,5 +44,6 @@ function decayResident(r: Resident, minute: number): Resident {
 
 export function needsTick(state: GameState): GameState {
   if (state.residents.length === 0) return state;
-  return { ...state, residents: state.residents.map((r) => decayResident(r, state.minute)) };
+  const drift = PRICE_SATISFACTION_DRIFT[state.priceLevel];
+  return { ...state, residents: state.residents.map((r) => decayResident(r, state.minute, drift)) };
 }

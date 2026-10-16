@@ -11,7 +11,7 @@ export function createInitialState(seed: number = STARTER_SCENARIO.defaultSeed, 
   const corridor = new Array<number>(width * height).fill(0);
   corridor[cellIndex(entrance.x, entrance.y, width)] = 1;
   const base: GameState = {
-    schemaVersion: 2,
+    schemaVersion: 3,
     seed,
     rngState: seedToState(seed),
     minute: START_MINUTE,
@@ -28,7 +28,10 @@ export function createInitialState(seed: number = STARTER_SCENARIO.defaultSeed, 
     site: { id: 'site-1', organizationId: 'org-1', width, height, entrance: { ...entrance }, corridor, rooms: [] },
     ledger: [],
     // First day-end fires at the next midnight.
-    queue: [{ at: Math.ceil((START_MINUTE + 1) / MINUTES_PER_DAY) * MINUTES_PER_DAY, seq: 0, kind: 'day_end' }],
+    queue: [
+      { at: 9 * 60, seq: -1, kind: 'event_check' },
+      { at: Math.ceil((START_MINUTE + 1) / MINUTES_PER_DAY) * MINUTES_PER_DAY, seq: 0, kind: 'day_end' },
+    ],
     log: [],
     employees: [],
     shifts: [],
@@ -38,6 +41,10 @@ export function createInitialState(seed: number = STARTER_SCENARIO.defaultSeed, 
     waitlist: [],
     today: { done: 0, missed: 0 },
     history: [],
+    priceLevel: 'standard',
+    invoices: [],
+    unbilled: {},
+    events: { active: null, cooldownUntil: {}, history: [] },
   };
   return seedCandidates(post(base, scenario.startingCashSatang, 'capital', 'ledger.capital'));
 }

@@ -20,8 +20,21 @@ export function useName() {
   return (name: PersonName, honorific = false) => (lang === 'th' ? `${honorific ? 'คุณ' : ''}${name.th}` : name.en);
 }
 
-export function Avatar({ name, color, size = 32, title, ring }: { name: PersonName; color: string; size?: number; title?: string; ring?: boolean }) {
+export function Avatar({ name, color, size = 32, title, ring, src }: { name: PersonName; color: string; size?: number; title?: string; ring?: boolean; src?: string }) {
   const lang = useGame((s) => s.lang);
+  if (src)
+    return (
+      <img
+        src={src}
+        alt=""
+        title={title}
+        width={size}
+        height={size}
+        className={`rounded-full object-cover shrink-0 select-none bg-white ${ring ? 'shadow-sm' : ''}`}
+        style={{ width: size, height: size, boxShadow: `0 0 0 ${size >= 40 ? 3 : 2}px ${color}` }}
+        draggable={false}
+      />
+    );
   return (
     <span
       title={title}

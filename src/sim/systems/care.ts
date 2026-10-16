@@ -6,6 +6,7 @@ import type { CareTask, Employee, GameState, Resident } from '../../domain/types
 import { MINUTES_PER_DAY } from '../constants';
 import { allocId } from '../helpers';
 import { applyNeedDelta } from './needs';
+import { recordService } from './billing';
 import { EXHAUSTED_ENERGY } from './staffing';
 
 /**
@@ -66,6 +67,7 @@ export function careTick(state: GameState): GameState {
   const therapyOpen = state.site.rooms.some((r) => r.type === 'therapy' && statuses.get(r.id)?.operational);
 
   const tasks = state.tasks.map((t) => ({ ...t }));
+  const billable: Array<[string, 'therapy' | 'activity']> = [];
 
   // 1. Finish in-progress tasks.
   for (const t of tasks) {
@@ -78,6 +80,8 @@ export function careTick(state: GameState): GameState {
       const def = TASK_KINDS[t.kind];
       const scale = def.room === 'therapy' && !therapyOpen ? 0.4 : 1;
       residents.set(r.id, { ...r, needs: applyNeedDelta(r.needs, def.effects, scale) });
+      if (t.kind === 'mobility_session') billable.push([r.id, 'therapy']);
+      if (t.kind === 'activity') billable.push([r.id, 'activity']);
     }
     if (t.assigneeId) {
       const e = employees.get(t.assigneeId);
@@ -118,11 +122,13 @@ export function careTick(state: GameState): GameState {
   }
 
   if (!changed) return state;
-  return {
+  let out: GameState = {
     ...state,
     tasks,
     residents: state.residents.map((r) => residents.get(r.id)!),
     employees: state.employees.map((e) => employees.get(e.id)!),
     today: { done, missed },
   };
+  for (const [rid, stream] of billable) out = recordService(out, rid, stream);
+  return out;
 }

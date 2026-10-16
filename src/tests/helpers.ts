@@ -72,3 +72,9 @@ export function admit(state: GameState, partial: Partial<ResidentCandidate> = {}
   if (!out.result.ok || !out.result.id) throw new Error(`admit failed: ${!out.result.ok ? out.result.reason : ''}`);
   return [out.state, out.result.id];
 }
+
+/** Switch random events off (for tests of other rules). */
+export function quietEvents(state: GameState): GameState {
+  const off = { family_visit: 1e9, resident_change: 1e9, staff_resign: 1e9, referral: 1e9 };
+  return { ...state, events: { ...state.events, cooldownUntil: off } };
+}

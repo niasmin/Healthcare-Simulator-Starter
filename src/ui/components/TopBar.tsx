@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import type { GameSpeed } from '../../domain/types';
 import { dayOf, formatClock } from '../../sim/systems/time';
+import { useMemo } from 'react';
+import { headline } from '../../sim/selectors';
 import { useMoney, useT } from '../hooks';
 import { useGame } from '../store';
 
@@ -20,6 +22,9 @@ export function TopBar() {
   const reputation = useGame((s) => s.game.organization.reputation);
   const lang = useGame((s) => s.lang);
   const { dispatch, setLang, newGame } = useGame.getState();
+  const game = useGame((s) => s.game);
+  const h = useMemo(() => headline(game), [game]);
+  const occPct = h.beds ? Math.round((h.residents / h.beds) * 100) : 0;
   // Two-step confirm inside the page (browser confirm() dialogs are blocked in embedded viewers).
   const [confirming, setConfirming] = useState(false);
   useEffect(() => {
@@ -61,6 +66,28 @@ export function TopBar() {
         <div className="leading-tight">
           <div className="text-[11px] text-white/60">{t('top.cash')}</div>
           <div className={`font-semibold ${cash < 0 ? 'text-red-300' : ''}`}>{money(cash)}</div>
+          {h.cashDelta !== 0 && (
+            <div className={`text-[10px] ${h.cashDelta > 0 ? 'text-emerald-300' : 'text-red-300'}`}>
+              {h.cashDelta > 0 ? '+' : ''}
+              {money(h.cashDelta)}
+            </div>
+          )}
+        </div>
+        <div className="leading-tight hidden sm:block">
+          <div className="text-[11px] text-white/60">{t('top.occupancy')}</div>
+          <div className="font-semibold">
+            {h.residents}/{h.beds}
+          </div>
+          <div className="h-1 w-16 rounded-full bg-white/20 overflow-hidden">
+            <div className="h-full bg-emerald-400" style={{ width: `${occPct}%` }} />
+          </div>
+        </div>
+        <div className="leading-tight hidden sm:block">
+          <div className="text-[11px] text-white/60">{t('top.satisfaction')}</div>
+          <div className="font-semibold">{h.satisfaction === null ? '—' : `${Math.round(h.satisfaction)}%`}</div>
+          <div className="h-1 w-16 rounded-full bg-white/20 overflow-hidden">
+            <div className="h-full bg-amber-300" style={{ width: `${h.satisfaction ?? 0}%` }} />
+          </div>
         </div>
         <div className="leading-tight">
           <div className="text-[11px] text-white/60">{t('top.reputation')}</div>

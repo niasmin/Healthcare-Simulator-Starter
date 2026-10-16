@@ -6,7 +6,7 @@ import type { Lang } from './i18n';
 
 export type Tool = { kind: 'select' } | { kind: 'corridor' } | { kind: 'bulldoze' } | { kind: 'room'; roomType: RoomType };
 
-export type View = 'map' | 'residents' | 'roster';
+export type View = 'map' | 'residents' | 'roster' | 'finance';
 export type LeftTab = 'build' | 'hire' | 'admit';
 
 export interface Toast {

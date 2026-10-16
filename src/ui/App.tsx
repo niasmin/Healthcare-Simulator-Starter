@@ -1,4 +1,6 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { EventModal } from './components/EventModal';
+import { TitleScreen } from './components/TitleScreen';
 import { LeftPanel } from './components/BuildPanel';
 import { Dashboard } from './components/Dashboard';
 import { CenterArea } from './components/CenterArea';
@@ -12,6 +14,7 @@ export function App() {
   useGameLoop();
   useKeyboard();
   const lang = useGame((s) => s.lang);
+  const [started, setStarted] = useState(() => window.location.search.includes('skiptitle'));
   useEffect(() => {
     document.documentElement.lang = lang;
   }, [lang]);
@@ -34,6 +37,7 @@ export function App() {
         </div>
       </main>
       <Toast />
+      {started ? <EventModal /> : <TitleScreen onStart={() => setStarted(true)} />}
     </div>
   );
 }
