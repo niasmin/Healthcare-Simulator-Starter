@@ -1,4 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
+import { SaveModal } from './components/SaveModal';
+import { useAutosave } from './saveService';
 import { EventModal } from './components/EventModal';
 import { TitleScreen } from './components/TitleScreen';
 import { LeftPanel } from './components/BuildPanel';
@@ -16,7 +18,14 @@ export function App() {
   useKeyboard();
   const lang = useGame((s) => s.lang);
   const mobile = useIsMobile();
-  const [started, setStarted] = useState(() => window.location.search.includes('skiptitle'));
+  useAutosave();
+  const started = useGame((s) => s.started);
+  const setStarted = useGame((s) => s.setStarted);
+  const saveOpen = useGame((s) => s.saveOpen);
+  const setSaveOpen = useGame((s) => s.setSaveOpen);
+  useEffect(() => {
+    if (window.location.search.includes('skiptitle')) setStarted(true);
+  }, [setStarted]);
   useEffect(() => {
     document.documentElement.lang = lang;
   }, [lang]);
@@ -24,18 +33,21 @@ export function App() {
   const overlays = (
     <>
       <Toast />
-      {started ? <EventModal /> : <TitleScreen onStart={() => setStarted(true)} />}
+      {started ? <EventModal /> : <TitleScreen />}
+      {started && saveOpen && <SaveModal mode="game" onClose={() => setSaveOpen(false)} />}
     </>
   );
 
-  if (mobile)
-    return (
-      <>
-        <MobileShell />
-        {overlays}
-      </>
-    );
+  // Overlays stay at a stable position in the tree so rotating a phone (layout switch) keeps them open.
+  return (
+    <>
+      {mobile ? <MobileShell /> : <DesktopLayout />}
+      {overlays}
+    </>
+  );
+}
 
+function DesktopLayout() {
   return (
     <div className="h-full flex flex-col">
       <TopBar />
@@ -53,7 +65,6 @@ export function App() {
           <Dashboard />
         </div>
       </main>
-      {overlays}
     </div>
   );
 }

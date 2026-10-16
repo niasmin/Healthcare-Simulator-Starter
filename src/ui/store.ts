@@ -44,6 +44,14 @@ interface UIStore {
   setLang: (lang: Lang) => void;
   togglePause: () => void;
   newGame: () => void;
+  /** Replace the running game with a loaded save (paused, UI reset). */
+  loadGame: (game: GameState) => void;
+  /** True once the player pressed Start or Continue; autosave waits for it. */
+  started: boolean;
+  setStarted: (v: boolean) => void;
+  notify: (key: string, level?: Toast['level'], params?: Toast['params']) => void;
+  saveOpen: boolean;
+  setSaveOpen: (v: boolean) => void;
   dismissToast: () => void;
 }
 
@@ -113,4 +121,11 @@ export const useGame = create<UIStore>((set, get) => ({
   newGame: () =>
     set({ game: createInitialState(), selectedRoomId: null, drag: null, tool: { kind: 'select' }, toast: null, view: 'map', leftTab: 'build', sheet: null }),
   dismissToast: () => set({ toast: null }),
+  loadGame: (game) =>
+    set({ game: { ...game, speed: 0 }, selectedRoomId: null, drag: null, tool: { kind: 'select' }, view: 'map', sheet: null, started: true, saveOpen: false }),
+  started: false,
+  setStarted: (started) => set({ started }),
+  notify: (key, level = 'ok', params) => set({ toast: { id: ++toastSeq, key, level, ...(params ? { params } : {}) } }),
+  saveOpen: false,
+  setSaveOpen: (saveOpen) => set({ saveOpen }),
 }));

@@ -25,12 +25,29 @@ Add `?debug` to the URL to expose `window.__HE__` (store + renderer) for automat
 | **1** | 20×20 isometric map, room building and validation, camera | ✅ Done (first playable build) |
 | **2** | Residents, staff, needs, care plans, care tasks, role × shift roster | ✅ Done |
 | **3** | Pricing, monthly invoices and payments, running costs, Financial Dashboard, 4 events, title screen, character portraits | ✅ Done |
-| 4 | Save/load (Dexie), tutorial, balancing | ⏳ Not started |
+| 4 | **Save/load ✅ done** · tutorial and balancing ⏳ next | 🟡 In progress |
 | 5–6 | Premium living, home care, workforce, hospital, multi-site | ⏳ Not started |
 
 ## What you can play now
 
 Everything playable today is **Chapter 1 — First Care Home** of the campaign in the concept art. Chapters 2–7 (30–80 beds, Tranquila villas, Home Care, PHC workforce, Neuro Hospital, multi-site empire) start after Phase 4.
+
+### Save system (Phase 4, part 1)
+
+- **Autosave:**
+  - At the start of every game day, every 60 s of real time while something changed, and whenever the tab is hidden or closed. Phones kill background tabs, so the hidden-tab save matters most there.
+  - A fresh, untouched game is never autosaved, so opening the page can't overwrite a real save.
+- **Slots:** one autosave plus three manual slots. Each slot shows the day, time, cash, residents, staff, reputation, how long ago it was saved, and where the newest copy lives. Overwrite, load and delete each need a second tap.
+- **Opening the game:** the title screen offers **เล่นต่อ** (continue the newest save, showing its day and cash), **เกมใหม่** and **โหลดเกม**.
+- **Where saves live:**
+  - **This browser:** IndexedDB via Dexie, falling back to memory if IndexedDB is blocked.
+  - **Your account:** on the published page, saves also go to the player's private space through the page's `db` capability (`data/users/<id>/save-<slot>`). Nobody else can read it, the page owner included. Loading picks whichever copy is newer, so a game saved on a phone continues on a PC for the same signed-in player.
+  - **Offline or blocked:** without the cloud (signed out, view-only access, offline), saves stay in the browser and the save panel says so.
+- **Format:**
+  - Versioned (`format` 1, `schemaVersion` 3). It holds the complete `GameState` gzip-compressed (about 10× smaller), so a reloaded game continues exactly as the original would.
+  - Cloud saves above 200,000 characters are split into parts, keeping every document under the 256 KiB limit.
+  - Loading validates the structure and the cash-ledger invariant. Damaged, tampered or unsupported saves are refused with a message, never half-loaded.
+- **Loading** pauses the game and resets the view.
 
 ### Phone layout (screens under 1024 px)
 
@@ -133,6 +150,10 @@ src/
   sim/systems/billing.ts   Invoices (admission / monthly / final), service counters, payments, food and supplies
   sim/systems/events.ts    Seeded event roll, triggers, choice effects, expiry, referral deadlines
   assets/                  Portraits and the world-map title image (from the project's own concept art)
+  storage/format.ts        Versioned save format, gzip encode/decode, validation
+  storage/localStore.ts    IndexedDB (Dexie) store with in-memory fallback
+  storage/cloudStore.ts    Per-player cloud store on the artifact db capability, chunked
+  storage/saves.ts         SaveManager: dual write, newest-copy load, slot list, latest
   sim/rng.ts               Seeded mulberry32; RNG state lives inside GameState
   sim/selectors.ts         Derived summaries and build goals (never stored)
   render/iso.ts            Pure isometric projection math
@@ -164,7 +185,7 @@ src/
   - Food, supplies, upkeep and payroll are each charged once per day.
   - An event's cost is charged once, and a resolved event can't be resolved again.
 
-## Tests (67 passing)
+## Tests (74 passing)
 
 | File | Covers |
 |---|---|
@@ -176,9 +197,10 @@ src/
 | `roster.test.ts` | Role × shift readiness (missing RN, missing skills); a covered shift becomes ready; occupancy and quality KPIs |
 | `finance.test.ts` | Pro-rated admission invoice; **monthly invoice created exactly once** (re-running billing is a no-op); each payment books revenue once and revenue equals paid invoices; therapy sessions billed on the next invoice and reset; food and supplies once per day; price level changes only new invoices; a full 10-bed home runs 30 days with cash rising and positive every day; finance view totals match the ledger and the revenue mix |
 | `events.test.ts` | Auto-pause and speed restore; no double resolve; a choice cost charged once; urgent assessment needs an RN on duty; raise (+10%) vs accept (both nurses leave); referral deadline costs reputation; default choice after 12 h; seeded and deterministic over 30 days with cooldowns; at least 3 quiet days between events |
+| `saves.test.ts` | **Save and reload gives identical state**, and the reloaded game then runs identically for 300 ticks; gzip makes it at least 3× smaller; corrupt, tampered (cash ≠ ledger) and incompatible saves rejected without throwing; IndexedDB store round-trip (fake-indexeddb); cloud store splits large saves into parts under 256 KiB and reassembles them; the newest copy wins across two devices sharing one account; works without cloud; local save survives cloud failure |
 | `i18n-iso.test.ts` | TH/EN key parity; labels for every room, equipment and reason; Thai interpolation; iso projection inverts for all 400 cells |
 
-GDD acceptance tests covered so far: *place a room and deduct construction cost once*, *reject collisions*, *admit up to capacity*, *reject excess admission*, *schedule a qualified staff member*, *prevent overlapping shifts*, *advance 30 days deterministically with a fixed seed*, *reconcile cash ledger*, *show Thai text correctly*, *run production build without errors*. *Create monthly invoice once* is now covered too. Still open: *save and reload identical state* (Phase 4).
+GDD acceptance tests covered so far: *place a room and deduct construction cost once*, *reject collisions*, *admit up to capacity*, *reject excess admission*, *schedule a qualified staff member*, *prevent overlapping shifts*, *advance 30 days deterministically with a fixed seed*, *reconcile cash ledger*, *show Thai text correctly*, *run production build without errors*. *Create monthly invoice once* is now covered too. *Save and reload identical state* is now covered as well, so **all GDD acceptance tests pass**.
 
 The Phase 3 browser playtest started from the title screen, built and staffed the home through the UI, and admitted 6 residents. It then played 35 days, answering every event through the event card: 12 invoices issued, 11 paid, cash still positive, and no console errors.
 
@@ -205,7 +227,9 @@ A browser playtest (Playwright, run outside the repo) drove the production build
 
 ## Known limitations
 
-- No save/load or tutorial yet (Phase 4). Refreshing the page starts a new game.
+- No guided tutorial yet (Phase 4, part 2). The goal list and the phone "next goal" chip guide play for now.
+- Starting a **new game** overwrites the autosave once the new game has progress. Use a manual slot to keep an older game.
+- Cloud saves need a signed-in viewer allowed to use the page (the owner always is). Anyone opening a public link with view-only access saves in their browser only.
 - Months are a flat 30 game days. Discharge mid-month doesn't refund prepaid room & care. Families always pay; there are no bad debts or late fees yet.
 - Portraits are per role (and per gender for residents), so two RNs share a face. More character art can be cropped from the concept sheets later.
 - Events are generic: they don't yet react to specific causes (for example, burnout after many double shifts).

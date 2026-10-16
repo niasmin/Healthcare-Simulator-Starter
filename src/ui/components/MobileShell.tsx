@@ -100,9 +100,21 @@ function MenuSheet() {
   const lang = useGame((s) => s.lang);
   const setLang = useGame((s) => s.setLang);
   const newGame = useGame((s) => s.newGame);
+  const setSaveOpen = useGame((s) => s.setSaveOpen);
+  const setSheet = useGame((s) => s.setSheet);
   const [confirm, setConfirm] = useState(false);
   return (
     <div className="flex flex-col gap-2">
+      <button
+        type="button"
+        onClick={() => {
+          setSheet(null);
+          setSaveOpen(true);
+        }}
+        className="rounded-xl bg-teal text-white px-4 py-3 text-left font-semibold"
+      >
+        💾 {t('save.title')}
+      </button>
       <button type="button" onClick={() => setLang(lang === 'th' ? 'en' : 'th')} className="rounded-xl bg-white border border-line px-4 py-3 text-left">
         {t('m.language')}: <span className="font-semibold">{lang === 'th' ? 'ไทย → English' : 'English → ไทย'}</span>
       </button>

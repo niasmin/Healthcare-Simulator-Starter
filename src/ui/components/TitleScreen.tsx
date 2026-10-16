@@ -1,12 +1,48 @@
+import { useEffect, useState } from 'react';
 import worldMap from '../../assets/world-map.jpg';
+import { formatTHB } from '../../domain/money';
+import type { SlotInfo } from '../../storage/saves';
+import { localeOf } from '../i18n';
 import { useT } from '../hooks';
+import { initCloud, saves, useSaveStatus } from '../saveService';
 import { useGame } from '../store';
+import { SaveModal } from './SaveModal';
 
-/** Opening screen over the world-map concept art. */
-export function TitleScreen({ onStart }: { onStart: () => void }) {
+/** Opening screen over the world-map concept art, with Continue when a save exists. */
+export function TitleScreen() {
   const t = useT();
   const lang = useGame((s) => s.lang);
   const setLang = useGame((s) => s.setLang);
+  const setStarted = useGame((s) => s.setStarted);
+  const newGame = useGame((s) => s.newGame);
+  const loadGame = useGame((s) => s.loadGame);
+  const notify = useGame((s) => s.notify);
+  const version = useSaveStatus((s) => s.version);
+  const [latest, setLatest] = useState<SlotInfo | null | undefined>(undefined);
+  const [loadOpen, setLoadOpen] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    initCloud()
+      .then(() => saves.latest())
+      .then((l) => alive && setLatest(l))
+      .catch(() => alive && setLatest(null));
+    return () => {
+      alive = false;
+    };
+  }, [version]);
+
+  const start = () => {
+    newGame();
+    setStarted(true);
+  };
+  const resume = async () => {
+    if (!latest) return;
+    const r = await saves.load(latest.slot);
+    if (!r.ok) return notify(`save.err.${r.error}`, 'error');
+    loadGame(r.state);
+  };
+
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-ink" role="dialog" aria-modal="true" aria-label={t('app.title')}>
       <img src={worldMap} alt="" className="absolute inset-0 size-full object-cover object-top" />
@@ -16,16 +52,34 @@ export function TitleScreen({ onStart }: { onStart: () => void }) {
         <h1 className="text-4xl sm:text-5xl font-bold tracking-tight drop-shadow-lg">{t('app.title')}</h1>
         <p className="text-lg sm:text-xl text-white/90">{t('title.tagline')}</p>
         <p className="max-w-xl text-sm text-white/80 leading-relaxed">{t('title.goal')}</p>
-        <div className="flex gap-2 mt-2">
-          <button type="button" autoFocus onClick={onStart} className="px-8 py-3 rounded-xl bg-coral text-white text-lg font-bold shadow-lg hover:brightness-110">
-            {t('title.start')}
-          </button>
+        <div className="flex flex-wrap justify-center gap-2 mt-2">
+          {latest?.meta ? (
+            <>
+              <button type="button" autoFocus onClick={resume} className="px-7 py-2.5 rounded-xl bg-coral text-white shadow-lg hover:brightness-110 text-left leading-tight">
+                <span className="block text-lg font-bold">{t('title.continue')}</span>
+                <span className="block text-xs text-white/85 tabular">
+                  {t('title.continue_sub', { day: latest.meta.day, cash: formatTHB(latest.meta.cashSatang, localeOf(lang)) })}
+                </span>
+              </button>
+              <button type="button" onClick={start} className="px-5 py-3 rounded-xl bg-white/15 border border-white/40 text-white font-semibold hover:bg-white/25">
+                {t('title.new')}
+              </button>
+              <button type="button" onClick={() => setLoadOpen(true)} className="px-5 py-3 rounded-xl border border-white/40 text-white hover:bg-white/10">
+                {t('title.load')}
+              </button>
+            </>
+          ) : (
+            <button type="button" autoFocus onClick={start} className="px-8 py-3 rounded-xl bg-coral text-white text-lg font-bold shadow-lg hover:brightness-110">
+              {t('title.start')}
+            </button>
+          )}
           <button type="button" onClick={() => setLang(lang === 'th' ? 'en' : 'th')} className="px-4 py-3 rounded-xl border border-white/50 text-white hover:bg-white/10">
             {t('top.lang')}
           </button>
         </div>
         <p className="text-[11px] text-white/60 mt-2">{t('title.note')}</p>
       </div>
+      {loadOpen && <SaveModal mode="title" onClose={() => setLoadOpen(false)} />}
     </div>
   );
 }
