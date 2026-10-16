@@ -20,3 +20,20 @@ export function chargeDailyUpkeep(state: GameState): GameState {
   const day = dayOf(state.minute - 1); // the day that just ended
   return post(state, -amount, 'upkeep', 'ledger.upkeep', { ref: `day-${day}`, memoParams: { day } });
 }
+
+/** One employee's daily pay: 1/30 of the monthly wage, rounded down to whole baht. */
+export function dailyWage(monthlySatang: Satang): Satang {
+  return Math.floor(monthlySatang / 30 / 100) * 100;
+}
+
+/** Daily payroll for all staff. One ledger entry per day. */
+export function dailyPayroll(state: GameState): Satang {
+  return state.employees.reduce((a, e) => a + dailyWage(e.wageMonthlySatang), 0);
+}
+
+export function chargeDailyPayroll(state: GameState): GameState {
+  const amount = dailyPayroll(state);
+  if (amount <= 0) return state;
+  const day = dayOf(state.minute - 1);
+  return post(state, -amount, 'payroll', 'ledger.payroll', { ref: `payroll-day-${day}`, memoParams: { day, n: state.employees.length } });
+}

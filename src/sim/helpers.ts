@@ -1,3 +1,4 @@
+import { nextInt } from './rng';
 import type { GameState, LedgerCategory, LedgerEntry, LogItem, LogLevel, Satang } from '../domain/types';
 import { LOG_LIMIT } from './constants';
 
@@ -38,4 +39,19 @@ export function log(state: GameState, level: LogLevel, key: string, params?: Log
   const item: LogItem = { id, at: s.minute, level, key, ...(params ? { params } : {}) };
   const next = [...s.log, item];
   return { ...s, log: next.length > LOG_LIMIT ? next.slice(next.length - LOG_LIMIT) : next };
+}
+
+/** Draw an integer in [min, max] from the state's seeded PRNG. */
+export function randInt(state: GameState, min: number, max: number): [GameState, number] {
+  const r = nextInt(state.rngState, min, max);
+  return [{ ...state, rngState: r.state }, r.value];
+}
+
+export function clamp(v: number, lo = 0, hi = 100): number {
+  return v < lo ? lo : v > hi ? hi : v;
+}
+
+/** Round to 2 decimals so floating noise never accumulates differently across runs. */
+export function r2(v: number): number {
+  return Math.round(v * 100) / 100;
 }

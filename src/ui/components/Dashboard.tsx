@@ -1,4 +1,4 @@
-import { buildObjectives } from '../../sim/selectors';
+import { buildObjectives, careKpis } from '../../sim/selectors';
 import { useMoney, useSummary, useT } from '../hooks';
 import { useGame } from '../store';
 
@@ -20,6 +20,7 @@ export function Dashboard() {
   const game = useGame((s) => s.game);
   const summary = useSummary();
   const goals = buildObjectives(game, summary);
+  const kpi = careKpis(game, summary);
   const invested = -(summary.spentByCategory.construction + summary.spentByCategory.equipment + summary.spentByCategory.refund);
   const recent = [...game.ledger].reverse().slice(0, 4);
 
@@ -29,16 +30,28 @@ export function Dashboard() {
         <Kpi label={t('dash.cash')} value={money(game.organization.cashSatang)} tone={game.organization.cashSatang < 0 ? 'bad' : undefined} />
         <Kpi label={t('dash.invested')} value={money(invested)} />
         <Kpi label={t('dash.upkeep')} value={money(summary.dailyUpkeepSatang)} />
-        <Kpi label={t('dash.rooms')} value={`${summary.roomsOperational}/${summary.roomsTotal}`} />
-        <Kpi label={t('dash.beds')} value={`${summary.bedsOperational}/${summary.bedsInstalled}`} />
-        <Kpi label={t('dash.occupancy')} value="—" sub={t('dash.phase2')} tone="muted" />
-        <Kpi label={t('dash.quality')} value="—" sub={t('dash.phase2')} tone="muted" />
+        <Kpi label={t('dash.payroll')} value={money(kpi.payrollPerDaySatang)} />
+        <Kpi
+          label={t('dash.occupancy')}
+          value={kpi.occupancy === null ? '—' : `${Math.round(kpi.occupancy * 100)}%`}
+          sub={t('dash.occ_sub', { n: kpi.residents, beds: kpi.bedsOperational })}
+          tone={kpi.occupancy === null ? 'muted' : undefined}
+        />
+        <Kpi
+          label={t('dash.quality')}
+          value={kpi.quality === null ? '—' : String(kpi.quality)}
+          sub={kpi.completion === null ? t('dash.wellbeing') + (kpi.wellbeing === null ? '' : ` ${Math.round(kpi.wellbeing)}`) : t('dash.quality_sub', { pct: Math.round(kpi.completion * 100) })}
+          tone={kpi.quality === null ? 'muted' : kpi.quality < 50 ? 'bad' : undefined}
+        />
+        <Kpi label={t('dash.rooms')} value={`${summary.roomsOperational}/${summary.roomsTotal}`} sub={`${t('dash.beds')} ${summary.bedsOperational}`} />
       </div>
 
       <div>
-        <h2 className="text-xs font-semibold text-ink-soft uppercase tracking-wide mb-1.5">{t('dash.goals')}</h2>
+        <h2 className="text-xs font-semibold text-ink-soft uppercase tracking-wide mb-1.5">
+          {t('dash.goals')} <span className="tabular font-normal">{goals.filter((g) => g.done).length}/{goals.length}</span>
+        </h2>
         <ul className="flex flex-col gap-1">
-          {goals.map((g) => (
+          {[...goals.filter((g) => !g.done), ...goals.filter((g) => g.done)].slice(0, 6).map((g) => (
             <li key={g.id} className={`flex items-center gap-2 text-xs ${g.done ? 'text-ok' : ''}`}>
               <span className={`grid place-items-center size-4 rounded-full border text-[10px] shrink-0 ${g.done ? 'bg-ok border-ok text-white' : 'border-ink-soft/40'}`}>
                 {g.done ? '✓' : ''}

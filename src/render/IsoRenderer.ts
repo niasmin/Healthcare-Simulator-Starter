@@ -10,7 +10,20 @@ import { cellCenter, cellDiamond, cellToWorld, TILE_H, TILE_W, worldToCell } fro
  * happen in the sim; this class only draws and reports pointer cells back.
  */
 
+/** A person to draw. Positions are resolved by the renderer from room layout. */
+export interface PersonMarker {
+  key: string;
+  kind: 'resident' | 'staff';
+  color: number;
+  roomId: string | null;
+  /** Bed index (residents, or staff working at that resident's bed). */
+  bed?: number;
+  /** Spot index for idle staff inside a room. */
+  spot?: number;
+}
+
 export interface RenderInput {
+  people: PersonMarker[];
   game: GameState;
   statuses: Map<string, RoomStatus>;
   labelFor: (room: Room) => string;
@@ -63,6 +76,10 @@ export class IsoRenderer {
   private staticLayer = new Container();
   private overlay = new Graphics();
   private labelLayer = new Container();
+  private peopleLayer = new Graphics();
+  private lastPeople = '';
+  /** Per room: cells holding beds (in bed order) and free floor cells, for placing people. */
+  private roomCells = new Map<string, { beds: Cell[]; free: Cell[] }>();
   private ready = false;
   private destroyed = false;
   private lastSite: GameState['site'] | null = null;
@@ -101,7 +118,7 @@ export class IsoRenderer {
     host.appendChild(this.app.canvas);
     this.app.canvas.style.display = 'block';
     this.app.canvas.style.touchAction = 'none';
-    this.world.addChild(this.staticLayer, this.overlay, this.labelLayer);
+    this.world.addChild(this.staticLayer, this.overlay, this.peopleLayer, this.labelLayer);
     this.app.stage.addChild(this.world);
     this.app.stage.eventMode = 'static';
     this.app.stage.hitArea = this.app.screen;
@@ -248,14 +265,17 @@ export class IsoRenderer {
       this.lastSite = input.game.site;
       this.lastStatic = staticKey;
       this.drawStatic(input);
+      this.lastPeople = '';
     }
     this.drawOverlay(input);
+    this.drawPeople(input.people);
   }
 
   private drawStatic(input: RenderInput): void {
     const { site } = input.game;
     for (const c of this.staticLayer.removeChildren()) c.destroy({ children: true });
     for (const c of this.labelLayer.removeChildren()) c.destroy({ children: true });
+    this.roomCells.clear();
 
     const g = new Graphics();
     this.staticLayer.addChild(g);
@@ -344,6 +364,11 @@ export class IsoRenderer {
     for (const slot of def.equipment) for (let k = 0; k < (room.equipment[slot.id] ?? 0); k++) props.push(slot.id);
     const stride = props.length ? Math.max(1, Math.floor(cells.length / props.length)) : 1;
     const placed = props.map((id, k) => ({ id, cell: cells[Math.min(cells.length - 1, k * stride)] })).filter((p) => p.cell);
+    const used = new Set(placed.map((p) => `${p.cell.x},${p.cell.y}`));
+    this.roomCells.set(room.id, {
+      beds: placed.filter((p) => p.id === 'care_bed').map((p) => p.cell),
+      free: cells.filter((c) => !used.has(`${c.x},${c.y}`)),
+    });
     placed.sort((a, b) => a.cell.x + a.cell.y - (b.cell.x + b.cell.y));
     for (const p of placed) this.drawProp(g, p.id, p.cell);
 
@@ -356,6 +381,43 @@ export class IsoRenderer {
     // label
     const c = cellToWorld(x + w / 2, y + h / 2);
     this.addLabel(status?.operational ? label : `⚠ ${label}`, c.x, c.y - WALL_H - 8, status?.operational ? wall : 0xc0392b, false);
+  }
+
+  private drawPeople(people: PersonMarker[]): void {
+    const key = people.map((p) => `${p.key}:${p.roomId}:${p.bed ?? ''}:${p.spot ?? ''}`).join('|');
+    if (key === this.lastPeople) return;
+    this.lastPeople = key;
+    const g = this.peopleLayer;
+    g.clear();
+    const items: Array<{ x: number; y: number; p: PersonMarker }> = [];
+    for (const p of people) {
+      const rc = p.roomId ? this.roomCells.get(p.roomId) : undefined;
+      let cell: Cell | undefined;
+      if (rc && p.bed !== undefined) cell = rc.beds[p.bed] ?? rc.free[p.bed % Math.max(1, rc.free.length)];
+      else if (rc && p.spot !== undefined) cell = rc.free.length ? rc.free[p.spot % rc.free.length] : rc.beds[0];
+      if (!cell) continue;
+      const c = cellCenter(cell.x, cell.y);
+      // Staff working at a bed stand beside it; several idle staff on one tile fan out.
+      const fan = p.kind === 'staff' && p.spot !== undefined && rc ? Math.floor(p.spot / Math.max(1, rc.free.length)) : 0;
+      const dx = p.kind === 'staff' ? (p.bed !== undefined ? 18 : -8 + fan * 14) : 0;
+      const dy = p.kind === 'staff' ? (p.bed !== undefined ? 6 : 2 + fan * 4) : 0;
+      items.push({ x: c.x + dx, y: c.y + dy, p });
+    }
+    items.sort((a, b) => a.y - b.y);
+    for (const { x, y, p } of items) {
+      if (p.kind === 'resident') {
+        // Lying in bed: head on the pillow, blanket in the care-group colour.
+        g.ellipse(x + 1, y - 9, 13, 6.5).fill({ color: p.color, alpha: 0.95 }).stroke({ width: 1, color: shade(p.color, 0.7) });
+        g.circle(x - 12, y - 14, 6).fill(0xf1c9a5).stroke({ width: 1.2, color: 0x9b7653 });
+        g.ellipse(x - 12, y - 18.5, 6, 3).fill(0xe2ddd4);
+      } else {
+        g.ellipse(x, y, 10, 4.5).fill({ color: 0x000000, alpha: 0.2 });
+        g.roundRect(x - 7, y - 25, 14, 24, 6).fill(p.color).stroke({ width: 1.2, color: shade(p.color, 0.65) });
+        g.rect(x - 7, y - 25, 14, 4).fill({ color: 0xffffff, alpha: 0.35 });
+        g.circle(x, y - 31, 6.5).fill(0xf1c9a5).stroke({ width: 1.2, color: 0x9b7653 });
+        g.ellipse(x, y - 35, 6.4, 3.2).fill(0x2b2522);
+      }
+    }
   }
 
   private drawProp(g: Graphics, id: EquipmentId, cell: Cell): void {

@@ -3,8 +3,13 @@ import { rectCells, rectContains, rectFromCorners } from '../../domain/grid';
 import { validateCorridor, validateRoomPlacement, type PlacementCheck } from '../../domain/rules/placement';
 import type { Cell, Rect } from '../../domain/types';
 import { IsoRenderer } from '../../render/IsoRenderer';
+import { ROLES } from '../../data/staff';
+import { peopleMarkers } from '../../sim/selectors';
+import type { CareGroup, StaffRole } from '../../domain/types';
 import { useMoney, useSummary, useT } from '../hooks';
 import { useGame } from '../store';
+
+const GROUP_HEX: Record<CareGroup, number> = { active_aging: 0xc9822b, stroke_rehab: 0x4a6aa5, bedridden: 0x8a5a9e };
 
 /**
  * Glue between the React/Zustand UI and the Pixi renderer.
@@ -78,8 +83,18 @@ export function GameCanvas() {
     return null;
   }, [drag, tool, game]);
 
+  const people = useMemo(
+    () =>
+      peopleMarkers(game).map((m) => ({
+        ...m,
+        color: m.kind === 'staff' ? ROLES[m.role as StaffRole].color : GROUP_HEX[m.group as CareGroup],
+      })),
+    [game],
+  );
+
   useEffect(() => {
     rendererRef.current?.update({
+      people,
       game,
       statuses: summary.statuses,
       labelFor: (room) => t(`room.${room.type}`),
@@ -90,7 +105,7 @@ export function GameCanvas() {
       hoverTint: tool.kind === 'bulldoze' ? 'danger' : 'neutral',
       leftDragPans: tool.kind === 'select',
     });
-  }, [game, summary, selectedRoomId, hover, preview, tool, t, ready, lang]);
+  }, [game, people, summary, selectedRoomId, hover, preview, tool, t, ready, lang]);
 
   let status: { text: string; tone: 'ok' | 'bad' | 'muted' } = { text: t('canvas.help'), tone: 'muted' };
   if (preview) {
@@ -103,7 +118,7 @@ export function GameCanvas() {
 
   const r = rendererRef.current;
   return (
-    <section className="panel relative min-h-[360px] overflow-hidden" aria-label="site map">
+    <section className="absolute inset-0 overflow-hidden" aria-label="site map">
       <div ref={hostRef} className="absolute inset-0" />
       {!ready && <div className="absolute inset-0 grid place-items-center text-ink-soft">{t('canvas.loading')}</div>}
       <div className="absolute right-3 top-3 flex flex-col gap-1.5">

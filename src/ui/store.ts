@@ -6,6 +6,9 @@ import type { Lang } from './i18n';
 
 export type Tool = { kind: 'select' } | { kind: 'corridor' } | { kind: 'bulldoze' } | { kind: 'room'; roomType: RoomType };
 
+export type View = 'map' | 'residents' | 'roster';
+export type LeftTab = 'build' | 'hire' | 'admit';
+
 export interface Toast {
   id: number;
   key: string;
@@ -23,6 +26,10 @@ interface UIStore {
   toast: Toast | null;
   /** Speed to restore when un-pausing with Space. */
   lastSpeed: 1 | 2 | 4;
+  view: View;
+  leftTab: LeftTab;
+  setView: (view: View) => void;
+  setLeftTab: (tab: LeftTab) => void;
 
   dispatch: (cmd: Command) => CommandResult;
   tick: (n: number) => void;
@@ -57,6 +64,10 @@ export const useGame = create<UIStore>((set, get) => ({
   drag: null,
   toast: null,
   lastSpeed: 1,
+  view: 'map',
+  leftTab: 'build',
+  setView: (view) => set({ view }),
+  setLeftTab: (leftTab) => set({ leftTab }),
 
   dispatch: (cmd) => {
     const { state, result } = applyCommand(get().game, cmd);
@@ -93,6 +104,7 @@ export const useGame = create<UIStore>((set, get) => ({
     const { game, lastSpeed, dispatch } = get();
     dispatch({ type: 'setSpeed', speed: game.speed === 0 ? lastSpeed : 0 });
   },
-  newGame: () => set({ game: createInitialState(), selectedRoomId: null, drag: null, tool: { kind: 'select' }, toast: null }),
+  newGame: () =>
+    set({ game: createInitialState(), selectedRoomId: null, drag: null, tool: { kind: 'select' }, toast: null, view: 'map', leftTab: 'build' }),
   dismissToast: () => set({ toast: null }),
 }));

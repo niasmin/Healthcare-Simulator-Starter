@@ -3,8 +3,12 @@ import { cellIndex, rectArea } from '../../domain/grid';
 import { pctOf } from '../../domain/money';
 import type { EquipmentId } from '../../domain/types';
 import { dayOf, formatClock } from '../../sim/systems/time';
+import { useMemo } from 'react';
+import { rosterView } from '../../sim/selectors';
+import { EXHAUSTED_ENERGY } from '../../sim/systems/staffing';
 import { useMoney, useSummary, useT } from '../hooks';
 import { useGame } from '../store';
+import { useName } from './people';
 
 function RoomInspector({ roomId }: { roomId: string }) {
   const t = useT();
@@ -147,16 +151,97 @@ function CellInfo() {
   );
 }
 
+function TasksPanel() {
+  const t = useT();
+  const name = useName();
+  const game = useGame((s) => s.game);
+  const setView = useGame((s) => s.setView);
+  const resName = (id: string) => {
+    const r = game.residents.find((x) => x.id === id);
+    return r ? name(r.name, true) : '';
+  };
+  const staffName = (id: string | null) => {
+    const e = game.employees.find((x) => x.id === id);
+    return e ? name(e.name) : '';
+  };
+  const now = game.minute;
+  const inProgress = game.tasks.filter((x) => x.status === 'in_progress');
+  const waiting = game.tasks.filter((x) => x.status === 'pending' && x.dueAt <= now).sort((a, b) => a.dueAt - b.dueAt);
+  const upcoming = game.tasks.filter((x) => x.status === 'pending' && x.dueAt > now).sort((a, b) => a.dueAt - b.dueAt).slice(0, 4);
+  const missed = game.tasks.filter((x) => x.status === 'missed' && x.dueAt > now - 360).sort((a, b) => b.dueAt - a.dueAt).slice(0, 3);
+  if (!game.tasks.length) return <p className="text-xs text-ink-soft">{t('tasks.empty')}</p>;
+  const row = (x: (typeof game.tasks)[number], tone: string, extra?: string) => (
+    <li key={x.id} className="flex gap-2 text-xs leading-snug">
+      <span className="tabular text-ink-soft shrink-0">{formatClock(x.dueAt)}</span>
+      <span className={`min-w-0 ${tone}`}>
+        <span className="font-medium">{t(`task.${x.kind}`)}</span> · {resName(x.residentId)}
+        {extra ? <span className="text-ink-soft"> · {extra}</span> : null}
+      </span>
+    </li>
+  );
+  return (
+    <div className="flex flex-col gap-2">
+      {inProgress.length > 0 && (
+        <div>
+          <div className="text-[10px] font-semibold text-teal uppercase tracking-wide mb-0.5">{t('tasks.in_progress')}</div>
+          <ul className="flex flex-col gap-0.5">{inProgress.map((x) => row(x, 'text-teal', staffName(x.assigneeId)))}</ul>
+        </div>
+      )}
+      {waiting.length > 0 && (
+        <div>
+          <div className="text-[10px] font-semibold text-warn uppercase tracking-wide mb-0.5">{t('tasks.waiting')}</div>
+          <ul className="flex flex-col gap-0.5">{waiting.slice(0, 4).map((x) => row(x, 'text-warn'))}</ul>
+        </div>
+      )}
+      {upcoming.length > 0 && (
+        <div>
+          <div className="text-[10px] font-semibold text-ink-soft uppercase tracking-wide mb-0.5">{t('tasks.upcoming')}</div>
+          <ul className="flex flex-col gap-0.5">{upcoming.map((x) => row(x, ''))}</ul>
+        </div>
+      )}
+      {missed.length > 0 && (
+        <button type="button" onClick={() => setView('roster')} className="text-left">
+          <div className="text-[10px] font-semibold text-bad uppercase tracking-wide mb-0.5">{t('tasks.missed')}</div>
+          <ul className="flex flex-col gap-0.5">{missed.map((x) => row(x, 'text-bad'))}</ul>
+        </button>
+      )}
+    </div>
+  );
+}
+
 function Alerts() {
   const t = useT();
-  const log = useGame((s) => s.game.log);
+  const name = useName();
+  const game = useGame((s) => s.game);
+  const log = game.log;
   const summary = useSummary();
-  const rooms = useGame((s) => s.game.site.rooms);
+  const rooms = game.site.rooms;
   const select = useGame((s) => s.select);
+  const setView = useGame((s) => s.setView);
+  const roster = useMemo(() => rosterView(game), [game]);
   const problems = rooms.filter((r) => !summary.statuses.get(r.id)?.operational);
+  const noPlan = game.residents.filter((r) => !r.carePlan);
+  const badSlots = game.residents.length ? roster.slots.filter((x) => !x.ready) : [];
+  const tired = game.employees.filter((e) => e.energy < EXHAUSTED_ENERGY);
   const items = [...log].reverse().slice(0, 12);
+  const chip = 'text-left text-xs rounded-lg bg-warn/12 border border-warn/30 px-2 py-1.5 hover:bg-warn/20';
   return (
     <div className="flex flex-col gap-1.5">
+      {noPlan.map((r) => (
+        <button key={r.id} type="button" onClick={() => setView('residents')} className={chip}>
+          ⚠ {t('alert.no_plan', { name: r.name.th, nameEn: r.name.en })}
+        </button>
+      ))}
+      {badSlots.map((x) => (
+        <button key={x.slot} type="button" onClick={() => setView('roster')} className={chip}>
+          ⚠ {t('alert.slot', { slot: x.slot })}
+        </button>
+      ))}
+      {tired.map((e) => (
+        <button key={e.id} type="button" onClick={() => setView('roster')} className={chip}>
+          ⚠ {t('alert.exhausted', { name: name(e.name) })}
+        </button>
+      ))}
       {problems.map((r) => (
         <button
           key={r.id}
@@ -167,7 +252,7 @@ function Alerts() {
           ⚠ {t(`room.${r.type}`)} — {t('inspector.not_operational')}
         </button>
       ))}
-      {items.length === 0 && problems.length === 0 && <p className="text-xs text-ink-soft">{t('alerts.empty')}</p>}
+      {items.length === 0 && problems.length === 0 && noPlan.length === 0 && <p className="text-xs text-ink-soft">{t('alerts.empty')}</p>}
       {items.map((l) => (
         <div key={l.id} className="text-xs flex gap-2">
           <span className="text-ink-soft tabular shrink-0">
@@ -185,9 +270,13 @@ export function SidePanel() {
   const selected = useGame((s) => s.selectedRoomId);
   return (
     <aside className="panel flex flex-col min-h-0 overflow-hidden">
-      <div className="p-3 border-b border-line overflow-y-auto scroll-thin max-h-[62%]">
+      <div className="p-3 border-b border-line overflow-y-auto scroll-thin max-h-[45%] shrink-0">
         <h2 className="text-xs font-semibold text-ink-soft uppercase tracking-wide mb-2">{t('inspector.title')}</h2>
         {selected ? <RoomInspector roomId={selected} /> : <CellInfo />}
+      </div>
+      <div className="p-3 border-b border-line overflow-y-auto scroll-thin max-h-[32%] shrink-0">
+        <h2 className="text-xs font-semibold text-ink-soft uppercase tracking-wide mb-2">{t('tasks.title')}</h2>
+        <TasksPanel />
       </div>
       <div className="p-3 overflow-y-auto scroll-thin flex-1 min-h-0">
         <h2 className="text-xs font-semibold text-ink-soft uppercase tracking-wide mb-2">{t('alerts.title')}</h2>
