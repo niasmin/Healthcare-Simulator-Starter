@@ -3,6 +3,7 @@ import type { GameSpeed } from '../../domain/types';
 import { dayOf, formatClock } from '../../sim/systems/time';
 import { useMemo } from 'react';
 import { headline } from '../../sim/selectors';
+import { spriteUrl } from '../../render/sprites';
 import { useMoney, useT } from '../hooks';
 import { useGame } from '../store';
 
@@ -63,6 +64,7 @@ export function TopBar() {
       </div>
 
       <div className="flex items-center gap-4 tabular">
+        <img src={spriteUrl('ic_coin')} alt="" className="size-7 -mr-2" />
         <div className="leading-tight">
           <div className="text-[11px] text-white/60">{t('top.cash')}</div>
           <div className={`font-semibold ${cash < 0 ? 'text-red-300' : ''}`}>{money(cash)}</div>
@@ -73,6 +75,7 @@ export function TopBar() {
             </div>
           )}
         </div>
+        <img src={spriteUrl('ic_people')} alt="" className="size-7 -mr-2 hidden sm:block" />
         <div className="leading-tight hidden sm:block">
           <div className="text-[11px] text-white/60">{t('top.occupancy')}</div>
           <div className="font-semibold">
@@ -82,6 +85,7 @@ export function TopBar() {
             <div className="h-full bg-emerald-400" style={{ width: `${occPct}%` }} />
           </div>
         </div>
+        <img src={spriteUrl('ic_smile')} alt="" className="size-7 -mr-2 hidden sm:block" />
         <div className="leading-tight hidden sm:block">
           <div className="text-[11px] text-white/60">{t('top.satisfaction')}</div>
           <div className="font-semibold">{h.satisfaction === null ? '—' : `${Math.round(h.satisfaction)}%`}</div>
@@ -91,7 +95,10 @@ export function TopBar() {
         </div>
         <div className="leading-tight">
           <div className="text-[11px] text-white/60">{t('top.reputation')}</div>
-          <div className="font-semibold">★ {reputation}</div>
+          <div className="font-semibold inline-flex items-center gap-1">
+            <img src={spriteUrl('ic_star')} alt="" className="size-4" />
+            {reputation}
+          </div>
         </div>
       </div>
 

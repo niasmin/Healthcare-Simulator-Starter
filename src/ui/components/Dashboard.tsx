@@ -47,8 +47,13 @@ export function Dashboard() {
       </div>
 
       <div>
-        <h2 className="text-xs font-semibold text-ink-soft uppercase tracking-wide mb-1.5">
-          {t('dash.goals')} <span className="tabular font-normal">{goals.filter((g) => g.done).length}/{goals.length}</span>
+        <h2 className="text-xs font-semibold text-ink-soft uppercase tracking-wide mb-1.5 flex items-center gap-2">
+          <span>
+            {t('dash.goals')} <span className="tabular font-normal">{goals.filter((g) => g.done).length}/{goals.length}</span>
+          </span>
+          <button type="button" onClick={() => useGame.getState().setChaptersOpen(true)} className="ml-auto normal-case tracking-normal text-teal hover:underline font-semibold">
+            {t('chapters.open')} →
+          </button>
         </h2>
         <ul className="flex flex-col gap-1">
           {[...goals.filter((g) => !g.done), ...goals.filter((g) => g.done)].slice(0, 6).map((g) => (

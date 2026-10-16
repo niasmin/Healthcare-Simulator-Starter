@@ -1,4 +1,5 @@
-import { Application, Container, Graphics, Text } from 'pixi.js';
+import { Application, Container, Graphics, Sprite, Text, type Texture } from 'pixi.js';
+import { DECOR_SPRITE, EQUIP_SPRITE, loadSpriteTextures } from './sprites';
 import { EQUIPMENT, ROOMS } from '../data/rooms';
 import { cellIndex } from '../domain/grid';
 import type { RoomStatus } from '../domain/rules/rooms';
@@ -83,6 +84,7 @@ export class IsoRenderer {
   /** Per room: cells holding beds (in bed order) and free floor cells, for placing people. */
   private roomCells = new Map<string, { beds: Cell[]; free: Cell[] }>();
   private ready = false;
+  private tex = new Map<string, Texture>();
   private destroyed = false;
   private lastSite: GameState['site'] | null = null;
   private lastStatic = '';
@@ -117,6 +119,7 @@ export class IsoRenderer {
       autoDensity: true,
       resolution: Math.min(window.devicePixelRatio || 1, 2),
     });
+    this.tex = await loadSpriteTextures();
     if (this.destroyed) {
       this.app.destroy(true);
       return;
@@ -389,9 +392,27 @@ export class IsoRenderer {
     g.poly([gl.x - 4, gl.y - 38, gr.x + 4, gr.y - 38, gr.x + 4, gr.y - 30, gl.x - 4, gl.y - 30]).fill(0xe0614b);
     this.addLabel(input.entranceLabel, ec.x, ec.y - 52, 0xe0614b, true);
 
-    // Rooms, back to front
-    const rooms = [...site.rooms].sort((a, b) => a.rect.x + a.rect.y - (b.rect.x + b.rect.y));
-    for (const room of rooms) this.drawRoom(room, input.statuses.get(room.id), input.labelFor(room));
+    // Entrance sign on the street, from the asset pack
+    const signAt = cellCenter(site.entrance.x - 1.6, site.height + 0.2);
+    this.placeSprite('dc_sign', signAt.x, signAt.y + SLAB_DEPTH, 104, 0.9);
+
+    // Rooms and garden items, back to front (painter's order by their front-most tile)
+    const items: Array<{ key: number; draw: () => void }> = [];
+    for (const room of site.rooms)
+      items.push({ key: room.rect.x + room.rect.w - 1 + room.rect.y + room.rect.h - 1, draw: () => this.drawRoom(room, input.statuses.get(room.id), input.labelFor(room)) });
+    for (const d of site.decor ?? [])
+      items.push({
+        key: d.cell.x + d.cell.y + 0.5,
+        draw: () => {
+          const c = cellCenter(d.cell.x, d.cell.y);
+          const spec = DECOR_SPRITE[d.type];
+          const g2 = new Graphics().ellipse(c.x, c.y + 4, spec.width * 0.32, spec.width * 0.12).fill({ color: 0x000000, alpha: 0.12 });
+          this.staticLayer.addChild(g2);
+          if (!this.placeSprite(spec.name, c.x, c.y + 8, spec.width, 0.92)) g2.circle(c.x, c.y - 10, 10).fill(0x6c9f4e);
+        },
+      });
+    items.sort((a, b) => a.key - b.key);
+    for (const it of items) it.draw();
   }
 
   private drawRoom(room: Room, status: RoomStatus | undefined, label: string): void {
@@ -441,7 +462,11 @@ export class IsoRenderer {
       free: cells.filter((c) => !used.has(`${c.x},${c.y}`)),
     });
     placed.sort((a, b) => a.cell.x + a.cell.y - (b.cell.x + b.cell.y));
-    for (const p of placed) this.drawProp(g, p.id, p.cell);
+    const spriteProps: typeof placed = [];
+    for (const p of placed) {
+      if (EQUIP_SPRITE[p.id] && this.tex.has(EQUIP_SPRITE[p.id]!.name)) spriteProps.push(p);
+      else this.drawProp(g, p.id, p.cell);
+    }
 
     // front walls (low cutaway so the interior stays visible)
     for (let j = 0; j < h; j++)
@@ -449,9 +474,28 @@ export class IsoRenderer {
     for (let i = 0; i < w; i++)
       if (!isDoor({ x: x + i, y: y + h - 1 }, { x: x + i, y: y + h })) seg(x + i, y + h, x + i + 1, y + h, FRONT_WALL_H, shade(wall, 0.95));
 
+    // equipment sprites go above the floor and low front walls
+    for (const p of spriteProps) {
+      const spec = EQUIP_SPRITE[p.id]!;
+      const c0 = cellCenter(p.cell.x, p.cell.y);
+      this.placeSprite(spec.name, c0.x, c0.y + 6, spec.width, 0.85);
+    }
+
     // label
     const c = cellToWorld(x + w / 2, y + h / 2);
     this.addLabel(status?.operational ? label : `⚠ ${label}`, c.x, c.y - WALL_H - 8, status?.operational ? wall : 0xc0392b, false);
+  }
+
+  /** Place a sprite with its base at a world point; width in world px. */
+  private placeSprite(name: string, x: number, y: number, width: number, anchorY = 0.85): boolean {
+    const t = this.tex.get(name);
+    if (!t) return false;
+    const sp = new Sprite(t);
+    sp.anchor.set(0.5, anchorY);
+    sp.scale.set(width / t.width);
+    sp.position.set(x, y);
+    this.staticLayer.addChild(sp);
+    return true;
   }
 
   private drawPeople(people: PersonMarker[]): void {

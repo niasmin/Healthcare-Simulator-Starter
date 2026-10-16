@@ -73,6 +73,9 @@ export function TitleScreen() {
               {t('title.start')}
             </button>
           )}
+          <button type="button" onClick={() => useGame.getState().setChaptersOpen(true)} className="px-4 py-3 rounded-xl border border-white/50 text-white hover:bg-white/10">
+            {t('chapters.open')}
+          </button>
           <button type="button" onClick={() => setLang(lang === 'th' ? 'en' : 'th')} className="px-4 py-3 rounded-xl border border-white/50 text-white hover:bg-white/10">
             {t('top.lang')}
           </button>

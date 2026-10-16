@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { SaveModal } from './components/SaveModal';
+import { ChaptersModal } from './components/ChaptersModal';
 import { useAutosave } from './saveService';
 import { EventModal } from './components/EventModal';
 import { TitleScreen } from './components/TitleScreen';
@@ -23,6 +24,8 @@ export function App() {
   const setStarted = useGame((s) => s.setStarted);
   const saveOpen = useGame((s) => s.saveOpen);
   const setSaveOpen = useGame((s) => s.setSaveOpen);
+  const chaptersOpen = useGame((s) => s.chaptersOpen);
+  const setChaptersOpen = useGame((s) => s.setChaptersOpen);
   useEffect(() => {
     if (window.location.search.includes('skiptitle')) setStarted(true);
   }, [setStarted]);
@@ -35,6 +38,7 @@ export function App() {
       <Toast />
       {started ? <EventModal /> : <TitleScreen />}
       {started && saveOpen && <SaveModal mode="game" onClose={() => setSaveOpen(false)} />}
+      {chaptersOpen && <ChaptersModal onClose={() => setChaptersOpen(false)} />}
     </>
   );
 

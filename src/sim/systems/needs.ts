@@ -1,6 +1,7 @@
 import { MEAL_TIMES, SELF_MEAL_NUTRITION, selfFeeds } from '../../data/patients';
 import { minuteOfDay } from '../../domain/rules/shifts';
 import { PRICE_SATISFACTION_DRIFT } from '../../data/finance';
+import { gardenAppeal } from '../../data/decor';
 import type { CareGroup, GameState, NeedKey, Needs, Resident } from '../../domain/types';
 import { clamp, r2 } from '../helpers';
 
@@ -18,15 +19,16 @@ export function wellbeing(n: Needs): number {
   return (n.physical + n.mobility + n.mental + n.happiness + n.nutrition) / 5;
 }
 
-function decayResident(r: Resident, minute: number, priceDrift: number): Resident {
+function decayResident(r: Resident, minute: number, priceDrift: number, appeal: number): Resident {
   const n = r.needs;
   const lvl = r.careLevel;
   const d: Partial<Record<NeedKey, number>> = {
     nutrition: -0.35,
     physical: -(0.04 + 0.04 * lvl) - (n.nutrition < 30 ? 0.1 : 0),
     mobility: -MOBILITY_DECAY[r.group],
-    mental: -0.05,
-    happiness: -0.07,
+    // A pleasant garden (appeal 0..30) slows happiness decay and lifts mood a little.
+    mental: -0.05 + appeal * 0.0005,
+    happiness: -0.07 + appeal * 0.0015,
   };
   if (priceDrift) d.satisfaction = (d.satisfaction ?? 0) + priceDrift;
   if (!r.carePlan) {
@@ -45,5 +47,6 @@ function decayResident(r: Resident, minute: number, priceDrift: number): Residen
 export function needsTick(state: GameState): GameState {
   if (state.residents.length === 0) return state;
   const drift = PRICE_SATISFACTION_DRIFT[state.priceLevel];
-  return { ...state, residents: state.residents.map((r) => decayResident(r, state.minute, drift)) };
+  const appeal = gardenAppeal(state.site.decor);
+  return { ...state, residents: state.residents.map((r) => decayResident(r, state.minute, drift, appeal)) };
 }

@@ -1,6 +1,8 @@
 import { ROLE_PORTRAIT, residentPortrait } from '../portraits';
 import { useMemo } from 'react';
 import { CORRIDOR_COST_PER_TILE, REFUND_PERCENT, ROOMS, ROOM_TYPES } from '../../data/rooms';
+import { DECOR, DECOR_ORDER, gardenAppeal, MAX_APPEAL } from '../../data/decor';
+import { DECOR_SPRITE, spriteUrl } from '../../render/sprites';
 import { ROLES, wageFor } from '../../data/staff';
 import { freeBeds } from '../../domain/rules/beds';
 import type { RoomType } from '../../domain/types';
@@ -8,6 +10,14 @@ import { careKpis } from '../../sim/selectors';
 import { useMoney, useT } from '../hooks';
 import { useGame, type LeftTab, type Tool } from '../store';
 import { Avatar, GROUP_COLOR, RoleChip, StatBar, useName } from './people';
+
+/** Room pictures from the Game Assets Pack. */
+const ROOM_ART: Record<RoomType, string> = {
+  ward: 'rm_standard',
+  nursing_station: 'rm_station',
+  therapy: 'rm_therapy',
+  staff_room: 'rm_dining',
+};
 
 const SWATCH: Record<RoomType, string> = {
   ward: '#4f8a80',
@@ -17,7 +27,10 @@ const SWATCH: Record<RoomType, string> = {
 };
 
 function sameTool(a: Tool, b: Tool) {
-  return a.kind === b.kind && (a.kind !== 'room' || (b.kind === 'room' && a.roomType === b.roomType));
+  if (a.kind !== b.kind) return false;
+  if (a.kind === 'room') return b.kind === 'room' && a.roomType === b.roomType;
+  if (a.kind === 'decor') return b.kind === 'decor' && a.decor === b.decor;
+  return true;
 }
 
 function BuildTools() {
@@ -28,27 +41,36 @@ function BuildTools() {
   const setView = useGame((s) => s.setView);
   const setSheet = useGame((s) => s.setSheet);
 
-  const item = (target: Tool, title: string, sub: string, swatch?: string) => {
+  const decorCount = useGame((s) => s.game.site.decor.length);
+  const appeal = useGame((s) => gardenAppeal(s.game.site.decor));
+  const choose = (target: Tool) => {
+    setTool(target);
+    setView('map');
+    setSheet(null); // phone: close the sheet so the map is free to drag on
+  };
+
+  const item = (target: Tool, title: string, sub: string, swatch?: string, art?: string) => {
     const active = sameTool(tool, target);
     return (
       <button
         key={title}
         type="button"
-        onClick={() => {
-          setTool(target);
-          setView('map');
-          setSheet(null); // phone: close the sheet so the map is free to drag on
-        }}
+        onClick={() => choose(target)}
         aria-pressed={active}
         className={`w-full text-left rounded-xl border px-3 py-2 transition-colors ${
           active ? 'border-teal bg-teal text-white shadow-sm' : 'border-line bg-white hover:border-teal/50'
         }`}
       >
-        <div className="flex items-center gap-2">
-          {swatch && <span className="inline-block size-3 rounded-sm shrink-0" style={{ background: swatch }} />}
-          <span className="font-semibold text-sm">{title}</span>
+        <div className="flex items-start gap-2.5">
+          {art && <img src={art} alt="" className="w-14 h-12 object-contain shrink-0 -my-0.5" draggable={false} />}
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              {swatch && <span className="inline-block size-3 rounded-sm shrink-0" style={{ background: swatch }} />}
+              <span className="font-semibold text-sm">{title}</span>
+            </div>
+            <div className={`text-xs mt-0.5 ${active ? 'text-white/80' : 'text-ink-soft'}`}>{sub}</div>
+          </div>
         </div>
-        <div className={`text-xs mt-0.5 ${active ? 'text-white/80' : 'text-ink-soft'}`}>{sub}</div>
       </button>
     );
   };
@@ -66,8 +88,40 @@ function BuildTools() {
           t(`room.${rt}`),
           `${t(`room.${rt}.desc`)} · ${money(d.baseCostSatang)} ${t('tool.base')} + ${money(d.costPerTileSatang)}${t('tool.per_tile')}`,
           SWATCH[rt],
+          spriteUrl(ROOM_ART[rt]),
         );
       })}
+      <div className="h-px bg-line my-1" />
+      <div className="flex items-baseline justify-between">
+        <h3 className="text-xs font-semibold text-ink-soft uppercase tracking-wide">{t('decor.section')}</h3>
+        <span className="text-[11px] text-ink-soft tabular" title={t('decor.appeal_hint')}>
+          {t('decor.appeal', { n: Math.round(appeal * 10) / 10, max: MAX_APPEAL })}
+        </span>
+      </div>
+      <p className="text-[11px] text-ink-soft leading-snug -mt-1">{t('decor.hint', { n: decorCount })}</p>
+      <div className="grid grid-cols-2 gap-1.5">
+        {DECOR_ORDER.map((type) => {
+          const target: Tool = { kind: 'decor', decor: type };
+          const active = sameTool(tool, target);
+          return (
+            <button
+              key={type}
+              type="button"
+              aria-pressed={active}
+              onClick={() => choose(target)}
+              className={`rounded-xl border p-1.5 flex flex-col items-center text-center transition-colors ${
+                active ? 'border-teal bg-teal text-white' : 'border-line bg-white hover:border-teal/50'
+              }`}
+            >
+              <img src={spriteUrl(DECOR_SPRITE[type].name)} alt="" className="h-12 w-full object-contain" draggable={false} />
+              <span className="text-xs font-semibold leading-tight mt-0.5">{t(`decor.${type}`)}</span>
+              <span className={`text-[10px] tabular ${active ? 'text-white/80' : 'text-ink-soft'}`}>
+                {money(DECOR[type].costSatang)} · ✿{DECOR[type].appeal}
+              </span>
+            </button>
+          );
+        })}
+      </div>
     </>
   );
 }

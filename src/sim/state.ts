@@ -11,7 +11,7 @@ export function createInitialState(seed: number = STARTER_SCENARIO.defaultSeed, 
   const corridor = new Array<number>(width * height).fill(0);
   corridor[cellIndex(entrance.x, entrance.y, width)] = 1;
   const base: GameState = {
-    schemaVersion: 3,
+    schemaVersion: 4,
     seed,
     rngState: seedToState(seed),
     minute: START_MINUTE,
@@ -25,7 +25,7 @@ export function createInitialState(seed: number = STARTER_SCENARIO.defaultSeed, 
       cashSatang: 0,
       reputation: 50,
     },
-    site: { id: 'site-1', organizationId: 'org-1', width, height, entrance: { ...entrance }, corridor, rooms: [] },
+    site: { id: 'site-1', organizationId: 'org-1', width, height, entrance: { ...entrance }, corridor, rooms: [], decor: [] },
     ledger: [],
     // First day-end fires at the next midnight.
     queue: [

@@ -60,6 +60,8 @@ export function useKeyboard() {
       else if (e.key === '3') st.dispatch({ type: 'setSpeed', speed: 2 });
       else if (e.key === '4') st.dispatch({ type: 'setSpeed', speed: 4 });
       else if (e.key === 'Escape') {
+        if (st.chaptersOpen) return st.setChaptersOpen(false);
+        if (st.saveOpen) return st.setSaveOpen(false);
         st.setTool({ kind: 'select' });
         st.select(null);
       }

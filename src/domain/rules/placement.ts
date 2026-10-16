@@ -1,6 +1,8 @@
 import { CORRIDOR_COST_PER_TILE, ROOMS, roomConstructionCost } from '../../data/rooms';
 import { cellIndex, rectArea, rectCells, rectInBounds, rectsOverlap } from '../grid';
-import type { Cell, GameState, Rect, ReasonCode, RoomType, Satang } from '../types';
+import type { Cell, DecorType, GameState, Rect, ReasonCode, RoomType, Satang } from '../types';
+import { DECOR } from '../../data/decor';
+import { rectContains, inBounds } from '../grid';
 
 export type PlacementCheck =
   | { ok: true; costSatang: Satang; cells: Cell[] }
@@ -8,6 +10,22 @@ export type PlacementCheck =
 
 function occupiedByRoom(state: GameState, rect: Rect): boolean {
   return state.site.rooms.some((r) => rectsOverlap(r.rect, rect));
+}
+
+function occupiedByDecor(state: GameState, rect: Rect): boolean {
+  return (state.site.decor ?? []).some((d) => rectContains(rect, d.cell));
+}
+
+/** A decoration needs one empty tile: no room, corridor, entrance or other decoration. */
+export function validateDecor(state: GameState, type: DecorType, cell: Cell): PlacementCheck {
+  const { site, organization } = state;
+  const cost = DECOR[type].costSatang;
+  if (!inBounds(cell.x, cell.y, site.width, site.height)) return { ok: false, reason: 'out_of_bounds', costSatang: cost };
+  const one = { x: cell.x, y: cell.y, w: 1, h: 1 };
+  if (occupiedByRoom(state, one) || occupiedByDecor(state, one) || site.corridor[cellIndex(cell.x, cell.y, site.width)])
+    return { ok: false, reason: 'overlap', costSatang: cost };
+  if (organization.cashSatang < cost) return { ok: false, reason: 'insufficient_funds', costSatang: cost };
+  return { ok: true, costSatang: cost, cells: [cell] };
 }
 
 /** Validate a room footprint before construction. Pure — never mutates state. */
@@ -20,7 +38,7 @@ export function validateRoomPlacement(state: GameState, type: RoomType, rect: Re
   if (Math.min(rect.w, rect.h) < def.minSide || area < def.minArea)
     return { ok: false, reason: 'too_small', costSatang: cost, params: { minSide: def.minSide, minArea: def.minArea } };
   if (area > def.maxArea) return { ok: false, reason: 'too_large', costSatang: cost, params: { maxArea: def.maxArea } };
-  if (occupiedByRoom(state, rect)) return { ok: false, reason: 'overlap', costSatang: cost };
+  if (occupiedByRoom(state, rect) || occupiedByDecor(state, rect)) return { ok: false, reason: 'overlap', costSatang: cost };
   const cells = rectCells(rect);
   if (cells.some((c) => site.corridor[cellIndex(c.x, c.y, site.width)]))
     return { ok: false, reason: 'overlap', costSatang: cost };
@@ -35,7 +53,7 @@ export function validateRoomPlacement(state: GameState, type: RoomType, rect: Re
 export function validateCorridor(state: GameState, rect: Rect): PlacementCheck {
   const { site, organization } = state;
   if (!rectInBounds(rect, site.width, site.height)) return { ok: false, reason: 'out_of_bounds', costSatang: 0 };
-  if (occupiedByRoom(state, rect)) return { ok: false, reason: 'overlap', costSatang: 0 };
+  if (occupiedByRoom(state, rect) || occupiedByDecor(state, rect)) return { ok: false, reason: 'overlap', costSatang: 0 };
   const cells = rectCells(rect).filter((c) => !site.corridor[cellIndex(c.x, c.y, site.width)]);
   const cost = CORRIDOR_COST_PER_TILE * cells.length;
   if (cells.length === 0) return { ok: false, reason: 'nothing_to_build', costSatang: 0 };

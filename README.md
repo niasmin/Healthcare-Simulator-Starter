@@ -32,6 +32,19 @@ Add `?debug` to the URL to expose `window.__HE__` (store + renderer) for automat
 
 Everything playable today is **Chapter 1 — First Care Home** of the campaign in the concept art. Chapters 2–7 (30–80 beds, Tranquila villas, Home Care, PHC workforce, Neuro Hospital, multi-site empire) start after Phase 4.
 
+### Visual upgrade from the Game Assets Pack
+
+- **Art source:** sprites were cut automatically from the project's own *Game Assets Pack* (transparent PNG), using alpha-channel connected components. They're stored as WebP: 26 sprites, about 155 KB.
+- **On the map:** beds, call-bell monitors, supply carts, desks, exercise balls, parallel bars and lockers are drawn as sprites instead of boxes, with the vector box kept as a fallback. A "HEALTHCARE EMPIRE" sign sits at the entrance.
+- **Garden & decor (สวนและตกแต่ง):** a new build section with 10 items: shade tree, round tree, pink trumpet tree, flower bush, hedge, planter, garden lamp, patio table, fountain and gazebo.
+  - Each item takes one empty tile. It can't overlap rooms, corridor, the entrance or other decor, and rooms and corridors can't be built over it.
+  - Demolish refunds 50%, and each item costs ฿10/day in upkeep.
+  - Each item adds *appeal*, capped at 30. Appeal slows residents' happiness decay and lifts mental well-being slightly. Tested: a lush garden keeps residents measurably happier.
+  - Rooms and garden items are drawn back to front, so trees overlap correctly.
+- **Pictures in the UI:** room pictures on the build cards, equipment pictures in the room inspector, and coin, people, smile and star icons in the desktop and phone top bars.
+- **7-chapter journey:** a chapters screen with cards cropped from the campaign concept art. Chapter 1 shows "playing now" and its goal progress; chapters 2–7 are marked as unlocking later. It opens from the title screen, the goals header and the phone menu, and Escape closes it.
+- **Save format:** schema 4 adds `site.decor`. Older schema-3 saves are migrated automatically on load (tested).
+
 ### Save system (Phase 4, part 1)
 
 - **Autosave:**
@@ -150,7 +163,9 @@ src/
   sim/systems/billing.ts   Invoices (admission / monthly / final), service counters, payments, food and supplies
   sim/systems/events.ts    Seeded event roll, triggers, choice effects, expiry, referral deadlines
   assets/                  Portraits and the world-map title image (from the project's own concept art)
-  storage/format.ts        Versioned save format, gzip encode/decode, validation
+  data/decor.ts            Garden items: cost, appeal, upkeep
+  render/sprites.ts        Sprite URLs, map sizes, texture loading
+  storage/format.ts        Versioned save format, gzip encode/decode, validation, schema migration
   storage/localStore.ts    IndexedDB (Dexie) store with in-memory fallback
   storage/cloudStore.ts    Per-player cloud store on the artifact db capability, chunked
   storage/saves.ts         SaveManager: dual write, newest-copy load, slot list, latest
@@ -185,7 +200,7 @@ src/
   - Food, supplies, upkeep and payroll are each charged once per day.
   - An event's cost is charged once, and a resolved event can't be resolved again.
 
-## Tests (74 passing)
+## Tests (79 passing)
 
 | File | Covers |
 |---|---|
@@ -198,6 +213,7 @@ src/
 | `finance.test.ts` | Pro-rated admission invoice; **monthly invoice created exactly once** (re-running billing is a no-op); each payment books revenue once and revenue equals paid invoices; therapy sessions billed on the next invoice and reset; food and supplies once per day; price level changes only new invoices; a full 10-bed home runs 30 days with cash rising and positive every day; finance view totals match the ledger and the revenue mix |
 | `events.test.ts` | Auto-pause and speed restore; no double resolve; a choice cost charged once; urgent assessment needs an RN on duty; raise (+10%) vs accept (both nurses leave); referral deadline costs reputation; default choice after 12 h; seeded and deterministic over 30 days with cooldowns; at least 3 quiet days between events |
 | `saves.test.ts` | **Save and reload gives identical state**, and the reloaded game then runs identically for 300 ticks; gzip makes it at least 3× smaller; corrupt, tampered (cash ≠ ledger) and incompatible saves rejected without throwing; IndexedDB store round-trip (fake-indexeddb); cloud store splits large saves into parts under 256 KiB and reassembles them; the newest copy wins across two devices sharing one account; works without cloud; local save survives cloud failure |
+| `decor.test.ts` | Decor placed on an empty tile and charged once; can't overlap rooms, corridor, entrance or decor, and blocks building over it; demolish refunds half; appeal is capped and makes residents happier; schema-3 saves migrate to schema 4 |
 | `i18n-iso.test.ts` | TH/EN key parity; labels for every room, equipment and reason; Thai interpolation; iso projection inverts for all 400 cells |
 
 GDD acceptance tests covered so far: *place a room and deduct construction cost once*, *reject collisions*, *admit up to capacity*, *reject excess admission*, *schedule a qualified staff member*, *prevent overlapping shifts*, *advance 30 days deterministically with a fixed seed*, *reconcile cash ledger*, *show Thai text correctly*, *run production build without errors*. *Create monthly invoice once* is now covered too. *Save and reload identical state* is now covered as well, so **all GDD acceptance tests pass**.

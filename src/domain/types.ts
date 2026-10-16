@@ -45,6 +45,14 @@ export interface Room {
   builtAt: SimMinute;
 }
 
+export type DecorType = 'tree' | 'sakura' | 'tree2' | 'flowers' | 'hedge' | 'planter' | 'lamp' | 'umbrella' | 'fountain' | 'gazebo';
+
+export interface Decor {
+  id: string;
+  type: DecorType;
+  cell: Cell;
+}
+
 export interface Site {
   id: string;
   organizationId: string;
@@ -55,6 +63,8 @@ export interface Site {
   /** Row-major corridor layer: 1 = corridor tile, 0 = empty. */
   corridor: number[];
   rooms: Room[];
+  /** Garden and decoration items, one tile each (Phase 4 visual upgrade). */
+  decor: Decor[];
 }
 
 export interface Organization {
@@ -299,7 +309,7 @@ export interface LogItem {
 }
 
 export interface GameState {
-  schemaVersion: 3;
+  schemaVersion: 4;
   seed: number;
   /** Current PRNG state (mulberry32). Advancing the RNG updates this. */
   rngState: number;

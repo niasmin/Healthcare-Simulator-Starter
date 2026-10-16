@@ -8,6 +8,7 @@ import { LeftPanel } from './BuildPanel';
 import { CenterArea } from './CenterArea';
 import { Dashboard } from './Dashboard';
 import { SidePanel } from './Inspector';
+import { spriteUrl } from '../../render/sprites';
 
 /**
  * Phone layout (< 1024px): the active view fills the screen, a bottom tab bar switches views,
@@ -83,13 +84,21 @@ function MobileTopBar({ alertCount }: { alertCount: number }) {
         </button>
       </div>
       <div className="flex items-center gap-3 text-[11px] tabular overflow-hidden">
+        <img src={spriteUrl('ic_coin')} alt="" className="size-4 -mr-2" />
         <span className="font-semibold text-sm">{money(game.organization.cashSatang)}</span>
         {h.cashDelta !== 0 && <span className={h.cashDelta > 0 ? 'text-emerald-300' : 'text-red-300'}>{(h.cashDelta > 0 ? '+' : '') + money(h.cashDelta)}</span>}
-        <span className="ml-auto text-white/80">
-          {t('top.occupancy')} {h.residents}/{h.beds}
+        <span className="ml-auto text-white/85 inline-flex items-center gap-1">
+          <img src={spriteUrl('ic_people')} alt={t('top.occupancy')} className="size-4" />
+          {h.residents}/{h.beds}
         </span>
-        <span className="text-white/80">☺ {h.satisfaction === null ? '—' : Math.round(h.satisfaction)}</span>
-        <span className="text-white/80">★ {game.organization.reputation}</span>
+        <span className="text-white/85 inline-flex items-center gap-1">
+          <img src={spriteUrl('ic_smile')} alt={t('top.satisfaction')} className="size-4" />
+          {h.satisfaction === null ? '—' : Math.round(h.satisfaction)}
+        </span>
+        <span className="text-white/85 inline-flex items-center gap-1">
+          <img src={spriteUrl('ic_star')} alt={t('top.reputation')} className="size-4" />
+          {game.organization.reputation}
+        </span>
       </div>
     </header>
   );
@@ -114,6 +123,16 @@ function MenuSheet() {
         className="rounded-xl bg-teal text-white px-4 py-3 text-left font-semibold"
       >
         💾 {t('save.title')}
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          setSheet(null);
+          useGame.getState().setChaptersOpen(true);
+        }}
+        className="rounded-xl bg-white border border-line px-4 py-3 text-left"
+      >
+        🗺 {t('chapters.open')}
       </button>
       <button type="button" onClick={() => setLang(lang === 'th' ? 'en' : 'th')} className="rounded-xl bg-white border border-line px-4 py-3 text-left">
         {t('m.language')}: <span className="font-semibold">{lang === 'th' ? 'ไทย → English' : 'English → ไทย'}</span>
@@ -169,7 +188,8 @@ export function MobileShell() {
     { id: 'manage', label: t('m.manage'), icon: 'M4 6h16 M4 12h16 M4 18h16' },
   ];
   const placing = tool.kind !== 'select';
-  const toolName = tool.kind === 'room' ? t(`room.${tool.roomType}`) : tool.kind === 'corridor' ? t('tool.corridor') : t('tool.bulldoze');
+  const toolName =
+    tool.kind === 'room' ? t(`room.${tool.roomType}`) : tool.kind === 'decor' ? t(`decor.${tool.decor}`) : tool.kind === 'corridor' ? t('tool.corridor') : t('tool.bulldoze');
 
   return (
     <div className="h-[100dvh] flex flex-col overflow-hidden">

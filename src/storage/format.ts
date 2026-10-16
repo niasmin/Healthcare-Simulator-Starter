@@ -9,7 +9,7 @@ import { dayOf } from '../sim/systems/time';
  * CompressionStream, so even long games stay far below storage limits.
  */
 export const SAVE_FORMAT = 1;
-export const CURRENT_SCHEMA = 3;
+export const CURRENT_SCHEMA = 4;
 
 export type SlotId = 'auto' | 'slot1' | 'slot2' | 'slot3';
 export const SLOTS: SlotId[] = ['auto', 'slot1', 'slot2', 'slot3'];
@@ -100,11 +100,22 @@ export async function decodeSave(blob: SaveBlob): Promise<{ ok: true; state: Gam
   }
 }
 
-/** Structural checks plus the cash-ledger invariant. Older schemas would be migrated here. */
-export function validate(state: GameState): { ok: true; state: GameState } | { ok: false; error: LoadError } {
-  if (!state || typeof state !== 'object') return { ok: false, error: 'corrupt' };
+/** Upgrade older saves step by step to the current schema. */
+export function migrate(state: GameState): GameState {
+  let s = state as Omit<GameState, 'schemaVersion'> & { schemaVersion: number };
+  if (s.schemaVersion === 3) {
+    // v4 adds garden decorations to the site.
+    s = { ...s, schemaVersion: 4, site: { ...s.site, decor: [] } };
+  }
+  return s as GameState;
+}
+
+/** Structural checks plus the cash-ledger invariant. Older schemas are migrated first. */
+export function validate(input: GameState): { ok: true; state: GameState } | { ok: false; error: LoadError } {
+  if (!input || typeof input !== 'object') return { ok: false, error: 'corrupt' };
+  const state = migrate(input);
   if (state.schemaVersion !== CURRENT_SCHEMA) return { ok: false, error: 'incompatible' };
-  const arrays = [state.ledger, state.site?.rooms, state.site?.corridor, state.residents, state.employees, state.shifts, state.tasks, state.invoices, state.queue];
+  const arrays = [state.ledger, state.site?.rooms, state.site?.corridor, state.site?.decor, state.residents, state.employees, state.shifts, state.tasks, state.invoices, state.queue];
   if (arrays.some((a) => !Array.isArray(a))) return { ok: false, error: 'corrupt' };
   if (!Number.isFinite(state.minute) || !state.organization || !state.events) return { ok: false, error: 'corrupt' };
   if (!reconcile(state).ok) return { ok: false, error: 'corrupt' };

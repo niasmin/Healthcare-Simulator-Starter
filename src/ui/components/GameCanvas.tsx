@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { rectCells, rectContains, rectFromCorners } from '../../domain/grid';
-import { validateCorridor, validateRoomPlacement, type PlacementCheck } from '../../domain/rules/placement';
+import { validateCorridor, validateDecor, validateRoomPlacement, type PlacementCheck } from '../../domain/rules/placement';
 import type { Cell, Rect } from '../../domain/types';
 import { IsoRenderer } from '../../render/IsoRenderer';
 import { ROLES } from '../../data/staff';
@@ -58,6 +58,8 @@ export function GameCanvas() {
           if (res.ok && res.id) st.select(res.id);
         } else if (tl.kind === 'corridor') {
           st.dispatch({ type: 'paintCorridor', rect });
+        } else if (tl.kind === 'decor') {
+          st.dispatch({ type: 'placeDecor', decor: tl.decor, cell: d.end });
         } else if (tl.kind === 'bulldoze') {
           if (d.start.x === d.end.x && d.start.y === d.end.y) st.dispatch({ type: 'bulldoze', cell: d.start });
         }
@@ -82,6 +84,7 @@ export function GameCanvas() {
     const rect = rectFromCorners(drag.start, drag.end);
     if (tool.kind === 'room') return { rect, check: validateRoomPlacement(game, tool.roomType, rect), cells: rectCells(rect) };
     if (tool.kind === 'corridor') return { rect, check: validateCorridor(game, rect), cells: rectCells(rect) };
+    if (tool.kind === 'decor') return { rect: { ...drag.end, w: 1, h: 1 }, check: validateDecor(game, tool.decor, drag.end), cells: [drag.end] };
     return null;
   }, [drag, tool, game]);
 
@@ -112,7 +115,7 @@ export function GameCanvas() {
   const coarse = typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches;
   let status: { text: string; tone: 'ok' | 'bad' | 'muted' } = { text: t(coarse ? 'canvas.help_touch' : 'canvas.help'), tone: 'muted' };
   if (preview) {
-    const name = tool.kind === 'room' ? t(`room.${tool.roomType}`) : t('room.corridor');
+    const name = tool.kind === 'room' ? t(`room.${tool.roomType}`) : tool.kind === 'decor' ? t(`decor.${tool.decor}`) : t('room.corridor');
     const head = `${name} ${preview.rect.w}×${preview.rect.h} · ${money(preview.check.costSatang)}`;
     status = preview.check.ok
       ? { text: `${head} · ✓ ${t('preview.ok')}`, tone: 'ok' }

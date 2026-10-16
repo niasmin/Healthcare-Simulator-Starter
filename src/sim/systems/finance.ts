@@ -1,4 +1,5 @@
 import { CORRIDOR_UPKEEP_PER_TILE, ROOMS } from '../../data/rooms';
+import { DECOR_UPKEEP } from '../../data/decor';
 import { rectArea } from '../../domain/grid';
 import type { GameState, Satang } from '../../domain/types';
 import { post } from '../helpers';
@@ -10,6 +11,7 @@ export function dailyUpkeep(state: GameState): Satang {
   for (const room of state.site.rooms) total += ROOMS[room.type].upkeepPerTileSatang * rectArea(room.rect);
   const corridorTiles = state.site.corridor.reduce((a, b) => a + b, 0);
   total += CORRIDOR_UPKEEP_PER_TILE * corridorTiles;
+  total += DECOR_UPKEEP * state.site.decor.length;
   return total;
 }
 

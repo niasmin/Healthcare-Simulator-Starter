@@ -1,13 +1,14 @@
 import { CORRIDOR_COST_PER_TILE, EQUIPMENT, REFUND_PERCENT, ROOMS, equipmentSlot, roomConstructionCost } from '../data/rooms';
 import { cellIndex, inBounds, rectContains } from '../domain/grid';
 import { pctOf } from '../domain/money';
-import { validateCorridor, validateRoomPlacement } from '../domain/rules/placement';
+import { validateCorridor, validateDecor, validateRoomPlacement } from '../domain/rules/placement';
+import { DECOR } from '../data/decor';
 import { equipmentCount } from '../domain/rules/rooms';
 import { SHIFT_SLOTS } from '../data/staff';
 import { freeBeds, parseBedId, residentsInRoom } from '../domain/rules/beds';
 import { roomStatus } from '../domain/rules/rooms';
 import { validateShift } from '../domain/rules/shifts';
-import type { Cell, CommandResult, DayStats, EquipmentId, GameSpeed, GameState, PriceLevel, Rect, Resident, Room, RoomType, ShiftSlot } from '../domain/types';
+import type { Cell, CommandResult, DayStats, DecorType, EquipmentId, GameSpeed, GameState, PriceLevel, Rect, Resident, Room, RoomType, ShiftSlot } from '../domain/types';
 import { dayInMonth, monthOfDay, PRICE_LEVELS } from '../data/finance';
 import { billAdmission, billFinal, billMonth, chargeDailyResidentCosts, collectPayments } from './systems/billing';
 import { eventCheck, eventExpiryTick, expireReferrals, resolveEvent } from './systems/events';
@@ -40,6 +41,7 @@ export type Command =
   | { type: 'dischargeResident'; residentId: string }
   | { type: 'createCarePlan'; residentId: string }
   | { type: 'setPriceLevel'; level: PriceLevel }
+  | { type: 'placeDecor'; decor: DecorType; cell: Cell }
   | { type: 'resolveEvent'; choiceId: string };
 
 export interface CommandOutcome {
@@ -107,6 +109,13 @@ export function applyCommand(state: GameState, cmd: Command): CommandOutcome {
       if (!inBounds(cell.x, cell.y, site.width, site.height)) return fail(state, 'out_of_bounds');
       const room = site.rooms.find((r) => rectContains(r.rect, cell));
       if (room) return deleteRoom(state, room.id);
+      const decor = site.decor.find((d) => d.cell.x === cell.x && d.cell.y === cell.y);
+      if (decor) {
+        const refund = pctOf(DECOR[decor.type].costSatang, REFUND_PERCENT);
+        let s: GameState = { ...state, site: { ...site, decor: site.decor.filter((d) => d.id !== decor.id) } };
+        s = post(s, refund, 'refund', 'ledger.refund_decor', { ref: decor.id, memoParams: { decor: decor.type } });
+        return { state: s, result: { ok: true, costSatang: -refund } };
+      }
       if (cell.x === site.entrance.x && cell.y === site.entrance.y) return fail(state, 'cannot_remove_entrance');
       const idx = cellIndex(cell.x, cell.y, site.width);
       if (!site.corridor[idx]) return fail(state, 'not_found');
@@ -236,6 +245,16 @@ export function applyCommand(state: GameState, cmd: Command): CommandOutcome {
 
     case 'resolveEvent':
       return resolveEvent(state, cmd.choiceId);
+
+    case 'placeDecor': {
+      if (!DECOR[cmd.decor]) return fail(state, 'invalid_choice');
+      const check = validateDecor(state, cmd.decor, cmd.cell);
+      if (!check.ok) return fail(state, check.reason, check.params);
+      let [s, id] = allocId(state, 'decor');
+      s = { ...s, site: { ...s.site, decor: [...s.site.decor, { id, type: cmd.decor, cell: { ...cmd.cell } }] } };
+      s = post(s, -check.costSatang, 'construction', 'ledger.decor', { ref: id, memoParams: { decor: cmd.decor } });
+      return { state: s, result: { ok: true, id, costSatang: check.costSatang } };
+    }
   }
 }
 

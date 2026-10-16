@@ -4,6 +4,7 @@ import { pctOf } from '../../domain/money';
 import type { EquipmentId } from '../../domain/types';
 import { dayOf, formatClock } from '../../sim/systems/time';
 import { useMemo } from 'react';
+import { EQUIP_SPRITE, spriteUrl } from '../../render/sprites';
 import { rosterView } from '../../sim/selectors';
 import { EXHAUSTED_ENERGY } from '../../sim/systems/staffing';
 import { useMoney, useSummary, useT } from '../hooks';
@@ -70,6 +71,7 @@ function RoomInspector({ roomId }: { roomId: string }) {
             const price = EQUIPMENT[slot.id].costSatang;
             return (
               <li key={slot.id} className="flex items-center gap-2 rounded-lg border border-line bg-white px-2 py-1.5">
+                {EQUIP_SPRITE[slot.id] && <img src={spriteUrl(EQUIP_SPRITE[slot.id]!.name)} alt="" className="size-8 object-contain shrink-0" draggable={false} />}
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-medium truncate">{t(`equip.${slot.id}`)}</div>
                   <div className="text-[11px] text-ink-soft tabular">
@@ -122,6 +124,7 @@ function CellInfo() {
   let hint = t('tool.select.hint');
   if (tool.kind === 'corridor') hint = t('tool.corridor.hint');
   if (tool.kind === 'bulldoze') hint = t('tool.bulldoze.hint', { pct: REFUND_PERCENT });
+  if (tool.kind === 'decor') hint = t('tool.decor.hint', { name: t(`decor.${tool.decor}`) });
   if (tool.kind === 'room') {
     const d = ROOMS[tool.roomType];
     hint = t('tool.room.hint', { minSide: d.minSide, minArea: d.minArea, maxArea: d.maxArea });
@@ -130,9 +133,12 @@ function CellInfo() {
   if (hover) {
     const isEntrance = hover.x === site.entrance.x && hover.y === site.entrance.y;
     const room = site.rooms.find((r) => hover.x >= r.rect.x && hover.y >= r.rect.y && hover.x < r.rect.x + r.rect.w && hover.y < r.rect.y + r.rect.h);
+    const decor = site.decor.find((d) => d.cell.x === hover.x && d.cell.y === hover.y);
     what = isEntrance
       ? t('room.entrance')
-      : room
+      : decor
+        ? t(`decor.${decor.type}`)
+        : room
         ? t(`room.${room.type}`)
         : site.corridor[cellIndex(hover.x, hover.y, site.width)]
           ? t('room.corridor')

@@ -1,10 +1,10 @@
 import { create } from 'zustand';
 import { applyCommand, step, type Command } from '../sim/engine';
 import { createInitialState } from '../sim/state';
-import type { Cell, CommandResult, GameState, RoomType } from '../domain/types';
+import type { Cell, CommandResult, DecorType, GameState, RoomType } from '../domain/types';
 import type { Lang } from './i18n';
 
-export type Tool = { kind: 'select' } | { kind: 'corridor' } | { kind: 'bulldoze' } | { kind: 'room'; roomType: RoomType };
+export type Tool = { kind: 'select' } | { kind: 'corridor' } | { kind: 'bulldoze' } | { kind: 'room'; roomType: RoomType } | { kind: 'decor'; decor: DecorType };
 
 export type View = 'map' | 'residents' | 'roster' | 'finance';
 export type LeftTab = 'build' | 'hire' | 'admit';
@@ -52,6 +52,8 @@ interface UIStore {
   notify: (key: string, level?: Toast['level'], params?: Toast['params']) => void;
   saveOpen: boolean;
   setSaveOpen: (v: boolean) => void;
+  chaptersOpen: boolean;
+  setChaptersOpen: (v: boolean) => void;
   dismissToast: () => void;
 }
 
@@ -128,4 +130,6 @@ export const useGame = create<UIStore>((set, get) => ({
   notify: (key, level = 'ok', params) => set({ toast: { id: ++toastSeq, key, level, ...(params ? { params } : {}) } }),
   saveOpen: false,
   setSaveOpen: (saveOpen) => set({ saveOpen }),
+  chaptersOpen: false,
+  setChaptersOpen: (chaptersOpen) => set({ chaptersOpen }),
 }));
