@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import type { GameSpeed } from '../../domain/types';
 import { dayOf, formatClock } from '../../sim/systems/time';
 import { useMoney, useT } from '../hooks';
@@ -19,6 +20,13 @@ export function TopBar() {
   const reputation = useGame((s) => s.game.organization.reputation);
   const lang = useGame((s) => s.lang);
   const { dispatch, setLang, newGame } = useGame.getState();
+  // Two-step confirm inside the page (browser confirm() dialogs are blocked in embedded viewers).
+  const [confirming, setConfirming] = useState(false);
+  useEffect(() => {
+    if (!confirming) return;
+    const h = setTimeout(() => setConfirming(false), 4000);
+    return () => clearTimeout(h);
+  }, [confirming]);
 
   return (
     <header className="flex flex-wrap items-center gap-x-5 gap-y-2 px-4 py-2 bg-ink text-white">
@@ -71,11 +79,15 @@ export function TopBar() {
         <button
           type="button"
           onClick={() => {
-            if (window.confirm(t('top.new_game_confirm'))) newGame();
+            if (confirming) {
+              setConfirming(false);
+              newGame();
+            } else setConfirming(true);
           }}
-          className="px-3 py-1 rounded-md border border-white/30 text-sm hover:bg-white/10"
+          title={t('top.new_game_confirm')}
+          className={`px-3 py-1 rounded-md border text-sm ${confirming ? 'bg-coral border-coral text-white' : 'border-white/30 hover:bg-white/10'}`}
         >
-          {t('top.new_game')}
+          {confirming ? t('top.new_game_sure') : t('top.new_game')}
         </button>
       </div>
     </header>

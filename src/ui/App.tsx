@@ -19,7 +19,7 @@ export function App() {
   return (
     <div className="h-full flex flex-col">
       <TopBar />
-      <main className="flex-1 min-h-0 grid gap-3 p-3 grid-cols-1 lg:grid-cols-[250px_1fr_300px] lg:grid-rows-[minmax(0,1fr)_auto] overflow-y-auto lg:overflow-hidden">
+      <main className="flex-1 min-h-0 grid gap-3 py-3 px-4 grid-cols-1 lg:grid-cols-[250px_1fr_300px] lg:grid-rows-[minmax(0,1fr)_auto] overflow-y-auto lg:overflow-hidden">
         <div className="lg:row-span-1 min-h-0 flex flex-col max-lg:order-2">
           <BuildPanel />
         </div>

@@ -11,6 +11,7 @@ const th: Dict = {
   'top.pause': 'หยุด',
   'top.new_game': 'เริ่มใหม่',
   'top.new_game_confirm': 'เริ่มเกมใหม่? ความคืบหน้าปัจจุบันจะหายไป',
+  'top.new_game_sure': 'กดอีกครั้งเพื่อเริ่มใหม่',
   'top.lang': 'EN',
 
   'tab.build': 'ก่อสร้าง',
@@ -132,6 +133,7 @@ const en: Dict = {
   'top.pause': 'Pause',
   'top.new_game': 'New game',
   'top.new_game_confirm': 'Start a new game? Current progress will be lost.',
+  'top.new_game_sure': 'Click again to restart',
   'top.lang': 'ไทย',
 
   'tab.build': 'Build',
