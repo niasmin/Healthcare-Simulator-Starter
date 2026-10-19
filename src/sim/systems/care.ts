@@ -1,4 +1,4 @@
-import { carePlanSchedule, TASK_GRACE_MINUTES, TASK_KINDS } from '../../data/patients';
+import { carePlanSchedule, TASK_KINDS } from '../../data/patients';
 import { parseBedId } from '../../domain/rules/beds';
 import { allRoomStatuses } from '../../domain/rules/rooms';
 import { isOnShift } from '../../domain/rules/shifts';
@@ -91,7 +91,7 @@ export function careTick(state: GameState): GameState {
 
   // 2. Overdue pending tasks are missed.
   for (const t of tasks) {
-    if (t.status !== 'pending' || now <= t.dueAt + TASK_GRACE_MINUTES) continue;
+    if (t.status !== 'pending' || now <= t.dueAt + TASK_KINDS[t.kind].grace) continue;
     t.status = 'missed';
     missed++;
     changed = true;

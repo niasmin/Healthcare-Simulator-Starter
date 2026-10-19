@@ -3,6 +3,8 @@ import { SaveModal } from './components/SaveModal';
 import { ChaptersModal } from './components/ChaptersModal';
 import { useAutosave } from './saveService';
 import { EventModal } from './components/EventModal';
+import { ChapterResultModal } from './components/ChapterResultModal';
+import { TutorialCard, useTutorialToasts } from './components/Tutorial';
 import { TitleScreen } from './components/TitleScreen';
 import { LeftPanel } from './components/BuildPanel';
 import { Dashboard } from './components/Dashboard';
@@ -20,6 +22,7 @@ export function App() {
   const lang = useGame((s) => s.lang);
   const mobile = useIsMobile();
   useAutosave();
+  useTutorialToasts();
   const started = useGame((s) => s.started);
   const setStarted = useGame((s) => s.setStarted);
   const saveOpen = useGame((s) => s.saveOpen);
@@ -37,6 +40,7 @@ export function App() {
     <>
       <Toast />
       {started ? <EventModal /> : <TitleScreen />}
+      {started && <ChapterResultModal />}
       {started && saveOpen && <SaveModal mode="game" onClose={() => setSaveOpen(false)} />}
       {chaptersOpen && <ChaptersModal onClose={() => setChaptersOpen(false)} />}
     </>
@@ -59,8 +63,11 @@ function DesktopLayout() {
         <div className="min-h-0 flex flex-col">
           <LeftPanel />
         </div>
-        <div className="min-h-0 flex flex-col">
+        <div className="min-h-0 flex flex-col relative">
           <CenterArea />
+          <div className="absolute left-3 bottom-14 z-10 max-w-[calc(100%-1.5rem)] pointer-events-none">
+            <TutorialCard />
+          </div>
         </div>
         <div className="min-h-0 flex flex-col">
           <SidePanel />

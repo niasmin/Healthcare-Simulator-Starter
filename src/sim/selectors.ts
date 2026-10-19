@@ -4,7 +4,8 @@ import type { GameState, LedgerCategory, RoomType, Satang } from '../domain/type
 import { dailyPayroll, dailyUpkeep } from './systems/finance';
 import { carePlanSchedule, TASK_KINDS } from '../data/patients';
 import { ROLE_ORDER, SHIFT_SLOTS, SLOT_ORDER } from '../data/staff';
-import { inWindow, isOnShift } from '../domain/rules/shifts';
+import { inWindow, isOnShift, shiftMinutes } from '../domain/rules/shifts';
+import { MINUTES_PER_DAY, START_MINUTE } from './constants';
 import type { Employee, ShiftSlot, Skill, StaffRole } from '../domain/types';
 import { wellbeing } from './systems/needs';
 import { dayInMonth, monthOfDay } from '../data/finance';
@@ -53,41 +54,55 @@ export function summarize(state: GameState): SiteSummary {
   };
 }
 
+/** What the tutorial's "Show me" button opens. Plain data: the UI decides how to show it. */
+export type GuideAction =
+  | { kind: 'tool'; tool: 'corridor' | RoomType }
+  | { kind: 'select'; roomType: RoomType }
+  | { kind: 'tab'; tab: 'hire' | 'admit' }
+  | { kind: 'view'; view: 'residents' | 'roster' | 'finance' }
+  | { kind: 'speed' };
+
 export interface Objective {
   id: string;
+  /** i18n key of the goal; `tut.<id>` holds the tutorial's how-to hint. */
   key: string;
   params?: Record<string, number>;
   done: boolean;
   progress?: { have: number; need: number };
+  action: GuideAction;
 }
 
-/** First-milestone build goals, derived purely from state (no stored flags). */
+/**
+ * Chapter 1 goals in tutorial order, derived purely from state (no stored flags), so the tutorial
+ * always matches the game: the current step is the first one not done, wherever the player is.
+ */
 export function buildObjectives(state: GameState, summary: SiteSummary = summarize(state)): Objective[] {
-  const target = STARTER_SCENARIO.targetBeds;
-  const connected = state.site.rooms.some((r) => summary.statuses.get(r.id)?.door);
+  const sc = STARTER_SCENARIO;
+  const capped = (have: number, need: number) => ({ have: Math.min(have, need), need });
+  const wardConnected = state.site.rooms.some((r) => r.type === 'ward' && summary.statuses.get(r.id)?.door);
+  const hasResidents = state.residents.length > 0;
+  const day = dayOf(state.minute);
   return [
-    { id: 'corridor', key: 'goal.corridor', done: summary.corridorTiles >= 6, progress: { have: Math.min(summary.corridorTiles, 6), need: 6 } },
-    { id: 'connected', key: 'goal.connected', done: connected },
+    { id: 'corridor', key: 'goal.corridor', done: summary.corridorTiles >= 6, progress: capped(summary.corridorTiles, 6), action: { kind: 'tool', tool: 'corridor' } },
+    { id: 'ward', key: 'goal.ward', done: wardConnected, action: { kind: 'tool', tool: 'ward' } },
+    { id: 'beds', key: 'goal.beds', params: { n: sc.targetBeds }, done: summary.bedsOperational >= sc.targetBeds, progress: capped(summary.bedsOperational, sc.targetBeds), action: { kind: 'select', roomType: 'ward' } },
+    { id: 'station', key: 'goal.station', done: summary.operationalByType.nursing_station > 0, action: { kind: 'tool', tool: 'nursing_station' } },
+    { id: 'therapy', key: 'goal.therapy', done: summary.operationalByType.therapy > 0, action: { kind: 'tool', tool: 'therapy' } },
+    { id: 'staff_room', key: 'goal.staff_room', done: summary.operationalByType.staff_room > 0, action: { kind: 'tool', tool: 'staff_room' } },
+    { id: 'hire_rn', key: 'goal.hire_rn', done: state.employees.some((e) => e.role === 'rn'), action: { kind: 'tab', tab: 'hire' } },
+    { id: 'admit', key: 'goal.admit', done: hasResidents, action: { kind: 'tab', tab: 'admit' } },
+    { id: 'care_plan', key: 'goal.care_plan', done: hasResidents && state.residents.every((r) => r.carePlan), action: { kind: 'view', view: 'residents' } },
+    { id: 'roster', key: 'goal.roster', done: hasResidents && rosterView(state).slots.every((s) => s.ready && s.staffCount > 0), action: { kind: 'view', view: 'roster' } },
+    { id: 'run', key: 'goal.run', done: state.minute > START_MINUTE, action: { kind: 'speed' } },
+    { id: 'fill', key: 'goal.fill', params: { n: sc.targetResidents }, done: state.residents.length >= sc.targetResidents, progress: capped(state.residents.length, sc.targetResidents), action: { kind: 'tab', tab: 'admit' } },
+    { id: 'first_revenue', key: 'goal.first_revenue', done: state.ledger.some((e) => e.category === 'revenue'), action: { kind: 'view', view: 'finance' } },
     {
-      id: 'beds',
-      key: 'goal.beds',
-      params: { n: target },
-      done: summary.bedsOperational >= target,
-      progress: { have: Math.min(summary.bedsOperational, target), need: target },
-    },
-    { id: 'station', key: 'goal.station', done: summary.operationalByType.nursing_station > 0 },
-    { id: 'staff_room', key: 'goal.staff_room', done: summary.operationalByType.staff_room > 0 },
-    { id: 'therapy', key: 'goal.therapy', done: summary.operationalByType.therapy > 0 },
-    { id: 'cash', key: 'goal.cash', done: state.organization.cashSatang > 0 && summary.roomsOperational >= 3 },
-    { id: 'hire_rn', key: 'goal.hire_rn', done: state.employees.some((e) => e.role === 'rn') },
-    { id: 'admit', key: 'goal.admit', done: state.residents.length > 0 },
-    { id: 'care_plan', key: 'goal.care_plan', done: state.residents.length > 0 && state.residents.every((r) => r.carePlan) },
-    { id: 'roster', key: 'goal.roster', done: state.residents.length > 0 && rosterView(state).slots.every((s) => s.ready && s.staffCount > 0) },
-    { id: 'first_revenue', key: 'goal.first_revenue', done: state.ledger.some((e) => e.category === 'revenue') },
-    {
-      id: 'positive_month',
-      key: 'goal.positive_month',
-      done: monthOfDay(dayOf(state.minute)) > 1 && totalsOf(state.ledger.filter((e) => monthOfDay(entryDay(e)) === 1)).net > 0,
+      id: 'chapter',
+      key: 'goal.chapter',
+      params: { n: sc.targetDays, r: sc.targetResidents, q: sc.targetQuality },
+      done: state.chapter.result?.outcome === 'won',
+      progress: capped(state.chapter.result ? sc.targetDays : day - 1, sc.targetDays),
+      action: { kind: 'view', view: 'finance' },
     },
   ];
 }
@@ -107,18 +122,27 @@ const SKILL_OWNER: Record<Skill, StaffRole> = {
   activity: 'ot',
 };
 
-/** Productive minutes per 8-hour shift used for recommendations (80%). */
-const PRODUCTIVE_MINUTES = 384;
+/** Share of staffed time that is productive, used for recommendations (80%). */
+const PRODUCTIVE_SHARE = 1;
+
+/** One planned care task, positioned in minutes since its shift started. */
+export interface PlannedTask {
+  at: number;
+  duration: number;
+  grace: number;
+  skill: Skill;
+}
 
 export interface SlotDemand {
   minutes: number;
   bySkill: Partial<Record<Skill, number>>;
+  tasks: PlannedTask[];
 }
 
 /** Care minutes each shift needs per day, from the residents' care plans. */
 export function slotDemand(state: GameState): Record<ShiftSlot, SlotDemand> {
   const out = {} as Record<ShiftSlot, SlotDemand>;
-  for (const slot of SLOT_ORDER) out[slot] = { minutes: 0, bySkill: {} };
+  for (const slot of SLOT_ORDER) out[slot] = { minutes: 0, bySkill: {}, tasks: [] };
   for (const r of state.residents) {
     if (!r.carePlan) continue;
     for (const [kind, mod] of carePlanSchedule(r.group, r.careLevel)) {
@@ -126,9 +150,47 @@ export function slotDemand(state: GameState): Record<ShiftSlot, SlotDemand> {
       const slot = SLOT_ORDER.find((sl) => inWindow(mod, SHIFT_SLOTS[sl].start, SHIFT_SLOTS[sl].end))!;
       out[slot].minutes += def.duration;
       out[slot].bySkill[def.skill] = (out[slot].bySkill[def.skill] ?? 0) + def.duration;
+      out[slot].tasks.push({ at: (mod - SHIFT_SLOTS[slot].start + MINUTES_PER_DAY) % MINUTES_PER_DAY, duration: def.duration, grace: def.grace, skill: def.skill });
     }
   }
   return out;
+}
+
+/**
+ * People needed so every rush fits: for each window of due times [a, b], the work due in it must be
+ * done between a and the last start time allowed (b + grace, capped at the shift end).
+ */
+function peopleFor(tasks: PlannedTask[], shiftLength: number): number {
+  if (!tasks.length) return 0;
+  const times = [...new Set(tasks.map((t) => t.at))].sort((x, y) => x - y);
+  let need = 0;
+  for (let i = 0; i < times.length; i++) {
+    let work = 0;
+    let end = 0;
+    for (let j = i; j < times.length; j++) {
+      for (const t of tasks) {
+        if (t.at !== times[j]) continue;
+        work += t.duration;
+        end = Math.max(end, Math.min(t.at + t.grace + t.duration, shiftLength));
+      }
+      const span = Math.max(10, end - times[i]);
+      need = Math.max(need, Math.ceil(work / (span * PRODUCTIVE_SHARE) - 1e-9));
+    }
+  }
+  return need;
+}
+
+/**
+ * Recommended headcount per role for one shift. Broader roles cover narrower work with their spare
+ * time, the way task assignment does: the supervising RN also does PN work (vital signs, medication
+ * rounds), and RNs and PNs also do caregiver work (personal care, meals).
+ */
+export function roleNeeds(demand: SlotDemand, shiftLength: number, rnOnDuty: boolean): Record<StaffRole, number> {
+  const of = (...roles: StaffRole[]) => demand.tasks.filter((t) => roles.includes(SKILL_OWNER[t.skill]));
+  const rn = rnOnDuty ? 1 : 0;
+  const pn = Math.max(0, peopleFor(of('rn', 'pn'), shiftLength) - rn);
+  const caregiver = Math.max(0, peopleFor(of('rn', 'pn', 'caregiver'), shiftLength) - rn - pn);
+  return { rn, pn, caregiver, pt: peopleFor(of('pt'), shiftLength), ot: peopleFor(of('ot'), shiftLength) };
 }
 
 export interface RosterCell {
@@ -159,17 +221,11 @@ export function rosterView(state: GameState): { cells: RosterCell[]; slots: Slot
   for (const slot of SLOT_ORDER) {
     const onSlot = new Set(state.shifts.filter((s) => s.slot === slot).map((s) => s.employeeId));
     const staff = state.employees.filter((e) => onSlot.has(e.id));
+    const needs = roleNeeds(demand[slot], shiftMinutes(SHIFT_SLOTS[slot].start, SHIFT_SLOTS[slot].end), hasResidents && slot !== 'night');
     let needCount = 0;
     for (const role of ROLE_ORDER) {
-      let need = 0;
-      if (role === 'rn') need = hasResidents && slot !== 'night' ? 1 : 0;
-      else {
-        let minutes = 0;
-        for (const [skill, m] of Object.entries(demand[slot].bySkill) as [Skill, number][]) if (SKILL_OWNER[skill] === role) minutes += m;
-        need = Math.ceil(minutes / PRODUCTIVE_MINUTES);
-      }
-      needCount += need;
-      cells.push({ role, slot, staff: staff.filter((e) => e.role === role), need });
+      needCount += needs[role];
+      cells.push({ role, slot, staff: staff.filter((e) => e.role === role), need: needs[role] });
     }
     const skillsOnDuty = new Set(staff.flatMap((e) => e.skills));
     const missingSkills = (Object.keys(demand[slot].bySkill) as Skill[]).filter((k) => !skillsOnDuty.has(k));

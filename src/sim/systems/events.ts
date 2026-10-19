@@ -1,4 +1,4 @@
-import { DAILY_EVENT_CHANCE, EVENT_DEFS, EVENT_EXPIRY_MINUTES, EVENT_ORDER, MIN_DAYS_BETWEEN_EVENTS, REFERRAL_COUNT, REFERRAL_DAYS } from '../../data/events';
+import { DAILY_EVENT_CHANCE, EVENT_DEFS, EVENT_EXPIRY_MINUTES, EVENT_ORDER, MIN_DAYS_BETWEEN_EVENTS, REFERRAL_COUNT, REFERRAL_DAYS, SCRIPTED_EVENTS, SCRIPT_WINDOW_DAYS } from '../../data/events';
 import { freeBeds } from '../../domain/rules/beds';
 import { isOnShift } from '../../domain/rules/shifts';
 import type { ActiveEvent, CommandResult, EventDefId, GameState, NeedKey, Resident } from '../../domain/types';
@@ -52,12 +52,18 @@ function pickResident(state: GameState, pool: Resident[]): [GameState, Resident]
 export function eventCheck(state: GameState): GameState {
   if (state.events.active) return state;
   const last = state.events.history[state.events.history.length - 1];
-  if (last && dayOf(state.minute) - last.day < MIN_DAYS_BETWEEN_EVENTS) return state;
+  const today = dayOf(state.minute);
+  if (last && today - last.day < MIN_DAYS_BETWEEN_EVENTS) return state;
+  // Scripted chapter events come first and use no randomness.
+  const pending = SCRIPTED_EVENTS.filter((x) => today <= x.day + SCRIPT_WINDOW_DAYS && !state.events.history.some((h) => h.defId === x.defId && h.day >= x.day));
+  const scripted = pending.find((x) => today >= x.day && eligible(state, x.defId));
+  if (scripted) return fireEvent(state, scripted.defId);
   let s = state;
   let roll: number;
   [s, roll] = randInt(s, 0, 99);
   if (roll >= DAILY_EVENT_CHANCE) return s;
-  const pool = EVENT_ORDER.filter((id) => eligible(s, id));
+  // A lesson still to come is not spent early by the random roll.
+  const pool = EVENT_ORDER.filter((id) => eligible(s, id) && !pending.some((x) => x.defId === id));
   if (!pool.length) return s;
   const total = pool.reduce((a, id) => a + weightOf(s, id), 0);
   let pick: number;

@@ -82,6 +82,18 @@ export const EVENT_DEFS: Record<EventDefId, EventDef> = {
   },
 };
 
+/**
+ * Chapter 1 teaching script: each event fires at 09:00 on its day, or on the first later day it is
+ * allowed (eligible, off cooldown, quiet gap respected), within a few days. Random events fill the rest.
+ */
+export const SCRIPTED_EVENTS: Array<{ day: number; defId: EventDefId }> = [
+  { day: 3, defId: 'family_visit' },
+  { day: 8, defId: 'resident_change' },
+  { day: 15, defId: 'staff_resign' },
+];
+/** A scripted event that could not fire by this many days after its day is dropped. */
+export const SCRIPT_WINDOW_DAYS = 5;
+
 export const EVENT_ORDER: EventDefId[] = ['resident_change', 'staff_resign', 'referral', 'family_visit'];
 
 /** Chance (percent) that an event fires at the 09:00 check when none is active. */

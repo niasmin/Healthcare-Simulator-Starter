@@ -20,6 +20,7 @@ import { needsTick, wellbeing } from './systems/needs';
 import { hireFromCandidate, refreshCandidates, removeEmployee, staffEnergyTick, staffMoraleDaily } from './systems/staffing';
 import { advanceClock, dayOf, schedule } from './systems/time';
 import { summarizeBeds } from './bedsSummary';
+import { judgeChapter } from './systems/chapter';
 
 /**
  * Commands are the ONLY way the UI changes game state.
@@ -297,6 +298,7 @@ export function step(state: GameState): GameState {
         s = collectPayments(s, closingDay);
         s = expireReferrals(s, closingDay);
         s = closeDay(s);
+        s = judgeChapter(s, closingDay);
         // The new day starts: bill the month in advance on its first day.
         const newDay = closingDay + 1;
         if (dayInMonth(newDay) === 1) s = billMonth(s, monthOfDay(newDay));
