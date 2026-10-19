@@ -34,7 +34,8 @@ export type EquipmentId =
   | 'exercise_mat'
   | 'parallel_bars'
   | 'lockers'
-  | 'rest_sofa';
+  | 'rest_sofa'
+  | 'door_sensor';
 
 export interface Room {
   id: string;
@@ -170,7 +171,7 @@ export type StaffRole = 'rn' | 'pn' | 'caregiver' | 'pt' | 'ot';
  * Abstract qualifications. Clinical work is modelled only as "who is allowed
  * to do which kind of task" — never as treatment advice.
  */
-export type Skill = 'assessment' | 'vital_signs' | 'med_round' | 'personal_care' | 'feeding' | 'mobility' | 'activity';
+export type Skill = 'assessment' | 'vital_signs' | 'med_round' | 'personal_care' | 'feeding' | 'mobility' | 'activity' | 'tube_feeding' | 'airway_care';
 
 export type ShiftSlot = 'morning' | 'afternoon' | 'night';
 
@@ -207,7 +208,8 @@ export interface StaffCandidate {
   experienceYears: number;
 }
 
-export type CareGroup = 'active_aging' | 'stroke_rehab' | 'bedridden';
+/** Chapter 1 groups plus the Chapter 2 specialised programmes (abstract care categories, never treatments). */
+export type CareGroup = 'active_aging' | 'stroke_rehab' | 'bedridden' | 'dementia' | 'tube_feeding' | 'airway';
 
 export type NeedKey = 'physical' | 'mobility' | 'mental' | 'happiness' | 'satisfaction' | 'nutrition';
 export type Needs = Record<NeedKey, number>;
@@ -242,7 +244,17 @@ export interface ResidentCandidate {
   referralDeadline?: number;
 }
 
-export type TaskKind = 'vital_signs' | 'med_round' | 'personal_care' | 'meal_assist' | 'repositioning' | 'mobility_session' | 'activity';
+export type TaskKind =
+  | 'vital_signs'
+  | 'med_round'
+  | 'personal_care'
+  | 'meal_assist'
+  | 'repositioning'
+  | 'mobility_session'
+  | 'activity'
+  | 'tube_feed'
+  | 'airway_care'
+  | 'safety_round';
 export type TaskStatus = 'pending' | 'in_progress' | 'done' | 'missed';
 
 export interface CareTask {
@@ -312,7 +324,7 @@ export interface LogItem {
 // Chapter challenge (Phase 4): the 30-day story goal, judged once by the engine.
 // ---------------------------------------------------------------------------
 
-export type ChapterCheckId = 'solvent' | 'beds' | 'residents' | 'cashflow' | 'quality';
+export type ChapterCheckId = 'solvent' | 'beds' | 'residents' | 'cashflow' | 'quality' | 'rn' | 'programmes';
 
 export interface ChapterCheck {
   id: ChapterCheckId;
@@ -322,6 +334,8 @@ export interface ChapterCheck {
 }
 
 export interface ChapterResult {
+  /** Chapter number (1 = First Care Home). */
+  chapter: number;
   outcome: 'won' | 'failed';
   /** Day the verdict was reached. */
   day: number;
@@ -330,8 +344,17 @@ export interface ChapterResult {
   checks: ChapterCheck[];
 }
 
+/** The running chapter. Each chapter is judged once, over days startDay .. startDay + days − 1. */
+export interface ChapterState {
+  id: number;
+  startDay: number;
+  result: ChapterResult | null;
+  /** Verdicts of earlier chapters, oldest first. */
+  past: ChapterResult[];
+}
+
 export interface GameState {
-  schemaVersion: 5;
+  schemaVersion: 6;
   seed: number;
   /** Current PRNG state (mulberry32). Advancing the RNG updates this. */
   rngState: number;
@@ -365,7 +388,7 @@ export interface GameState {
   unbilled: Record<string, { therapy: number; activity: number; special: number }>;
   events: EventsState;
   // Phase 4
-  chapter: { result: ChapterResult | null };
+  chapter: ChapterState;
 }
 
 export type ReasonCode =
@@ -391,7 +414,9 @@ export type ReasonCode =
   | 'plan_exists'
   | 'no_event'
   | 'invalid_choice'
-  | 'needs_rn_on_shift';
+  | 'needs_rn_on_shift'
+  | 'needs_secure_ward'
+  | 'chapter_locked';
 
 export type CommandResult =
   | { ok: true; id?: string; costSatang?: Satang }

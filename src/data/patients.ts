@@ -5,13 +5,19 @@ import type { CareGroup, NeedKey, PersonName, Skill, TaskKind } from '../domain/
  * tasks describe who may do a kind of work and when, never what treatment to give.
  */
 
-export const CARE_GROUPS: CareGroup[] = ['active_aging', 'stroke_rehab', 'bedridden'];
+export const CARE_GROUPS: CareGroup[] = ['active_aging', 'stroke_rehab', 'bedridden', 'dementia', 'tube_feeding', 'airway'];
 
 export const GROUP_LEVELS: Record<CareGroup, [number, number]> = {
   active_aging: [1, 2],
   stroke_rehab: [2, 3],
   bedridden: [3, 4],
+  dementia: [2, 3],
+  tube_feeding: [3, 4],
+  airway: [4, 4],
 };
+
+/** Programmes that need a ward fitted with this equipment (dementia: a door-sensor secured ward). */
+export const GROUP_WARD_EQUIPMENT: Partial<Record<CareGroup, 'door_sensor'>> = { dementia: 'door_sensor' };
 
 export interface TaskKindDef {
   kind: TaskKind;
@@ -41,6 +47,10 @@ export const TASK_KINDS: Record<TaskKind, TaskKindDef> = {
   repositioning: { kind: 'repositioning', skill: 'personal_care', duration: 10, priority: 2, effects: { physical: 3, mobility: 1 }, missPenalty: { physical: -4, satisfaction: -2 }, grace: 90 },
   mobility_session: { kind: 'mobility_session', skill: 'mobility', duration: 40, priority: 3, effects: { mobility: 10, mental: 2, satisfaction: 2 }, missPenalty: { satisfaction: -2 }, room: 'therapy', grace: SESSION_GRACE_MINUTES },
   activity: { kind: 'activity', skill: 'activity', duration: 20, priority: 3, effects: { happiness: 10, mental: 8, mobility: 2, satisfaction: 2 }, missPenalty: { satisfaction: -1 }, grace: SESSION_GRACE_MINUTES },
+  // Chapter 2 programmes. Named only by the kind of work and the qualification it needs.
+  tube_feed: { kind: 'tube_feed', skill: 'tube_feeding', duration: 20, priority: 1, effects: { nutrition: 30 }, missPenalty: { nutrition: -8, satisfaction: -4 }, grace: 90 },
+  airway_care: { kind: 'airway_care', skill: 'airway_care', duration: 15, priority: 1, effects: { physical: 5, satisfaction: 1 }, missPenalty: { physical: -8, satisfaction: -4 }, grace: 90 },
+  safety_round: { kind: 'safety_round', skill: 'personal_care', duration: 10, priority: 2, effects: { mental: 3, happiness: 2 }, missPenalty: { mental: -3, satisfaction: -2 }, grace: 90 },
 };
 
 /** Fixed meal times (minute of day). Residents who eat independently restore nutrition here. */
@@ -60,11 +70,15 @@ export function carePlanSchedule(group: CareGroup, level: number): Array<[TaskKi
     ['med_round', h(21)],
   ];
   if (level >= 2) out.push(['personal_care', h(7, 30)], ['personal_care', h(19)]);
-  if (level >= 3 || group === 'bedridden') {
-    out.push(['meal_assist', h(8)], ['meal_assist', h(12)], ['meal_assist', h(18)]);
-    out.push(['vital_signs', h(20)]);
-  }
-  if (group === 'bedridden') for (const t of [h(2), h(6), h(10), h(14), h(18, 30), h(22)]) out.push(['repositioning', t]);
+  const tube = group === 'tube_feeding' || group === 'airway';
+  if (tube) out.push(['tube_feed', h(8)], ['tube_feed', h(12)], ['tube_feed', h(18)]);
+  else if (!selfFeeds(group, level)) out.push(['meal_assist', h(8)], ['meal_assist', h(12)], ['meal_assist', h(18)]);
+  if (level >= 3 || group === 'bedridden') out.push(['vital_signs', h(20)]);
+  if (group === 'bedridden' || tube) for (const t of [h(2), h(6), h(10), h(14), h(18, 30), h(22)]) out.push(['repositioning', t]);
+  // Airway care every six hours, so a home with these residents needs an RN on the night shift too.
+  if (group === 'airway') for (const t of [h(3), h(9, 30), h(15, 30), h(21, 30)]) out.push(['airway_care', t]);
+  // Residents living with dementia get regular safety and orientation rounds.
+  if (group === 'dementia') for (const t of [h(11), h(16), h(22, 30)]) out.push(['safety_round', t]);
   // Sessions are booked from 10:00 and may run until 14:00, inside the morning shift.
   if (group === 'stroke_rehab') out.push(['mobility_session', h(10)]);
   out.push(['activity', h(10)]);
@@ -73,7 +87,7 @@ export function carePlanSchedule(group: CareGroup, level: number): Array<[TaskKi
 
 /** Residents with a plan that includes meal assistance don't self-feed. */
 export function selfFeeds(group: CareGroup, level: number): boolean {
-  return !(level >= 3 || group === 'bedridden');
+  return !(level >= 3 || group === 'bedridden' || group === 'dementia' || group === 'tube_feeding' || group === 'airway');
 }
 
 /** Fictional resident names (Thai, with romanisation). Many are Northern Thai names. */

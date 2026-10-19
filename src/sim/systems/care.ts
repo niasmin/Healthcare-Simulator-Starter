@@ -55,6 +55,14 @@ function staffOrder(a: Employee, b: Employee): number {
   return a.skills.length - b.skills.length || b.energy - a.energy || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
 }
 
+/** A routine task this close to being missed is taken by whoever is free. */
+const RESERVE_URGENT_MINUTES = 30;
+
+/** True when other work only `e` (not the task's narrowest staff) can do falls due before `t` would be finished. */
+function reservedFor(e: Employee, t: CareTask, tasks: CareTask[], now: number, narrowSkills: Set<string>): boolean {
+  return tasks.some((u) => u.status === 'pending' && !narrowSkills.has(u.skill) && e.skills.includes(u.skill) && u.dueAt <= now + t.duration);
+}
+
 export function careTick(state: GameState): GameState {
   if (state.tasks.length === 0) return state;
   const now = state.minute;
@@ -110,7 +118,14 @@ export function careTick(state: GameState): GameState {
       const candidates = [...employees.values()]
         .filter((e) => !e.taskId && e.busyUntil <= now && e.energy >= EXHAUSTED_ENERGY && e.skills.includes(t.skill) && isOnShift(state, e.id, now))
         .sort(staffOrder);
-      const e = candidates[0];
+      // Someone whose other skills are needed within the hour keeps free for that work, unless this
+      // task is about to be missed. (Stops PNs doing 07:30 personal care while 08:00 vital signs wait.)
+      // Only staff with a narrower colleague on shift for this task hold back.
+      const urgent = now >= t.dueAt + TASK_KINDS[t.kind].grace - RESERVE_URGENT_MINUTES;
+      const qualified = [...employees.values()].filter((x) => x.skills.includes(t.skill) && isOnShift(state, x.id, now));
+      const narrowest = qualified.reduce<Employee | null>((a, x) => (!a || x.skills.length < a.skills.length ? x : a), null);
+      const narrowSkills = new Set<string>(narrowest?.skills ?? []);
+      const e = urgent ? candidates[0] : candidates.find((c) => c.skills.length === narrowest?.skills.length || !reservedFor(c, t, tasks, now, narrowSkills));
       if (!e) continue;
       const duration = e.energy < 30 ? Math.round(t.duration * 1.5) : t.duration;
       t.status = 'in_progress';

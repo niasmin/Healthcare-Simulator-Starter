@@ -11,7 +11,7 @@ export function createInitialState(seed: number = STARTER_SCENARIO.defaultSeed, 
   const corridor = new Array<number>(width * height).fill(0);
   corridor[cellIndex(entrance.x, entrance.y, width)] = 1;
   const base: GameState = {
-    schemaVersion: 5,
+    schemaVersion: 6,
     seed,
     rngState: seedToState(seed),
     minute: START_MINUTE,
@@ -45,7 +45,7 @@ export function createInitialState(seed: number = STARTER_SCENARIO.defaultSeed, 
     invoices: [],
     unbilled: {},
     events: { active: null, cooldownUntil: {}, history: [] },
-    chapter: { result: null },
+    chapter: { id: 1, startDay: 1, result: null, past: [] },
   };
   return seedCandidates(post(base, scenario.startingCashSatang, 'capital', 'ledger.capital'));
 }

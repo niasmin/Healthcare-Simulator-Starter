@@ -15,7 +15,7 @@ export interface RoleDef {
 export const ROLES: Record<StaffRole, RoleDef> = {
   rn: {
     role: 'rn',
-    skills: ['assessment', 'vital_signs', 'med_round', 'personal_care', 'feeding'],
+    skills: ['assessment', 'vital_signs', 'med_round', 'personal_care', 'feeding', 'tube_feeding', 'airway_care'],
     baseWageSatang: thb(30_000),
     wagePerYearSatang: thb(1_000),
     color: 0x2f6f68,
@@ -23,7 +23,7 @@ export const ROLES: Record<StaffRole, RoleDef> = {
   },
   pn: {
     role: 'pn',
-    skills: ['vital_signs', 'med_round', 'personal_care', 'feeding'],
+    skills: ['vital_signs', 'med_round', 'personal_care', 'feeding', 'tube_feeding'],
     baseWageSatang: thb(19_000),
     wagePerYearSatang: thb(600),
     color: 0x4a6aa5,

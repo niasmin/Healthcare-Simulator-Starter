@@ -1,4 +1,5 @@
-import type { GameState, Room } from '../types';
+import type { CareGroup, GameState, Room } from '../types';
+import { GROUP_WARD_EQUIPMENT } from '../../data/patients';
 import { allRoomStatuses } from './rooms';
 
 /** Bed ids are `${roomId}#${index}` for index < installed bed count. */
@@ -19,20 +20,26 @@ export function residentsInRoom(state: GameState, roomId: string) {
  * Free beds in OPERATIONAL wards, in deterministic order (room order, then index).
  * Invariant: a bed id is never held by two residents.
  */
-export function freeBeds(state: GameState): string[] {
+export function freeBeds(state: GameState, group?: CareGroup): string[] {
   const statuses = allRoomStatuses(state.site);
   const taken = new Set(state.residents.map((r) => r.bedId));
+  const needs = group ? GROUP_WARD_EQUIPMENT[group] : undefined;
   const out: string[] = [];
+  const secured: string[] = [];
   for (const room of state.site.rooms) {
     if (room.type !== 'ward') continue;
     const st = statuses.get(room.id)!;
     if (!st.operational) continue;
+    const fitted = needs ? (room.equipment[needs] ?? 0) > 0 : false;
+    if (needs && !fitted) continue;
+    // Other residents fill ordinary wards first, keeping secured beds for those who need them.
+    const list = !needs && (room.equipment.door_sensor ?? 0) > 0 ? secured : out;
     for (let i = 0; i < st.capacity; i++) {
       const id = bedId(room.id, i);
-      if (!taken.has(id)) out.push(id);
+      if (!taken.has(id)) list.push(id);
     }
   }
-  return out;
+  return [...out, ...secured];
 }
 
 export function roomOfResident(state: GameState, residentBedId: string): Room | undefined {

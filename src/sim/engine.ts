@@ -20,7 +20,8 @@ import { needsTick, wellbeing } from './systems/needs';
 import { hireFromCandidate, refreshCandidates, removeEmployee, staffEnergyTick, staffMoraleDaily } from './systems/staffing';
 import { advanceClock, dayOf, schedule } from './systems/time';
 import { summarizeBeds } from './bedsSummary';
-import { judgeChapter } from './systems/chapter';
+import { judgeChapter, startNextChapter } from './systems/chapter';
+import { GROUP_WARD_EQUIPMENT } from '../data/patients';
 
 /**
  * Commands are the ONLY way the UI changes game state.
@@ -43,7 +44,8 @@ export type Command =
   | { type: 'createCarePlan'; residentId: string }
   | { type: 'setPriceLevel'; level: PriceLevel }
   | { type: 'placeDecor'; decor: DecorType; cell: Cell }
-  | { type: 'resolveEvent'; choiceId: string };
+  | { type: 'resolveEvent'; choiceId: string }
+  | { type: 'startChapter' };
 
 export interface CommandOutcome {
   state: GameState;
@@ -199,8 +201,8 @@ export function applyCommand(state: GameState, cmd: Command): CommandOutcome {
     case 'admitResident': {
       const c = state.waitlist.find((x) => x.id === cmd.candidateId);
       if (!c) return fail(state, 'not_found');
-      const bed = freeBeds(state)[0];
-      if (!bed) return fail(state, 'no_free_bed');
+      const bed = freeBeds(state, c.group)[0];
+      if (!bed) return fail(state, GROUP_WARD_EQUIPMENT[c.group] && freeBeds(state).length ? 'needs_secure_ward' : 'no_free_bed');
       let [s, id] = allocId(state, 'res');
       const resident: Resident = { id, name: c.name, age: c.age, group: c.group, careLevel: c.careLevel, needs: { ...c.needs }, bedId: bed, admittedAt: s.minute, carePlan: null };
       s = { ...s, waitlist: s.waitlist.filter((x) => x.id !== c.id), residents: [...s.residents, resident] };
@@ -246,6 +248,11 @@ export function applyCommand(state: GameState, cmd: Command): CommandOutcome {
 
     case 'resolveEvent':
       return resolveEvent(state, cmd.choiceId);
+
+    case 'startChapter': {
+      const next = startNextChapter(state);
+      return next ? { state: next, result: { ok: true } } : fail(state, 'chapter_locked');
+    }
 
     case 'placeDecor': {
       if (!DECOR[cmd.decor]) return fail(state, 'invalid_choice');

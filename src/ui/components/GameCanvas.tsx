@@ -9,7 +9,7 @@ import type { CareGroup, StaffRole } from '../../domain/types';
 import { isMobileNow, useMoney, useSummary, useT } from '../hooks';
 import { useGame } from '../store';
 
-const GROUP_HEX: Record<CareGroup, number> = { active_aging: 0xc9822b, stroke_rehab: 0x4a6aa5, bedridden: 0x8a5a9e };
+const GROUP_HEX: Record<CareGroup, number> = { active_aging: 0xc9822b, stroke_rehab: 0x4a6aa5, bedridden: 0x8a5a9e, dementia: 0xb5537a, tube_feeding: 0x3f8f86, airway: 0x2f6aa5 };
 
 /**
  * Glue between the React/Zustand UI and the Pixi renderer.

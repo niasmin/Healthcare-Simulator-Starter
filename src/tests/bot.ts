@@ -4,7 +4,10 @@ import { choiceBlocker } from '../sim/systems/events';
 import { EVENT_DEFS } from '../data/events';
 import { rosterView } from '../sim/selectors';
 import { SLOT_ORDER } from '../data/staff';
-import type { GameState, ShiftSlot, Skill, StaffRole } from '../domain/types';
+import type { GameState, Rect, ShiftSlot, Skill, StaffRole } from '../domain/types';
+import { EQUIPMENT, TILES_PER_BED, roomConstructionCost } from '../data/rooms';
+import { chapterDef } from '../data/chapters';
+import { thb } from '../domain/money';
 import { buildHome } from './helpers';
 
 /**
@@ -22,6 +25,8 @@ const SKILL_ROLE: Record<Skill, StaffRole> = {
   feeding: 'caregiver',
   mobility: 'pt',
   activity: 'ot',
+  tube_feeding: 'pn',
+  airway_care: 'rn',
 };
 
 /** Preferred answer per event, falling back to the next choice when blocked. */
@@ -35,6 +40,35 @@ const EVENT_PREFS: Record<string, string[]> = {
 export interface BotOptions {
   /** Stop admitting once this many residents live in the home. */
   maxResidents?: number;
+  /** Start the next chapter after a win and play it (Chapter 2 expansion). */
+  campaign?: boolean;
+  /** Cash kept in hand after building a ward, so payroll never bounces (default ฿150,000). */
+  reserve?: number;
+}
+
+/** Chapter 2 expansion: two more wards on the existing corridor, the first one secured. */
+export const EXPANSION: Array<{ rect: Rect; sensor: boolean }> = [
+  { rect: { x: 13, y: 4, w: 5, h: 6 }, sensor: true },
+  { rect: { x: 5, y: 11, w: 4, h: 6 }, sensor: false },
+];
+
+function wardCost(rect: Rect, sensor: boolean): number {
+  const beds = Math.floor((rect.w * rect.h) / TILES_PER_BED);
+  return roomConstructionCost('ward', rect) + beds * EQUIPMENT.care_bed.costSatang + EQUIPMENT.call_system.costSatang + (sensor ? EQUIPMENT.door_sensor.costSatang : 0);
+}
+
+/** Build the next planned ward when cash allows, fully equipped. */
+function expand(s: GameState, reserve: number): GameState {
+  const plan = EXPANSION.find((p) => !s.site.rooms.some((r) => r.rect.x === p.rect.x && r.rect.y === p.rect.y));
+  if (!plan || s.organization.cashSatang < wardCost(plan.rect, plan.sensor) + reserve) return s;
+  const out = applyCommand(s, { type: 'placeRoom', roomType: 'ward', rect: plan.rect });
+  if (!out.result.ok || !out.result.id) return s;
+  let next = out.state;
+  const roomId = out.result.id;
+  for (let i = 0; i < Math.floor((plan.rect.w * plan.rect.h) / TILES_PER_BED); i++) next = tryCmd(next, { type: 'installEquipment', roomId, equipment: 'care_bed' });
+  next = tryCmd(next, { type: 'installEquipment', roomId, equipment: 'call_system' });
+  if (plan.sensor) next = tryCmd(next, { type: 'installEquipment', roomId, equipment: 'door_sensor' });
+  return next;
 }
 
 function tryCmd(s: GameState, cmd: Command): GameState {
@@ -60,6 +94,12 @@ function cover(s: GameState, role: StaffRole, slot: ShiftSlot): GameState {
 export function botTurn(state: GameState, opts: BotOptions = {}): GameState {
   let s = state;
   const max = opts.maxResidents ?? Infinity;
+  if (opts.campaign && s.chapter.result?.outcome === 'won') s = tryCmd(s, { type: 'startChapter' });
+  if (s.chapter.id >= 2) {
+    s = expand(s, opts.reserve ?? thb(150_000));
+    const def = chapterDef(s.chapter.id);
+    if (def.targetRn && s.employees.filter((e) => e.role === 'rn').length < def.targetRn) s = cover(s, 'rn', 'night');
+  }
   if (s.events.active) {
     for (const id of EVENT_PREFS[s.events.active.defId]) {
       if (!EVENT_DEFS[s.events.active.defId].choices.some((c) => c.id === id) || choiceBlocker(s, id)) continue;

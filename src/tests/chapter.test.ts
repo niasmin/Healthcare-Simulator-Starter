@@ -126,7 +126,7 @@ describe('chapter verdict rules', () => {
   it('an older save already past day 30 is judged at its next midnight', () => {
     let s = buildHome(quietEvents(createInitialState(9)));
     s = advance(s, TICKS_PER_DAY * 31);
-    const legacy = { ...s, chapter: { result: null } };
+    const legacy = { ...s, chapter: { ...s.chapter, result: null } };
     expect(advance(legacy, TICKS_PER_DAY).chapter.result?.day).toBe(32);
   });
 });
@@ -147,7 +147,7 @@ describe('tutorial', () => {
     for (const g of buildObjectives(createInitialState(1)))
       for (const lang of ['th', 'en'] as const) {
         expect(DICTS[lang][g.key], `${lang} ${g.key}`).toBeTruthy();
-        expect(DICTS[lang][`tut.${g.id}`], `${lang} tut.${g.id}`).toBeTruthy();
+        expect(DICTS[lang][g.hint], `${lang} ${g.hint}`).toBeTruthy();
       }
   });
 });

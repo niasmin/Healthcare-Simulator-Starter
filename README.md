@@ -26,11 +26,57 @@ Add `?debug` to the URL to expose `window.__HE__` (store + renderer) for automat
 | **2** | Residents, staff, needs, care plans, care tasks, role × shift roster | ✅ Done |
 | **3** | Pricing, monthly invoices and payments, running costs, Financial Dashboard, 4 events, title screen, character portraits | ✅ Done |
 | **4** | Save/load, guided tutorial, 30-day chapter goal with win/lose verdict, three scripted events, balancing | ✅ Done (**MVP complete**) |
-| 5–6 | Premium living, home care, workforce, hospital, multi-site | ⏳ Not started |
+| **5** | **Part 1 ✅** chapter campaign + Chapter 2 (30-bed nursing center, dementia / tube-feeding / tracheostomy programmes) · part 2 ⏳ premium villas (Ch. 3), home care (Ch. 4) | 🟡 In progress |
+| 6 | Workforce, hospital, multi-site | ⏳ Not started |
 
 ## What you can play now
 
-Everything playable today is **Chapter 1 — First Care Home** of the campaign in the concept art, from the first corridor tile to the day-30 verdict. Chapters 2–7 (30–80 beds, Tranquila villas, Home Care, PHC workforce, Neuro Hospital, multi-site empire) come in Phase 5.
+Playable today: **Chapter 1 — First Care Home** (days 1–30) and **Chapter 2 — Professional Nursing Center** (the next 60 days, same business). Chapters 3–7 (Tranquila villas, Home Care, PHC workforce, Neuro Hospital, multi-site empire) come in Phase 5 part 2 and Phase 6.
+
+### Phase 5, part 1: the campaign and Chapter 2
+
+- **Campaign:** winning a chapter offers **เริ่มบทที่ 2** on the result card, on the tutorial card and on the chapters screen. The next chapter starts that day with the same site, staff, residents and cash. Each chapter is judged once over its own days; earlier verdicts are kept in `chapter.past`.
+- **Chapter 2: Professional Nursing Center** (60 days). To win:
+  - 30 operational beds and at least 24 residents
+  - at least 3 RNs
+  - at least one resident in each specialised programme
+  - an operating profit over the chapter's days
+  - care quality of at least 75
+  - cash never below zero
+- **Specialised programmes** (the GDD roadmap's "dementia, tracheostomy, feeding and rehab as abstract care levels"). They are modelled only as kinds of work and who is qualified to do them, never as treatment:
+
+  | Programme | Care level | Extra fee/month | What it needs |
+  |---|---|---|---|
+  | สมองเสื่อม (dementia) | 2–3 | ฿4,000 | A ward fitted with the new **door sensor system** (฿35,000). Three safety rounds a day; help at meals |
+  | ให้อาหารทางสาย (tube feeding) | 3–4 | ฿6,000 | Three tube feeds a day (RN or PN only), repositioning every 4 h, ฿40/day supplies |
+  | เจาะคอ (tracheostomy) | 4 | ฿12,000 | Airway care every 6 h (**RN only**, so an RN on nights too), tube feeds, repositioning, ฿90/day supplies |
+
+  - Programme candidates join the waiting list from Chapter 2, one of each on its first day, and then at half the rate of the basic groups.
+  - Other residents fill ordinary wards first, keeping secured beds free.
+  - The waiting-list card shows each candidate's monthly fee and programme. Admit is disabled when no suitable bed is free.
+- **Staffing advice v3:** an RN is added wherever RN-only work needs one, nights included. Caregiver work is now planned for caregivers alone, because in a real rush the nurses' time goes to nurse-only work. The more generous estimate under-staffed big homes; 30+ residents missed up to 13% of their care.
+- **Task assignment:** a PN or RN holds back from routine personal care when their own specialist work would fall due before they finished it, unless the routine task is within 30 minutes of being missed. Before this, PNs took 07:30 personal care while the 08:00 vital-sign checks waited and were missed.
+- **Balance** (scripted player, 7 seeds, room & care fees now ฿29k / ฿33k / ฿39k / ฿46k for levels 1–4):
+
+  | Play | Result |
+  |---|---|
+  | Chapter 1, full home staffed to the advice | won on 6 of 7 seeds (−฿1k to +฿38k operating result) |
+  | Chapter 1, stopping at 8 residents | won on 3 of 7 seeds |
+  | Chapter 1, stopping at 6 residents | failed on 7 of 7 seeds |
+  | Chapter 2, adding a 15-bed secured ward and a 12-bed ward when cash allows | won on 6 of 6 seeds that reached it; lowest cash ฿5k–฿117k |
+  | Chapter 2 plus a second full team | bankrupt |
+
+  A bigger home is very profitable once it is full: about ฿1.0–1.2M of operating profit over the 60 days. The danger is liquidity. Wages are paid every day, but the new residents' bills arrive at admission and on day 1 of each month, so building too early or hiring ahead of the advice can run the cash out.
+- **Save format:** schema 6 stores `chapter = { id, startDay, result, past }`. Schema-5 saves migrate automatically, keeping their Chapter 1 verdict, and staff hired earlier learn the new skills of their role.
+
+#### Ideas taken from CMNH-ENTERPRISE (V11–V18)
+
+The attached project is a separate, simpler engine (one counter per centre, V4–V10 upgrades and illustrated or 3D scenes), so none of its code was imported. These approaches were adopted:
+
+- **Requirement cards per chapter** (its `v15-phases.js`): every road-map card now lists its real targets (days, beds, residents, RNs, programmes, profit and quality), all derived from game data. Done, current, ready-to-start and locked chapters each get their own badge.
+- **Derived progress, no second store:** it computed milestones from game state rather than saving progress flags. The tutorial already did this, and it now covers both chapters.
+- **Its own bug notes as a checklist:** rejecting actions with zero residents, affordability checks that match the charge, and no fabricated counts on the map. All three already hold here and are covered by tests.
+- **Kept for later:** walking nurses and a Full/Reduced/Off motion setting (`v16-animation.js`), and the Home Care, villa and hospital building ideas for Chapters 3, 4 and 6. Its Supabase cloud save isn't needed, because saves already sync through the page's own storage.
 
 ### Phase 4, part 2: tutorial, the 30-day goal and balancing
 
@@ -229,7 +275,7 @@ src/
   - Food, supplies, upkeep and payroll are each charged once per day.
   - An event's cost is charged once, and a resolved event can't be resolved again.
 
-## Tests (93 passing)
+## Tests (103 passing)
 
 | File | Covers |
 |---|---|
@@ -244,6 +290,7 @@ src/
 | `saves.test.ts` | **Save and reload gives identical state**, and the reloaded game then runs identically for 300 ticks; gzip makes it at least 3× smaller; corrupt, tampered (cash ≠ ledger) and incompatible saves rejected without throwing; IndexedDB store round-trip (fake-indexeddb); cloud store splits large saves into parts under 256 KiB and reassembles them; the newest copy wins across two devices sharing one account; works without cloud; local save survives cloud failure |
 | `decor.test.ts` | Decor placed on an empty tile and charged once; can't overlap rooms, corridor, entrance or decor, and blocks building over it; demolish refunds half; appeal is capped and makes residents happier; schema-3 saves migrate to schema 4 |
 | `chapter.test.ts` | **30-day playthrough** by a scripted sensible player using only public commands and the real applicant and waiting-list pools: wins chapter 1 with cash positive every day; every invariant holds (ledger, unique beds, no overlapping shifts, no care without the skill); roster ready and >95% of tasks done; the three scripted events fire on their days; the same seed plays byte-identically; the verdict pauses the game and survives a save. **Balance:** a full home wins on more seeds, a 40% empty home and an overstaffed home fail on targets. **Verdict rules:** bankrupt at the first negative midnight, decided once and never changed; nothing decided before day 30; a migrated save past day 30 is judged at the next midnight. **Tutorial:** step order, derived from state, a goal and a how-to hint in Thai and English for every step. **Staffing advice:** rush-hour windows, RN covering PN work, one OT for ten sessions |
+| `chapter2.test.ts` | **90-day campaign** by the scripted player: wins Chapter 1, starts Chapter 2 on day 31 and wins it on day 90 with every target; dementia residents only in secured wards; airway care only by RNs and tube feeding only by RNs/PNs; an RN on the night roster; >93% of tasks done; byte-identical rerun; a second full team goes bankrupt. **Rules:** the next chapter only after a win, with one candidate per programme; secured-ward admission; RN-only airway care missed with only a PN on nights; programme fees; schema-5 migration; Thai and English text for every Chapter 2 step |
 | `i18n-iso.test.ts` | TH/EN key parity; labels for every room, equipment and reason; Thai interpolation; iso projection inverts for all 400 cells |
 
 GDD acceptance tests covered so far: *place a room and deduct construction cost once*, *reject collisions*, *admit up to capacity*, *reject excess admission*, *schedule a qualified staff member*, *prevent overlapping shifts*, *advance 30 days deterministically with a fixed seed*, *reconcile cash ledger*, *show Thai text correctly*, *run production build without errors*. *Create monthly invoice once* is now covered too. *Save and reload identical state* is now covered as well, so **all GDD acceptance tests pass**.
@@ -263,7 +310,7 @@ A browser playtest (Playwright, run outside the repo) drove the production build
 
 - **Balancing (fictional):**
   - Costs: start THB 2,000,000; corridor THB 3,000/tile; rooms THB 30–50k base + THB 12,000/tile; equipment THB 12–60k; upkeep THB 15–25/tile/day (THB 5 per corridor tile).
-  - Fees: monthly room & care THB 26k / 30k / 36k / 42k for care levels 1–4.
+  - Fees: monthly room & care THB 29k / 33k / 39k / 46k for care levels 1–4, plus THB 4k / 6k / 12k for the dementia / tube-feeding / tracheostomy programmes.
   - Result: a full 10-bed starter build costs about THB 1.1M. A full home staffed to the roster advice (8–10 people) is slightly profitable in month 1 and makes about 16–21% from month 2. At 60% occupancy it loses money.
 - The chapter's "positive cashflow" is read as **operating** cash flow: payments received minus payroll, upkeep, food, supplies and event costs over days 1–30. Construction and equipment are investment and don't count against it. Therapy and activity sessions are billed on the next month's invoice, so month 1 earns room & care only.
 - The GDD's CMNH figures are kept as scenario reference only and aren't used for tuning. Real organisation names aren't used in-game.
@@ -277,7 +324,9 @@ A browser playtest (Playwright, run outside the repo) drove the production build
 ## Known limitations
 
 - The tutorial guides through text and a "Show me" button; it doesn't yet spotlight individual buttons on screen.
-- Only Chapter 1 is playable. After the verdict the game continues as a sandbox, and chapters 2–7 stay locked until Phase 5.
+- Chapters 1–2 are playable. After the Chapter 2 verdict the game continues as a sandbox, and chapters 3–7 stay locked.
+- The 20×20 lot fits about 37 beds with the starter layout, which is enough for Chapter 2 but not for the GDD's 80-bed upper range. A bigger lot or a second site comes with the multi-site work.
+- Chapter 2 is easy on profit once the home is full; its real challenge is cash flow during expansion. Later chapters should add new cost pressure.
 - The scripted player used for balancing hires strictly by the roster advice. Real players can do better, for example with the premium price level, so the chapter is meant to be a fair first challenge, not a hard one.
 - Starting a **new game** overwrites the autosave once the new game has progress. Use a manual slot to keep an older game.
 - Cloud saves need a signed-in viewer allowed to use the page (the owner always is). Anyone opening a public link with view-only access saves in their browser only.

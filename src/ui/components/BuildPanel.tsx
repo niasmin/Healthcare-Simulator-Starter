@@ -5,6 +5,8 @@ import { DECOR, DECOR_ORDER, gardenAppeal, MAX_APPEAL } from '../../data/decor';
 import { DECOR_SPRITE, spriteUrl } from '../../render/sprites';
 import { ROLES, wageFor } from '../../data/staff';
 import { freeBeds } from '../../domain/rules/beds';
+import { monthlyFee, PROGRAMME_FEE } from '../../data/finance';
+import { GROUP_WARD_EQUIPMENT } from '../../data/patients';
 import type { RoomType } from '../../domain/types';
 import { careKpis } from '../../sim/selectors';
 import { useMoney, useT } from '../hooks';
@@ -175,6 +177,7 @@ function HireList() {
 
 function AdmitList() {
   const t = useT();
+  const money = useMoney();
   const name = useName();
   const game = useGame((s) => s.game);
   const dispatch = useGame((s) => s.dispatch);
@@ -194,12 +197,19 @@ function AdmitList() {
                 {name(c.name, true)} <span className="font-normal text-ink-soft text-xs">{t('res.age', { age: c.age })}</span>
               </div>
               <div className="text-[11px] text-ink-soft truncate">
-                {t(`group.${c.group}`)} · {t('res.level', { n: c.careLevel })}
+                {t(`group.${c.group}`)} · {t('res.level', { n: c.careLevel })} · {money(monthlyFee(c.careLevel, game.priceLevel, c.group))}
+                {t('admit.per_month')}
               </div>
+              {PROGRAMME_FEE[c.group] !== undefined && (
+                <div className="text-[10px] font-semibold text-teal truncate">
+                  ★ {t('admit.programme')}
+                  {GROUP_WARD_EQUIPMENT[c.group] ? ` · ${t('admit.needs_secure')}` : ''}
+                </div>
+              )}
             </div>
             <button
               type="button"
-              disabled={!free}
+              disabled={!freeBeds(game, c.group).length}
               onClick={() => {
                 const r = dispatch({ type: 'admitResident', candidateId: c.id });
                 if (r.ok) setView('residents');

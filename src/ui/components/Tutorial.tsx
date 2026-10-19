@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { STARTER_SCENARIO } from '../../data/scenarios';
+import { chapterDef } from '../../data/chapters';
 import { buildObjectives, type GuideAction, type Objective } from '../../sim/selectors';
-import { chapterChecks } from '../../sim/systems/chapter';
+import { chapterChecks, nextChapterAvailable } from '../../sim/systems/chapter';
 import { dayOf } from '../../sim/systems/time';
 import type { ChapterCheck } from '../../domain/types';
 import { isMobileNow, useMoney, useT } from '../hooks';
@@ -87,12 +87,13 @@ function StepBody({ goal }: { goal: Objective }) {
   const t = useT();
   const game = useGame((s) => s.game);
   const checks = useMemo(() => (goal.id === 'chapter' ? chapterChecks(game) : null), [goal.id, game]);
+  const days = chapterDef(game.chapter.id).days;
   return (
     <>
-      <p className="text-xs leading-relaxed text-ink-soft">{t(`tut.${goal.id}`, goal.params)}</p>
+      <p className="text-xs leading-relaxed text-ink-soft">{t(goal.hint, goal.params)}</p>
       {checks && (
         <div className="rounded-lg bg-sand/60 p-2">
-          <div className="text-[11px] font-semibold mb-1 tabular">{t('chapter.day', { day: Math.min(dayOf(game.minute), STARTER_SCENARIO.targetDays), n: STARTER_SCENARIO.targetDays })}</div>
+          <div className="text-[11px] font-semibold mb-1 tabular">{t('chapter.day', { day: Math.min(dayOf(game.minute) - game.chapter.startDay + 1, days), n: days })}</div>
           <ChapterChecks checks={checks} />
         </div>
       )}
@@ -109,11 +110,24 @@ export function TutorialCard({ compact = false }: { compact?: boolean }) {
   const t = useT();
   const goals = useObjectives();
   const hidden = useGame((s) => s.tutorialHidden);
+  const chapter = useGame((s) => s.game.chapter.id);
+  const next = useGame((s) => nextChapterAvailable(s.game));
   const setHidden = useGame((s) => s.setTutorialHidden);
   const [open, setOpen] = useState(!compact);
   const idx = goals.findIndex((g) => !g.done);
   const goal = idx >= 0 ? goals[idx] : null;
   const doneCount = goals.filter((g) => g.done).length;
+
+  if (!goal && next && !hidden)
+    return (
+      <section className={`pointer-events-auto rounded-xl bg-white/97 border border-teal/40 shadow-lg px-3 py-2.5 flex flex-col gap-2 ${compact ? 'min-w-0 flex-1' : 'w-[340px]'} max-w-full`}>
+        <div className="text-sm font-semibold">🏆 {t('tut.chapter_done', { c: chapter })}</div>
+        <p className="text-xs text-ink-soft leading-relaxed">{t(`chapters.c${next}.desc`)}</p>
+        <button type="button" onClick={() => useGame.getState().dispatch({ type: 'startChapter' })} className="self-start px-3 py-1.5 rounded-lg bg-teal text-white text-xs font-bold">
+          {t('chapter.start', { c: next, name: t(`chapters.c${next}.title`) })} →
+        </button>
+      </section>
+    );
 
   if (hidden || !goal) {
     if (!goal && hidden) return null;
@@ -131,11 +145,11 @@ export function TutorialCard({ compact = false }: { compact?: boolean }) {
   return (
     <section
       className={`pointer-events-auto rounded-xl bg-white/97 border border-teal/40 shadow-lg ${compact ? 'min-w-0 flex-1' : 'w-[340px]'} max-w-full`}
-      aria-label={t('tut.header', { n: idx + 1, total: goals.length })}
+      aria-label={t('tut.header', { c: chapter, n: idx + 1, total: goals.length })}
     >
       <button type="button" onClick={() => compact && setOpen(!open)} className="w-full text-left px-3 pt-2 pb-1.5 flex items-start gap-2">
         <span className="min-w-0 flex-1">
-          <span className="block text-[10px] text-teal font-semibold tabular">{t('tut.header', { n: idx + 1, total: goals.length })}</span>
+          <span className="block text-[10px] text-teal font-semibold tabular">{t('tut.header', { c: chapter, n: idx + 1, total: goals.length })}</span>
           <span className={`block text-sm font-semibold leading-snug ${compact && !open ? 'truncate' : ''}`}>
             {t(goal.key, goal.params)}
             {goal.progress && (

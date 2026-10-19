@@ -1,4 +1,4 @@
-import { STARTER_SCENARIO } from '../data/scenarios';
+import { chapterDef, type ChapterDef } from '../data/chapters';
 import { allRoomStatuses, type RoomStatus } from '../domain/rules/rooms';
 import type { GameState, LedgerCategory, RoomType, Satang } from '../domain/types';
 import { dailyPayroll, dailyUpkeep } from './systems/finance';
@@ -6,7 +6,7 @@ import { carePlanSchedule, TASK_KINDS } from '../data/patients';
 import { ROLE_ORDER, SHIFT_SLOTS, SLOT_ORDER } from '../data/staff';
 import { inWindow, isOnShift, shiftMinutes } from '../domain/rules/shifts';
 import { MINUTES_PER_DAY, START_MINUTE } from './constants';
-import type { Employee, ShiftSlot, Skill, StaffRole } from '../domain/types';
+import type { CareGroup, Employee, ShiftSlot, Skill, StaffRole } from '../domain/types';
 import { wellbeing } from './systems/needs';
 import { dayInMonth, monthOfDay } from '../data/finance';
 import { dayOf } from './systems/time';
@@ -64,46 +64,75 @@ export type GuideAction =
 
 export interface Objective {
   id: string;
-  /** i18n key of the goal; `tut.<id>` holds the tutorial's how-to hint. */
+  /** i18n key of the goal. */
   key: string;
+  /** i18n key of the tutorial's how-to hint. */
+  hint: string;
   params?: Record<string, number>;
   done: boolean;
   progress?: { have: number; need: number };
   action: GuideAction;
 }
 
+const capped = (have: number, need: number) => ({ have: Math.min(have, need), need });
+
+/** The last step of every chapter: finish it with the targets met. */
+function chapterStep(state: GameState, def: ChapterDef): Objective {
+  const elapsed = state.chapter.result ? def.days : dayOf(state.minute) - state.chapter.startDay;
+  return {
+    id: 'chapter',
+    key: `goal.chapter${def.id}`,
+    hint: `tut.chapter${def.id}`,
+    params: { n: def.days, r: def.targetResidents, q: def.targetQuality },
+    done: state.chapter.result?.outcome === 'won',
+    progress: capped(elapsed, def.days),
+    action: { kind: 'view', view: 'finance' },
+  };
+}
+
 /**
- * Chapter 1 goals in tutorial order, derived purely from state (no stored flags), so the tutorial
- * always matches the game: the current step is the first one not done, wherever the player is.
+ * Goals of the running chapter in tutorial order, derived purely from state (no stored flags), so
+ * the tutorial always matches the game: the current step is the first one not done.
  */
 export function buildObjectives(state: GameState, summary: SiteSummary = summarize(state)): Objective[] {
-  const sc = STARTER_SCENARIO;
-  const capped = (have: number, need: number) => ({ have: Math.min(have, need), need });
-  const wardConnected = state.site.rooms.some((r) => r.type === 'ward' && summary.statuses.get(r.id)?.door);
+  const def = chapterDef(state.chapter.id);
   const hasResidents = state.residents.length > 0;
-  const day = dayOf(state.minute);
+  const rosterReady = hasResidents && rosterView(state).slots.every((s) => s.ready && s.staffCount > 0);
+  const step = (id: string, done: boolean, action: GuideAction, extra: Partial<Objective> = {}): Objective => ({ id, key: `goal.${id}`, hint: `tut.${id}`, done, action, ...extra });
+
+  if (def.id === 2) {
+    const secured = state.site.rooms.some((r) => r.type === 'ward' && (r.equipment.door_sensor ?? 0) > 0 && summary.statuses.get(r.id)?.operational);
+    const rn = state.employees.filter((e) => e.role === 'rn').length;
+    const has = (g: CareGroup) => state.residents.some((r) => r.group === g);
+    return [
+      step('beds2', summary.bedsOperational >= def.targetBeds, { kind: 'tool', tool: 'ward' }, { key: 'goal.beds', params: { n: def.targetBeds }, progress: capped(summary.bedsOperational, def.targetBeds) }),
+      step('secure_ward', secured, { kind: 'select', roomType: 'ward' }),
+      step('rn_team', rn >= (def.targetRn ?? 0), { kind: 'tab', tab: 'hire' }, { params: { n: def.targetRn ?? 0 }, progress: capped(rn, def.targetRn ?? 0) }),
+      step('prog_dementia', has('dementia'), { kind: 'tab', tab: 'admit' }),
+      step('prog_tube_feeding', has('tube_feeding'), { kind: 'tab', tab: 'admit' }),
+      step('prog_airway', has('airway'), { kind: 'tab', tab: 'admit' }),
+      step('roster2', rosterReady, { kind: 'view', view: 'roster' }, { key: 'goal.roster' }),
+      step('fill2', state.residents.length >= def.targetResidents, { kind: 'tab', tab: 'admit' }, { key: 'goal.fill', params: { n: def.targetResidents }, progress: capped(state.residents.length, def.targetResidents) }),
+      chapterStep(state, def),
+    ];
+  }
+
+  const wardConnected = state.site.rooms.some((r) => r.type === 'ward' && summary.statuses.get(r.id)?.door);
   return [
-    { id: 'corridor', key: 'goal.corridor', done: summary.corridorTiles >= 6, progress: capped(summary.corridorTiles, 6), action: { kind: 'tool', tool: 'corridor' } },
-    { id: 'ward', key: 'goal.ward', done: wardConnected, action: { kind: 'tool', tool: 'ward' } },
-    { id: 'beds', key: 'goal.beds', params: { n: sc.targetBeds }, done: summary.bedsOperational >= sc.targetBeds, progress: capped(summary.bedsOperational, sc.targetBeds), action: { kind: 'select', roomType: 'ward' } },
-    { id: 'station', key: 'goal.station', done: summary.operationalByType.nursing_station > 0, action: { kind: 'tool', tool: 'nursing_station' } },
-    { id: 'therapy', key: 'goal.therapy', done: summary.operationalByType.therapy > 0, action: { kind: 'tool', tool: 'therapy' } },
-    { id: 'staff_room', key: 'goal.staff_room', done: summary.operationalByType.staff_room > 0, action: { kind: 'tool', tool: 'staff_room' } },
-    { id: 'hire_rn', key: 'goal.hire_rn', done: state.employees.some((e) => e.role === 'rn'), action: { kind: 'tab', tab: 'hire' } },
-    { id: 'admit', key: 'goal.admit', done: hasResidents, action: { kind: 'tab', tab: 'admit' } },
-    { id: 'care_plan', key: 'goal.care_plan', done: hasResidents && state.residents.every((r) => r.carePlan), action: { kind: 'view', view: 'residents' } },
-    { id: 'roster', key: 'goal.roster', done: hasResidents && rosterView(state).slots.every((s) => s.ready && s.staffCount > 0), action: { kind: 'view', view: 'roster' } },
-    { id: 'run', key: 'goal.run', done: state.minute > START_MINUTE, action: { kind: 'speed' } },
-    { id: 'fill', key: 'goal.fill', params: { n: sc.targetResidents }, done: state.residents.length >= sc.targetResidents, progress: capped(state.residents.length, sc.targetResidents), action: { kind: 'tab', tab: 'admit' } },
-    { id: 'first_revenue', key: 'goal.first_revenue', done: state.ledger.some((e) => e.category === 'revenue'), action: { kind: 'view', view: 'finance' } },
-    {
-      id: 'chapter',
-      key: 'goal.chapter',
-      params: { n: sc.targetDays, r: sc.targetResidents, q: sc.targetQuality },
-      done: state.chapter.result?.outcome === 'won',
-      progress: capped(state.chapter.result ? sc.targetDays : day - 1, sc.targetDays),
-      action: { kind: 'view', view: 'finance' },
-    },
+    step('corridor', summary.corridorTiles >= 6, { kind: 'tool', tool: 'corridor' }, { progress: capped(summary.corridorTiles, 6) }),
+    step('ward', wardConnected, { kind: 'tool', tool: 'ward' }),
+    step('beds', summary.bedsOperational >= def.targetBeds, { kind: 'select', roomType: 'ward' }, { params: { n: def.targetBeds }, progress: capped(summary.bedsOperational, def.targetBeds) }),
+    step('station', summary.operationalByType.nursing_station > 0, { kind: 'tool', tool: 'nursing_station' }),
+    step('therapy', summary.operationalByType.therapy > 0, { kind: 'tool', tool: 'therapy' }),
+    step('staff_room', summary.operationalByType.staff_room > 0, { kind: 'tool', tool: 'staff_room' }),
+    step('hire_rn', state.employees.some((e) => e.role === 'rn'), { kind: 'tab', tab: 'hire' }),
+    step('admit', hasResidents, { kind: 'tab', tab: 'admit' }),
+    step('care_plan', hasResidents && state.residents.every((r) => r.carePlan), { kind: 'view', view: 'residents' }),
+    step('roster', rosterReady, { kind: 'view', view: 'roster' }),
+    step('run', state.minute > START_MINUTE, { kind: 'speed' }),
+    step('fill', state.residents.length >= def.targetResidents, { kind: 'tab', tab: 'admit' }, { params: { n: def.targetResidents }, progress: capped(state.residents.length, def.targetResidents) }),
+    step('first_revenue', state.ledger.some((e) => e.category === 'revenue'), { kind: 'view', view: 'finance' }),
+    chapterStep(state, def),
   ];
 }
 
@@ -120,6 +149,8 @@ const SKILL_OWNER: Record<Skill, StaffRole> = {
   feeding: 'caregiver',
   mobility: 'pt',
   activity: 'ot',
+  tube_feeding: 'pn',
+  airway_care: 'rn',
 };
 
 /** Share of staffed time that is productive, used for recommendations (80%). */
@@ -187,9 +218,11 @@ function peopleFor(tasks: PlannedTask[], shiftLength: number): number {
  */
 export function roleNeeds(demand: SlotDemand, shiftLength: number, rnOnDuty: boolean): Record<StaffRole, number> {
   const of = (...roles: StaffRole[]) => demand.tasks.filter((t) => roles.includes(SKILL_OWNER[t.skill]));
-  const rn = rnOnDuty ? 1 : 0;
+  // One RN supervises each day shift; airway care can call for more, at night too.
+  const rn = Math.max(rnOnDuty ? 1 : 0, peopleFor(of('rn'), shiftLength));
   const pn = Math.max(0, peopleFor(of('rn', 'pn'), shiftLength) - rn);
-  const caregiver = Math.max(0, peopleFor(of('rn', 'pn', 'caregiver'), shiftLength) - rn - pn);
+  // Caregiver work is planned for caregivers alone: in a rush, nurses' time goes to nurse-only work.
+  const caregiver = peopleFor(of('caregiver'), shiftLength);
   return { rn, pn, caregiver, pt: peopleFor(of('pt'), shiftLength), ot: peopleFor(of('ot'), shiftLength) };
 }
 

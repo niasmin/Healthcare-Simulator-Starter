@@ -23,6 +23,7 @@ export const EQUIPMENT: Record<EquipmentId, EquipmentDef> = {
   parallel_bars: { id: 'parallel_bars', costSatang: thb(60_000), color: 0x9aa4b1 },
   lockers: { id: 'lockers', costSatang: thb(15_000), color: 0x7c86a8 },
   rest_sofa: { id: 'rest_sofa', costSatang: thb(12_000), color: 0xd98a6c },
+  door_sensor: { id: 'door_sensor', costSatang: thb(35_000), color: 0x8a5a9e },
 };
 
 export interface EquipmentSlot {
@@ -63,6 +64,8 @@ export const ROOMS: Record<RoomType, RoomDef> = {
     equipment: [
       { id: 'care_bed', required: 1, max: (r) => Math.floor(rectArea(r) / TILES_PER_BED) },
       { id: 'call_system', required: 1, max: () => 1 },
+      // Optional: secures the ward so residents living with dementia can stay there.
+      { id: 'door_sensor', required: 0, max: () => 1 },
     ],
     floorColor: 0xb9d7cf,
     wallColor: 0x4f8a80,

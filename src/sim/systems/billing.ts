@@ -8,6 +8,7 @@ import {
   SERVICE_PRICE,
   SUPPLIES_BASE_PER_DAY,
   SUPPLIES_PER_LEVEL_DAY,
+  PROGRAMME_SUPPLIES_PER_DAY,
 } from '../../data/finance';
 import type { GameState, Invoice, InvoiceLine, Resident, RevenueStream } from '../../domain/types';
 import { allocId, log, post, randInt } from '../helpers';
@@ -65,7 +66,7 @@ function issue(state: GameState, resident: Resident, kind: Invoice['kind'], mont
 export function billAdmission(state: GameState, resident: Resident): GameState {
   const day = dayOf(state.minute);
   const days = DAYS_PER_MONTH - dayInMonth(day) + 1;
-  const fee = monthlyFee(resident.careLevel, state.priceLevel);
+  const fee = monthlyFee(resident.careLevel, state.priceLevel, resident.group);
   const amount = Math.floor((fee * days) / DAYS_PER_MONTH / 100) * 100;
   const line: InvoiceLine = { stream: 'room_care', memo: 'invoice.line.room_care_days', memoParams: { days, level: resident.careLevel }, qty: days, unitSatang: Math.floor(fee / DAYS_PER_MONTH), amountSatang: amount };
   return issue(state, resident, 'admission', monthOfDay(day), [line]);
@@ -75,7 +76,7 @@ export function billAdmission(state: GameState, resident: Resident): GameState {
 export function billMonth(state: GameState, month: number): GameState {
   let s = state;
   for (const r of state.residents) {
-    const fee = monthlyFee(r.careLevel, s.priceLevel);
+    const fee = monthlyFee(r.careLevel, s.priceLevel, r.group);
     const lines: InvoiceLine[] = [
       { stream: 'room_care', memo: 'invoice.line.room_care', memoParams: { level: r.careLevel }, qty: 1, unitSatang: fee, amountSatang: fee },
       ...serviceLines(s.unbilled[r.id] ?? EMPTY),
@@ -119,7 +120,7 @@ export function chargeDailyResidentCosts(state: GameState): GameState {
   if (!state.residents.length) return state;
   const day = dayOf(state.minute - 1);
   const food = FOOD_PER_RESIDENT_DAY * state.residents.length;
-  const supplies = state.residents.reduce((a, r) => a + SUPPLIES_BASE_PER_DAY + SUPPLIES_PER_LEVEL_DAY * r.careLevel, 0);
+  const supplies = state.residents.reduce((a, r) => a + SUPPLIES_BASE_PER_DAY + SUPPLIES_PER_LEVEL_DAY * r.careLevel + (PROGRAMME_SUPPLIES_PER_DAY[r.group] ?? 0), 0);
   let s = post(state, -food, 'food', 'ledger.food', { ref: `food-day-${day}`, memoParams: { day, n: state.residents.length } });
   s = post(s, -supplies, 'supplies', 'ledger.supplies', { ref: `supplies-day-${day}`, memoParams: { day } });
   return s;

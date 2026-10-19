@@ -71,6 +71,7 @@ const PROP: Record<EquipmentId, PropStyle> = {
   parallel_bars: { s: 0.6, h: 18 },
   lockers: { s: 0.4, h: 28 },
   rest_sofa: { s: 0.6, h: 10 },
+  door_sensor: { s: 0.2, h: 20 },
 };
 
 export class IsoRenderer {

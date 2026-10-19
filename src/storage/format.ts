@@ -1,5 +1,6 @@
 import { reconcile } from '../domain/rules/ledger';
-import type { GameState } from '../domain/types';
+import type { ChapterResult, GameState } from '../domain/types';
+import { ROLES } from '../data/staff';
 import { dayOf } from '../sim/systems/time';
 
 /**
@@ -9,7 +10,7 @@ import { dayOf } from '../sim/systems/time';
  * CompressionStream, so even long games stay far below storage limits.
  */
 export const SAVE_FORMAT = 1;
-export const CURRENT_SCHEMA = 5;
+export const CURRENT_SCHEMA = 6;
 
 export type SlotId = 'auto' | 'slot1' | 'slot2' | 'slot3';
 export const SLOTS: SlotId[] = ['auto', 'slot1', 'slot2', 'slot3'];
@@ -109,7 +110,17 @@ export function migrate(state: GameState): GameState {
   }
   if (s.schemaVersion === 4) {
     // v5 adds the chapter verdict; a game already past day 30 is judged at its next midnight.
-    s = { ...s, schemaVersion: 5, chapter: { result: null } };
+    s = { ...s, schemaVersion: 5, chapter: { result: null } as unknown as GameState['chapter'] };
+  }
+  if (s.schemaVersion === 5) {
+    // v6: chapters 1..n with a start day, and the Chapter 2 skills for staff hired earlier.
+    const old = (s.chapter as unknown as { result: Omit<ChapterResult, 'chapter'> | null }).result;
+    s = {
+      ...s,
+      schemaVersion: 6,
+      chapter: { id: 1, startDay: 1, result: old ? { ...old, chapter: 1 } : null, past: [] },
+      employees: s.employees.map((e) => ({ ...e, skills: [...new Set([...e.skills, ...ROLES[e.role].skills])] })),
+    };
   }
   return s as GameState;
 }

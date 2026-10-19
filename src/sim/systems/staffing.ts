@@ -1,4 +1,5 @@
-import { CARE_GROUPS, GROUP_LEVELS, RESIDENT_NAMES } from '../../data/patients';
+import { GROUP_LEVELS, RESIDENT_NAMES } from '../../data/patients';
+import { chapterDef } from '../../data/chapters';
 import { ROLES, STAFF_NAMES, wageFor } from '../../data/staff';
 import { WAITLIST_ARRIVALS } from '../../data/finance';
 import { allRoomStatuses } from '../../domain/rules/rooms';
@@ -51,18 +52,19 @@ export function randomRole(state: GameState): [GameState, StaffRole] {
   return [s, 'caregiver'];
 }
 
-export function makeResidentCandidate(state: GameState, forced?: { group: CareGroup; referralDeadline: number }): GameState {
+export function makeResidentCandidate(state: GameState, forced?: { group: CareGroup; referralDeadline?: number }): GameState {
   let s = state;
   let name: PersonName;
   [s, name] = pickName(s, RESIDENT_NAMES, usedNames(s));
   let gi: number, age: number, level: number;
-  [s, gi] = randInt(s, 0, CARE_GROUPS.length - 1);
-  const group = forced?.group ?? CARE_GROUPS[gi];
+  const groups = chapterDef(s.chapter.id).groups;
+  [s, gi] = randInt(s, 0, groups.length - 1);
+  const group = forced?.group ?? groups[gi];
   [s, age] = randInt(s, 64, 92);
   [s, level] = randInt(s, GROUP_LEVELS[group][0], GROUP_LEVELS[group][1]);
   const ranges: Record<keyof Needs, [number, number]> = {
     physical: [55, 80],
-    mobility: group === 'active_aging' ? [60, 85] : group === 'stroke_rehab' ? [25, 45] : [5, 20],
+    mobility: group === 'active_aging' ? [60, 85] : group === 'stroke_rehab' ? [25, 45] : group === 'dementia' ? [45, 75] : [5, 20],
     mental: [50, 85],
     happiness: [45, 75],
     satisfaction: [60, 75],
@@ -76,7 +78,7 @@ export function makeResidentCandidate(state: GameState, forced?: { group: CareGr
   }
   let id: string;
   [s, id] = allocId(s, 'cand');
-  const c: ResidentCandidate = { id, name, age, group, careLevel: level, needs, ...(forced ? { referralDeadline: forced.referralDeadline } : {}) };
+  const c: ResidentCandidate = { id, name, age, group, careLevel: level, needs, ...(forced?.referralDeadline !== undefined ? { referralDeadline: forced.referralDeadline } : {}) };
   return { ...s, waitlist: [...s.waitlist, c] };
 }
 
