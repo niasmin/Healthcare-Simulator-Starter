@@ -6,7 +6,7 @@ import residentF2 from '../assets/portraits/resident_f2.jpg';
  * Character portraits from the project's chibi character sheet (fictional characters).
  * Each character has five expressions; the UI picks one from the person's live mood.
  */
-const faces = import.meta.glob('../assets/faces/*.webp', { eager: true, import: 'default' }) as Record<string, string>;
+const faces = import.meta.glob('../assets/faces/*.png', { eager: true, import: 'default' }) as Record<string, string>;
 
 export type Mood = 'default' | 'smile' | 'happy' | 'surprise' | 'sad';
 type FaceSet = 'owner_f' | 'owner_m' | 'nurse' | 'caregiver' | 'pt' | 'ot' | 'resident';
@@ -14,7 +14,7 @@ type FaceSet = 'owner_f' | 'owner_m' | 'nurse' | 'caregiver' | 'pt' | 'ot' | 're
 const ROLE_FACE: Record<StaffRole, FaceSet> = { rn: 'nurse', pn: 'nurse', caregiver: 'caregiver', pt: 'pt', ot: 'ot' };
 
 function face(set: FaceSet, mood: Mood): string {
-  return faces[`../assets/faces/${set}_${mood}.webp`];
+  return faces[`../assets/faces/${set}_${mood}.png`];
 }
 
 /** 0..100 → expression. */
