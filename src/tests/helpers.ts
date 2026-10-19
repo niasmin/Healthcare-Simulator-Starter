@@ -73,6 +73,12 @@ export function admit(state: GameState, partial: Partial<ResidentCandidate> = {}
   return [out.state, out.result.id];
 }
 
+/** Admit a resident and create their care plan straight away. */
+export function admitPlanned(state: GameState, partial: Partial<ResidentCandidate> = {}): [GameState, string] {
+  const [s, id] = admit(state, partial);
+  return [ok(s, { type: 'createCarePlan', residentId: id }), id];
+}
+
 /** Switch random events off (for tests of other rules). */
 export function quietEvents(state: GameState): GameState {
   const off = { family_visit: 1e9, resident_change: 1e9, staff_resign: 1e9, referral: 1e9 };

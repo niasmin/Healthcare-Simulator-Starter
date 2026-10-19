@@ -4,7 +4,7 @@ import { reconcile } from '../domain/rules/ledger';
 import { monthlyFee } from '../data/finance';
 import { billMonth } from '../sim/systems/billing';
 import type { GameState } from '../domain/types';
-import { admit, buildHome, hire, ok, quietEvents } from './helpers';
+import { admit, admitPlanned, buildHome, hire, ok, quietEvents } from './helpers';
 
 function home(seed = 5): GameState {
   let s = quietEvents(buildHome(createInitialState(seed)));
@@ -45,7 +45,7 @@ describe('invoices', () => {
 
   it('creates each monthly invoice exactly once', () => {
     let s = home();
-    for (let i = 0; i < 3; i++) [s] = admit(s);
+    for (let i = 0; i < 3; i++) [s] = admitPlanned(s);
     s = until(s, 31, 1); // just after the month-2 billing run
     const m2 = s.invoices.filter((i) => i.month === 2 && i.kind === 'monthly');
     expect(m2).toHaveLength(3);
@@ -87,7 +87,7 @@ describe('invoices', () => {
 
   it('charges food and supplies once per day per home', () => {
     let s = home();
-    for (let i = 0; i < 2; i++) [s] = admit(s);
+    for (let i = 0; i < 2; i++) [s] = admitPlanned(s);
     s = until(s, 11);
     const food = s.ledger.filter((e) => e.category === 'food');
     expect(food).toHaveLength(10);

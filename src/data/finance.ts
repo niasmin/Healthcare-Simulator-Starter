@@ -8,10 +8,10 @@ import type { PriceLevel, RevenueStream } from '../domain/types';
 
 /** Monthly room & care fee by abstract care level 1..4 at the standard price level. */
 export const MONTHLY_FEE_BY_LEVEL: Record<number, number> = {
-  1: thb(24_000),
-  2: thb(28_000),
-  3: thb(33_000),
-  4: thb(38_000),
+  1: thb(26_000),
+  2: thb(30_000),
+  3: thb(36_000),
+  4: thb(41_000),
 };
 
 export const PRICE_LEVELS: PriceLevel[] = ['value', 'standard', 'premium'];
@@ -22,7 +22,7 @@ export const PRICE_MULTIPLIER: Record<PriceLevel, number> = { value: 0.9, standa
 export const WAITLIST_ARRIVALS: Record<PriceLevel, [number, number]> = { value: [2, 3], standard: [1, 2], premium: [0, 1] };
 
 /** Extra satisfaction drift per tick: premium prices raise expectations. */
-export const PRICE_SATISFACTION_DRIFT: Record<PriceLevel, number> = { value: 0.01, standard: 0, premium: -0.015 };
+export const PRICE_SATISFACTION_DRIFT: Record<PriceLevel, number> = { value: 0.02, standard: 0, premium: -0.06 };
 
 /** Billable services, charged per completed session on the next monthly invoice. */
 export const SERVICE_PRICE: Record<Exclude<RevenueStream, 'room_care'>, number> = {

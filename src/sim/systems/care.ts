@@ -14,7 +14,9 @@ import { EXHAUSTED_ENERGY } from './staffing';
  * - A care plan turns a resident's group + level into a fixed daily task schedule.
  * - Each tick: finish in-progress tasks, mark overdue ones missed, then assign due tasks
  *   to qualified, on-shift, available staff who can reach the resident's room.
- * Everything is deterministic: tasks are processed in (dueAt, priority, id) order and
+ * Everything is deterministic: tasks are processed in (dueAt, priority, resident
+ * satisfaction, id) order — when staff are short, the least satisfied resident is
+ * served first, so shortfalls rotate instead of always hitting the same people — and
  * staff are chosen by (fewest skills, highest energy, id).
  */
 
@@ -47,8 +49,10 @@ export function pruneTasks(state: GameState): GameState {
   return tasks.length === state.tasks.length ? state : { ...state, tasks };
 }
 
-function taskOrder(a: CareTask, b: CareTask): number {
-  return a.dueAt - b.dueAt || a.priority - b.priority || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+function taskOrder(residents: Map<string, Resident>) {
+  const sat = (t: CareTask) => Math.floor(residents.get(t.residentId)?.needs.satisfaction ?? 100);
+  return (a: CareTask, b: CareTask): number =>
+    a.dueAt - b.dueAt || a.priority - b.priority || sat(a) - sat(b) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
 }
 
 function staffOrder(a: Employee, b: Employee): number {
@@ -100,7 +104,7 @@ export function careTick(state: GameState): GameState {
   }
 
   // 3. Assign due tasks to qualified, available staff.
-  const due = tasks.filter((t) => t.status === 'pending' && t.dueAt <= now).sort(taskOrder);
+  const due = tasks.filter((t) => t.status === 'pending' && t.dueAt <= now).sort(taskOrder(residents));
   if (due.length) {
     for (const t of due) {
       const r = residents.get(t.residentId);

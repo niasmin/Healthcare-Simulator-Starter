@@ -99,7 +99,10 @@ export function refreshCandidates(state: GameState): GameState {
   const [lo, hi] = WAITLIST_ARRIVALS[s.priceLevel];
   let add: number;
   [s, add] = randInt(s, lo, hi);
+  // Word of mouth: a strong reputation brings extra enquiries, a poor one dries them up.
   if (s.organization.reputation >= 70) add++;
+  if (s.organization.reputation < 30) add = Math.max(0, add - 1);
+  if (s.organization.reputation < 15) add = 0;
   for (let i = 0; i < add && s.waitlist.filter((c) => !c.referralDeadline).length < WAITLIST_SIZE; i++) s = makeResidentCandidate(s);
   return s;
 }
