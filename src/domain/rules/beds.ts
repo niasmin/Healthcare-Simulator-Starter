@@ -1,5 +1,5 @@
 import type { CareGroup, GameState, Room } from '../types';
-import { GROUP_WARD_EQUIPMENT } from '../../data/patients';
+import { GROUP_WARD_EQUIPMENT, PROGRAMME_EQUIPMENT } from '../../data/patients';
 import { allRoomStatuses } from './rooms';
 
 /** Bed ids are `${roomId}#${index}` for index < installed bed count. */
@@ -30,10 +30,9 @@ export function freeBeds(state: GameState, group?: CareGroup): string[] {
     if (room.type !== 'ward') continue;
     const st = statuses.get(room.id)!;
     if (!st.operational) continue;
-    const fitted = needs ? (room.equipment[needs] ?? 0) > 0 : false;
-    if (needs && !fitted) continue;
-    // Other residents fill ordinary wards first, keeping secured beds for those who need them.
-    const list = !needs && (room.equipment.door_sensor ?? 0) > 0 ? secured : out;
+    if (needs && !needs.every((k) => (room.equipment[k] ?? 0) > 0)) continue;
+    // Other residents fill ordinary wards first, keeping specialised beds for those who need them.
+    const list = !needs && PROGRAMME_EQUIPMENT.some((k) => (room.equipment[k] ?? 0) > 0) ? secured : out;
     for (let i = 0; i < st.capacity; i++) {
       const id = bedId(room.id, i);
       if (!taken.has(id)) list.push(id);

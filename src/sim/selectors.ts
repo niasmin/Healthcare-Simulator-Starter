@@ -2,6 +2,7 @@ import { chapterDef, type ChapterDef } from '../data/chapters';
 import { allRoomStatuses, type RoomStatus } from '../domain/rules/rooms';
 import type { GameState, LedgerCategory, RoomType, Satang } from '../domain/types';
 import { dailyPayroll, dailyUpkeep } from './systems/finance';
+import { dailyResidentCosts } from './systems/billing';
 import { carePlanSchedule, TASK_KINDS } from '../data/patients';
 import { ROLE_ORDER, SHIFT_SLOTS, SLOT_ORDER } from '../data/staff';
 import { inWindow, isOnShift, shiftMinutes } from '../domain/rules/shifts';
@@ -438,6 +439,34 @@ export function financeView(state: GameState, period: 'month' | 'all'): FinanceV
     receivables: state.invoices.filter((i) => i.status === 'issued').reduce((a, i) => a + i.totalSatang, 0),
     invoices: [...state.invoices].reverse().slice(0, 8),
   };
+}
+
+/** Running costs charged every midnight at today's size: payroll, upkeep, food and supplies. */
+export function dailyRunningCost(state: GameState): Satang {
+  const { food, supplies } = dailyResidentCosts(state);
+  return dailyPayroll(state) + dailyUpkeep(state) + food + supplies;
+}
+
+/** Day number of the next start-of-month billing run. */
+export function nextBillingDay(state: GameState): number {
+  return monthOfDay(dayOf(state.minute)) * 30 + 1;
+}
+
+export interface Runway {
+  /** Whole days the cash covers at today's running costs (null with no costs). */
+  days: number | null;
+  /** Days until the next monthly invoices go out. */
+  untilBilling: number;
+  /** True when cash runs out before the next billing day. */
+  short: boolean;
+}
+
+/** How long the cash lasts without new revenue; the danger zone is running dry before billing day. */
+export function cashRunway(state: GameState): Runway {
+  const cost = dailyRunningCost(state);
+  const untilBilling = nextBillingDay(state) - dayOf(state.minute);
+  const days = cost > 0 ? Math.max(0, Math.floor(state.organization.cashSatang / cost)) : null;
+  return { days, untilBilling, short: days !== null && days < untilBilling };
 }
 
 /** Top-bar gauges. */

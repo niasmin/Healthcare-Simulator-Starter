@@ -48,8 +48,8 @@ Playable today: **Chapter 1 — First Care Home** (days 1–30) and **Chapter 2 
   | Programme | Care level | Extra fee/month | What it needs |
   |---|---|---|---|
   | สมองเสื่อม (dementia) | 2–3 | ฿4,000 | A ward fitted with the new **door sensor system** (฿35,000). Three safety rounds a day; help at meals |
-  | ให้อาหารทางสาย (tube feeding) | 3–4 | ฿6,000 | Three tube feeds a day (RN or PN only), repositioning every 4 h, ฿40/day supplies |
-  | เจาะคอ (tracheostomy) | 4 | ฿12,000 | Airway care every 6 h (**RN only**, so an RN on nights too), tube feeds, repositioning, ฿90/day supplies |
+  | ให้อาหารทางสาย (tube feeding) | 3–4 | ฿6,000 | A ward with a **feeding pump** (฿12,000). Three tube feeds a day (RN or PN only), repositioning every 4 h, ฿40/day supplies |
+  | เจาะคอ (tracheostomy) | 4 | ฿12,000 | A ward with a **feeding pump and a suction machine** (฿20,000). Airway care every 6 h (**RN only**, so an RN on nights too), tube feeds, repositioning, ฿90/day supplies |
 
   - Programme candidates join the waiting list from Chapter 2, one of each on its first day, and then at half the rate of the basic groups.
   - Other residents fill ordinary wards first, keeping secured beds free.
@@ -63,11 +63,21 @@ Playable today: **Chapter 1 — First Care Home** (days 1–30) and **Chapter 2 
   | Chapter 1, full home staffed to the advice | won on 6 of 7 seeds (−฿1k to +฿38k operating result) |
   | Chapter 1, stopping at 8 residents | won on 3 of 7 seeds |
   | Chapter 1, stopping at 6 residents | failed on 7 of 7 seeds |
-  | Chapter 2, adding a 15-bed secured ward and a 12-bed ward when cash allows | won on 6 of 6 seeds that reached it; lowest cash ฿5k–฿117k |
-  | Chapter 2 plus a second full team | bankrupt |
+  | Chapter 2, a careful builder: a 15-bed specialised ward, then a 12-bed ward, each only when the cash runway reaches billing day | won on 6 of 6 seeds that reached it; lowest cash ฿241k–฿385k |
+  | Chapter 2, a reckless builder: each ward the moment it is affordable | lowest cash −฿60k to ฿40k; bankrupt on one of three seeds |
+  | Chapter 2 plus a second full team | failed |
 
-  A bigger home is very profitable once it is full: about ฿1.0–1.2M of operating profit over the 60 days. The danger is liquidity. Wages are paid every day, but the new residents' bills arrive at admission and on day 1 of each month, so building too early or hiring ahead of the advice can run the cash out.
+  A bigger home is very profitable once it is full: about ฿0.7–0.8M of operating profit over the 60 days. The danger is liquidity. Wages are paid every day, but the new residents' bills arrive at admission and on day 1 of each month.
+- **Cash runway (เงินสดพอจ่าย):** a new dashboard tile shows how many days the cash covers at today's running costs (payroll, upkeep, food and supplies). It turns red with a warning when the cash would run out before the next billing day.
 - **Save format:** schema 6 stores `chapter = { id, startDay, result, past }`. Schema-5 saves migrate automatically, keeping their Chapter 1 verdict, and staff hired earlier learn the new skills of their role.
+
+#### Character and equipment art from the project's new sheets
+
+- **Characters:** the chibi character sheet (7 roles, front/side/back views and 5 expressions each) was cut with flood-fill background removal into 7 full-body sprites and 35 expression faces, about 200 KB of WebP.
+  - **On the map**, staff on shift are drawn as full-body characters standing on a role-coloured ring. RN and PN share the nurse uniform, and the ring tells them apart.
+  - **Portraits follow the person's live mood.** Residents use the average of happiness and satisfaction: happy at 80+, smile at 65+, default at 45+, otherwise sad. Staff use morale, and look sad when exhausted. Event cards show surprise for an urgent change and sad for a resignation.
+  - Male residents use the new elder; female residents keep the earlier portraits until there is a female elder in the sheet.
+- **Equipment:** the feeding pump, suction machine and sofa were cut from the equipment sheet. The pump and suction machine are new ward fittings for the tube-feeding and tracheostomy programmes (above), and the sofa is the staff-room rest sofa. Residents outside a programme fill ordinary wards first, keeping specialised beds free.
 
 #### Ideas taken from CMNH-ENTERPRISE (V11–V18)
 
@@ -275,7 +285,7 @@ src/
   - Food, supplies, upkeep and payroll are each charged once per day.
   - An event's cost is charged once, and a resolved event can't be resolved again.
 
-## Tests (103 passing)
+## Tests (104 passing)
 
 | File | Covers |
 |---|---|
@@ -290,7 +300,7 @@ src/
 | `saves.test.ts` | **Save and reload gives identical state**, and the reloaded game then runs identically for 300 ticks; gzip makes it at least 3× smaller; corrupt, tampered (cash ≠ ledger) and incompatible saves rejected without throwing; IndexedDB store round-trip (fake-indexeddb); cloud store splits large saves into parts under 256 KiB and reassembles them; the newest copy wins across two devices sharing one account; works without cloud; local save survives cloud failure |
 | `decor.test.ts` | Decor placed on an empty tile and charged once; can't overlap rooms, corridor, entrance or decor, and blocks building over it; demolish refunds half; appeal is capped and makes residents happier; schema-3 saves migrate to schema 4 |
 | `chapter.test.ts` | **30-day playthrough** by a scripted sensible player using only public commands and the real applicant and waiting-list pools: wins chapter 1 with cash positive every day; every invariant holds (ledger, unique beds, no overlapping shifts, no care without the skill); roster ready and >95% of tasks done; the three scripted events fire on their days; the same seed plays byte-identically; the verdict pauses the game and survives a save. **Balance:** a full home wins on more seeds, a 40% empty home and an overstaffed home fail on targets. **Verdict rules:** bankrupt at the first negative midnight, decided once and never changed; nothing decided before day 30; a migrated save past day 30 is judged at the next midnight. **Tutorial:** step order, derived from state, a goal and a how-to hint in Thai and English for every step. **Staffing advice:** rush-hour windows, RN covering PN work, one OT for ten sessions |
-| `chapter2.test.ts` | **90-day campaign** by the scripted player: wins Chapter 1, starts Chapter 2 on day 31 and wins it on day 90 with every target; dementia residents only in secured wards; airway care only by RNs and tube feeding only by RNs/PNs; an RN on the night roster; >93% of tasks done; byte-identical rerun; a second full team goes bankrupt. **Rules:** the next chapter only after a win, with one candidate per programme; secured-ward admission; RN-only airway care missed with only a PN on nights; programme fees; schema-5 migration; Thai and English text for every Chapter 2 step |
+| `chapter2.test.ts` | **90-day campaign** by the scripted player: wins Chapter 1, starts Chapter 2 on day 31 and wins it on day 90 with every target; dementia residents only in secured wards; airway care only by RNs and tube feeding only by RNs/PNs; an RN on the night roster; >93% of tasks done; byte-identical rerun; a reckless builder's lowest cash falls far below the careful one, with at least one bankruptcy; a second full team fails the chapter. **Rules:** the next chapter only after a win, with one candidate per programme; secured-ward admission; RN-only airway care missed with only a PN on nights; programme fees; schema-5 migration; Thai and English text for every Chapter 2 step |
 | `i18n-iso.test.ts` | TH/EN key parity; labels for every room, equipment and reason; Thai interpolation; iso projection inverts for all 400 cells |
 
 GDD acceptance tests covered so far: *place a room and deduct construction cost once*, *reject collisions*, *admit up to capacity*, *reject excess admission*, *schedule a qualified staff member*, *prevent overlapping shifts*, *advance 30 days deterministically with a fixed seed*, *reconcile cash ledger*, *show Thai text correctly*, *run production build without errors*. *Create monthly invoice once* is now covered too. *Save and reload identical state* is now covered as well, so **all GDD acceptance tests pass**.
@@ -331,7 +341,7 @@ A browser playtest (Playwright, run outside the repo) drove the production build
 - Starting a **new game** overwrites the autosave once the new game has progress. Use a manual slot to keep an older game.
 - Cloud saves need a signed-in viewer allowed to use the page (the owner always is). Anyone opening a public link with view-only access saves in their browser only.
 - Months are a flat 30 game days. Discharge mid-month doesn't refund prepaid room & care. Families always pay; there are no bad debts or late fees yet.
-- Portraits are per role (and per gender for residents), so two RNs share a face. More character art can be cropped from the concept sheets later.
+- Portraits are per role, so two nurses share a face (with different expressions). Female residents still use the earlier portrait style. Map characters stand still; walking (as in CMNH V16) is not done yet.
 - Events are generic: they don't yet react to specific causes (for example, burnout after many double shifts).
 - Shifts are a standing daily roster (the same every day). There's no weekly pattern, leave or sick days yet.
 - Staff don't walk. They appear at the station or at the bedside when a task starts, and travel time isn't simulated.

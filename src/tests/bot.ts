@@ -2,11 +2,13 @@ import { applyCommand, step, type Command } from '../sim/engine';
 import { freeBeds } from '../domain/rules/beds';
 import { choiceBlocker } from '../sim/systems/events';
 import { EVENT_DEFS } from '../data/events';
-import { rosterView } from '../sim/selectors';
+import { dailyRunningCost, nextBillingDay, rosterView } from '../sim/selectors';
+import { dayOf } from '../sim/systems/time';
 import { SLOT_ORDER } from '../data/staff';
 import type { GameState, Rect, ShiftSlot, Skill, StaffRole } from '../domain/types';
 import { EQUIPMENT, TILES_PER_BED, roomConstructionCost } from '../data/rooms';
 import { chapterDef } from '../data/chapters';
+import { monthlyFee } from '../data/finance';
 import { thb } from '../domain/money';
 import { buildHome } from './helpers';
 
@@ -42,7 +44,9 @@ export interface BotOptions {
   maxResidents?: number;
   /** Start the next chapter after a win and play it (Chapter 2 expansion). */
   campaign?: boolean;
-  /** Cash kept in hand after building a ward, so payroll never bounces (default ฿150,000). */
+  /** Build as soon as the ward itself is affordable, ignoring the cash runway (a reckless player). */
+  eager?: boolean;
+  /** Extra cash kept on top of the running costs until billing day (default ฿50,000). */
   reserve?: number;
 }
 
@@ -54,20 +58,31 @@ export const EXPANSION: Array<{ rect: Rect; sensor: boolean }> = [
 
 function wardCost(rect: Rect, sensor: boolean): number {
   const beds = Math.floor((rect.w * rect.h) / TILES_PER_BED);
-  return roomConstructionCost('ward', rect) + beds * EQUIPMENT.care_bed.costSatang + EQUIPMENT.call_system.costSatang + (sensor ? EQUIPMENT.door_sensor.costSatang : 0);
+  const fittings = sensor ? EQUIPMENT.door_sensor.costSatang + EQUIPMENT.feeding_pump.costSatang + EQUIPMENT.suction_unit.costSatang : 0;
+  return roomConstructionCost('ward', rect) + beds * EQUIPMENT.care_bed.costSatang + EQUIPMENT.call_system.costSatang + fittings;
 }
 
 /** Build the next planned ward when cash allows, fully equipped. */
-function expand(s: GameState, reserve: number): GameState {
+function expand(s: GameState, reserve: number, eager: boolean): GameState {
   const plan = EXPANSION.find((p) => !s.site.rooms.some((r) => r.rect.x === p.rect.x && r.rect.y === p.rect.y));
-  if (!plan || s.organization.cashSatang < wardCost(plan.rect, plan.sensor) + reserve) return s;
+  if (!plan) return s;
+  // Keep enough to pay the bigger home's running costs until the next billing day, plus a cushion.
+  const beds = Math.floor((plan.rect.w * plan.rect.h) / TILES_PER_BED);
+  const grown = (dailyRunningCost(s) * (s.residents.length + beds)) / Math.max(1, s.residents.length);
+  const untilBilling = nextBillingDay(s) - dayOf(s.minute);
+  // New residents pay a pro-rated invoice for the rest of the month soon after admission.
+  const avgFee = s.residents.reduce((a, r) => a + monthlyFee(r.careLevel, s.priceLevel, r.group), 0) / Math.max(1, s.residents.length);
+  const admissions = (beds * avgFee * untilBilling) / 30;
+  const need = eager ? wardCost(plan.rect, plan.sensor) : wardCost(plan.rect, plan.sensor) + grown * untilBilling - admissions + reserve;
+  if (s.organization.cashSatang < need) return s;
   const out = applyCommand(s, { type: 'placeRoom', roomType: 'ward', rect: plan.rect });
   if (!out.result.ok || !out.result.id) return s;
   let next = out.state;
   const roomId = out.result.id;
   for (let i = 0; i < Math.floor((plan.rect.w * plan.rect.h) / TILES_PER_BED); i++) next = tryCmd(next, { type: 'installEquipment', roomId, equipment: 'care_bed' });
   next = tryCmd(next, { type: 'installEquipment', roomId, equipment: 'call_system' });
-  if (plan.sensor) next = tryCmd(next, { type: 'installEquipment', roomId, equipment: 'door_sensor' });
+  // The first new ward becomes the specialised one: secured, with a feeding pump and suction.
+  if (plan.sensor) for (const k of ['door_sensor', 'feeding_pump', 'suction_unit'] as const) next = tryCmd(next, { type: 'installEquipment', roomId, equipment: k });
   return next;
 }
 
@@ -96,7 +111,7 @@ export function botTurn(state: GameState, opts: BotOptions = {}): GameState {
   const max = opts.maxResidents ?? Infinity;
   if (opts.campaign && s.chapter.result?.outcome === 'won') s = tryCmd(s, { type: 'startChapter' });
   if (s.chapter.id >= 2) {
-    s = expand(s, opts.reserve ?? thb(150_000));
+    s = expand(s, opts.reserve ?? thb(50_000), opts.eager ?? false);
     const def = chapterDef(s.chapter.id);
     if (def.targetRn && s.employees.filter((e) => e.role === 'rn').length < def.targetRn) s = cover(s, 'rn', 'night');
   }

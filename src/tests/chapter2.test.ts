@@ -34,6 +34,11 @@ describe('chapter 2: Professional Nursing Center (campaign playthrough)', () => 
       const room = s.site.rooms.find((x) => x.id === parseBedId(r.bedId).roomId)!;
       expect(room.equipment.door_sensor).toBe(1);
     }
+    for (const r of s.residents.filter((x) => x.group === 'airway' || x.group === 'tube_feeding')) {
+      const room = s.site.rooms.find((x) => x.id === parseBedId(r.bedId).roomId)!;
+      expect(room.equipment.feeding_pump).toBe(1);
+      if (r.group === 'airway') expect(room.equipment.suction_unit).toBe(1);
+    }
     for (const t of s.tasks.filter((x) => x.kind === 'airway_care' && x.assigneeId)) expect(s.employees.find((e) => e.id === t.assigneeId)?.role ?? 'rn').toBe('rn');
     for (const t of s.tasks.filter((x) => x.kind === 'tube_feed' && x.assigneeId)) expect(['rn', 'pn']).toContain(s.employees.find((e) => e.id === t.assigneeId)?.role ?? 'rn');
     if (s.residents.some((r) => r.group === 'airway')) {
@@ -51,7 +56,13 @@ describe('chapter 2: Professional Nursing Center (campaign playthrough)', () => 
     expect(JSON.stringify(playthrough(createInitialState(STARTER_SCENARIO.defaultSeed), 91, { campaign: true }).state)).toBe(JSON.stringify(s));
   });
 
-  it('a second full team hired at expansion time runs the home out of cash', () => {
+  it('building every ward the moment it is affordable skates on the edge of bankruptcy', () => {
+    const runs = [STARTER_SCENARIO.defaultSeed, 1, 3].map((seed) => playthrough(createInitialState(seed), 91, { campaign: true, eager: true }));
+    for (const r of runs) expect(r.minCash).toBeLessThan(run.minCash / 4);
+    expect(runs.some((r) => r.state.chapter.result?.reason === 'bankrupt')).toBe(true);
+  }, 30_000);
+
+  it('a second full team hired at expansion time fails the chapter', () => {
     let g = playthrough(createInitialState(STARTER_SCENARIO.defaultSeed), 30).state;
     g = step(step(g)); // past the verdict midnight
     g = botTurn(g, { campaign: true });
@@ -60,7 +71,7 @@ describe('chapter 2: Professional Nursing Center (campaign playthrough)', () => 
       g = step(g);
       if (g.minute % 1440 === 420) g = botTurn(g, { campaign: true });
     }
-    expect(g.chapter.result).toMatchObject({ chapter: 2, outcome: 'failed', reason: 'bankrupt' });
+    expect(g.chapter.result).toMatchObject({ chapter: 2, outcome: 'failed' });
   });
 });
 
@@ -80,7 +91,7 @@ describe('chapter rules', () => {
   it('dementia needs a secured ward; others fill ordinary wards first', () => {
     let s = quietEvents(buildHome(createInitialState(4)));
     const out = applyCommand({ ...s, waitlist: [{ id: 'c1', name: { th: 'ก', en: 'A' }, age: 80, group: 'dementia', careLevel: 2, needs: { physical: 70, mobility: 60, mental: 50, happiness: 60, satisfaction: 70, nutrition: 70 } }] }, { type: 'admitResident', candidateId: 'c1' });
-    expect(out.result).toMatchObject({ ok: false, reason: 'needs_secure_ward' });
+    expect(out.result).toMatchObject({ ok: false, reason: 'needs_ward_equipment', params: { equipment: 'door_sensor' } });
     s = ok(s, { type: 'installEquipment', roomId: ward(s).id, equipment: 'door_sensor' });
     let id: string;
     [s, id] = admit(s, { group: 'dementia', careLevel: 2 });
@@ -89,6 +100,7 @@ describe('chapter rules', () => {
 
   it('airway care is RN-only and puts an RN on the night roster', () => {
     let s = quietEvents(buildHome(createInitialState(5)));
+    for (const k of ['feeding_pump', 'suction_unit'] as const) s = ok(s, { type: 'installEquipment', roomId: ward(s).id, equipment: k });
     [s] = hire(s, 'rn', ['morning']);
     [s] = hire(s, 'pn', ['night']);
     let id: string;

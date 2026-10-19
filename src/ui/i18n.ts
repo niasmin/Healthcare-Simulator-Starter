@@ -236,6 +236,10 @@ const th: Dict = {
   'alert.exhausted': '{name} เหนื่อยล้ามาก รับงานไม่ได้',
 
   'dash.payroll': 'ค่าแรงต่อวัน',
+  'dash.runway': 'เงินสดพอจ่าย',
+  'dash.runway_days': '{n} วัน',
+  'dash.runway_sub': 'บิลรอบถัดไปอีก {n} วัน',
+  'dash.runway_short': '⚠ หมดก่อนบิลรอบถัดไป ({n} วัน)',
   'dash.occ_sub': '{n}/{beds} เตียง',
   'dash.quality_sub': 'งานสำเร็จ {pct}%',
   'dash.wellbeing': 'สุขภาวะเฉลี่ย',
@@ -451,7 +455,7 @@ const th: Dict = {
   'title.load': 'โหลดเกม',
   'admit.per_month': '/เดือน',
   'admit.programme': 'กลุ่มดูแลเฉพาะทาง',
-  'admit.needs_secure': 'ต้องใช้ห้องที่มีประตูเซนเซอร์',
+  'admit.needs': 'ต้องใช้ห้องที่มี {list}',
 
   // Phase 4: tutorial and the 30-day chapter challenge
   'goal.ward': 'สร้างห้องพักผู้สูงอายุติดทางเดิน',
@@ -496,6 +500,8 @@ const th: Dict = {
 
 
   'equip.door_sensor': 'ระบบประตูเซนเซอร์ (Secure ward)',
+  'equip.feeding_pump': 'เครื่องให้อาหาร (Feeding pump)',
+  'equip.suction_unit': 'เครื่องดูดเสมหะ (Suction)',
   'skill.tube_feeding': 'ให้อาหารทางสาย',
   'skill.airway_care': 'ดูแลทางเดินหายใจ (Trach)',
   'task.tube_feed': 'ให้อาหารทางสาย',
@@ -504,7 +510,7 @@ const th: Dict = {
   'group.dementia': 'สมองเสื่อม',
   'group.tube_feeding': 'ให้อาหารทางสาย (NG)',
   'group.airway': 'เจาะคอ (Trach)',
-  'reason.needs_secure_ward': 'ผู้พักกลุ่มสมองเสื่อมต้องใช้ห้องพักที่ติดตั้งประตูเซนเซอร์',
+  'reason.needs_ward_equipment': 'กลุ่มดูแลนี้ต้องใช้ห้องพักที่ติดตั้ง{equipment}',
   'reason.chapter_locked': 'ต้องผ่านบทปัจจุบันก่อนจึงจะเริ่มบทถัดไปได้',
   'goal.chapter1': 'ผ่าน {n} วันแรกโดยมีกำไรจากการดำเนินงาน',
   'tut.chapter1': 'เล่นให้ครบ {n} วัน: เงินสดห้ามติดลบ รายรับต้องมากกว่าค่าใช้จ่ายดำเนินงาน มีผู้พักอย่างน้อย {r} คน และคุณภาพการดูแลอย่างน้อย {q} อย่าจ้างคนเกินคำแนะนำของตารางเวร',
@@ -519,9 +525,9 @@ const th: Dict = {
   'goal.prog_dementia': 'รับผู้พักกลุ่มสมองเสื่อม',
   'tut.prog_dementia': 'กลุ่มสมองเสื่อมจ่ายค่าบริการเพิ่ม ต้องอยู่ในห้องที่มีประตูเซนเซอร์ และมีรอบดูแลความปลอดภัยวันละ 3 ครั้ง',
   'goal.prog_tube_feeding': 'รับผู้พักกลุ่มให้อาหารทางสาย',
-  'tut.prog_tube_feeding': 'กลุ่มนี้ต้องให้อาหารทางสายวันละ 3 มื้อ ทำได้เฉพาะ RN หรือ PN และต้องพลิกตัวทุก 4 ชั่วโมง ค่าบริการและค่าเวชภัณฑ์สูงขึ้น',
+  'tut.prog_tube_feeding': 'ติดตั้งเครื่องให้อาหารในห้องพักก่อน กลุ่มนี้ต้องให้อาหารทางสายวันละ 3 มื้อ ทำได้เฉพาะ RN หรือ PN และต้องพลิกตัวทุก 4 ชั่วโมง ค่าบริการและค่าเวชภัณฑ์สูงขึ้น',
   'goal.prog_airway': 'รับผู้พักกลุ่มเจาะคอ (Trach)',
-  'tut.prog_airway': 'กลุ่มเจาะคอจ่ายค่าบริการสูงสุด แต่ต้องมี RN ดูแลทางเดินหายใจทุก 6 ชั่วโมง ต้องจัด RN ลงกะดึกด้วย',
+  'tut.prog_airway': 'ห้องพักต้องมีทั้งเครื่องให้อาหารและเครื่องดูดเสมหะ กลุ่มเจาะคอจ่ายค่าบริการสูงสุด แต่ต้องมี RN ดูแลทางเดินหายใจทุก 6 ชั่วโมง ต้องจัด RN ลงกะดึกด้วย',
   'tut.roster2': 'ไปที่หน้า "ตารางเวร" แล้วเติมช่องสีแดงจนทุกกะขึ้นว่าพร้อม ถ้ามีผู้พักกลุ่มเจาะคอ กะดึกต้องมี RN',
   'tut.fill2': 'รับผู้พักให้ได้อย่างน้อย {n} คน กลุ่มดูแลเฉพาะทางจ่ายมากกว่า แต่ใช้ทีมมากกว่าด้วย',
   'chapter.check.rn': 'พยาบาลวิชาชีพ (RN) อย่างน้อย {need} คน',
@@ -777,6 +783,10 @@ const en: Dict = {
   'alert.exhausted': '{name} is exhausted and cannot take tasks',
 
   'dash.payroll': 'Payroll / day',
+  'dash.runway': 'Cash runway',
+  'dash.runway_days': '{n} days',
+  'dash.runway_sub': 'next billing in {n} days',
+  'dash.runway_short': '⚠ runs out before billing ({n} days)',
   'dash.occ_sub': '{n}/{beds} beds',
   'dash.quality_sub': '{pct}% tasks done',
   'dash.wellbeing': 'Avg well-being',
@@ -992,7 +1002,7 @@ const en: Dict = {
   'title.load': 'Load game',
   'admit.per_month': '/month',
   'admit.programme': 'Specialised programme',
-  'admit.needs_secure': 'needs a ward with a door sensor',
+  'admit.needs': 'needs a ward with {list}',
 
   // Phase 4: tutorial and the 30-day chapter challenge
   'goal.ward': 'Build a resident ward on the corridor',
@@ -1037,6 +1047,8 @@ const en: Dict = {
 
 
   'equip.door_sensor': 'Door sensor system (secure ward)',
+  'equip.feeding_pump': 'Feeding pump',
+  'equip.suction_unit': 'Suction machine',
   'skill.tube_feeding': 'Tube feeding',
   'skill.airway_care': 'Airway care (trach)',
   'task.tube_feed': 'Tube feeding',
@@ -1045,7 +1057,7 @@ const en: Dict = {
   'group.dementia': 'Dementia',
   'group.tube_feeding': 'Tube feeding (NG)',
   'group.airway': 'Tracheostomy',
-  'reason.needs_secure_ward': 'Residents living with dementia need a ward with a door sensor system',
+  'reason.needs_ward_equipment': 'This programme needs a ward fitted with: {equipment}',
   'reason.chapter_locked': 'Pass the current chapter before starting the next one',
   'goal.chapter1': 'Finish the first {n} days with an operating profit',
   'tut.chapter1': 'Play to day {n}: keep cash above zero, earn more than your running costs, keep at least {r} residents and care quality at {q} or more. Don’t hire beyond the roster advice.',
@@ -1060,9 +1072,9 @@ const en: Dict = {
   'goal.prog_dementia': 'Admit a resident living with dementia',
   'tut.prog_dementia': 'The dementia programme pays more. These residents need a ward with a door sensor system and three safety rounds a day.',
   'goal.prog_tube_feeding': 'Admit a tube-feeding resident',
-  'tut.prog_tube_feeding': 'Three tube feeds a day, by an RN or PN only, plus repositioning every 4 hours. Higher fee, higher supply costs.',
+  'tut.prog_tube_feeding': 'Fit a feeding pump in a ward first. Three tube feeds a day, by an RN or PN only, plus repositioning every 4 hours. Higher fee, higher supply costs.',
   'goal.prog_airway': 'Admit a tracheostomy resident',
-  'tut.prog_airway': 'The highest fee, but an RN must give airway care every 6 hours, so an RN has to be on the night shift too.',
+  'tut.prog_airway': 'The ward needs both a feeding pump and a suction machine. The highest fee, but an RN must give airway care every 6 hours, so an RN has to be on the night shift too.',
   'tut.roster2': 'Go to Shift schedule and fill the red cells until every shift says ready. With tracheostomy residents, the night shift needs an RN.',
   'tut.fill2': 'House at least {n} residents. Specialised programmes pay more but need more of your team.',
   'chapter.check.rn': 'At least {need} Registered Nurses',

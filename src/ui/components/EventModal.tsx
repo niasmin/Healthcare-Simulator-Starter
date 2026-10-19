@@ -3,7 +3,7 @@ import { EVENT_DEFS, REFERRAL_COUNT } from '../../data/events';
 import { freeBeds } from '../../domain/rules/beds';
 import { choiceBlocker } from '../../sim/systems/events';
 import { useMoney, useT } from '../hooks';
-import { ROLE_PORTRAIT, residentPortrait } from '../portraits';
+import { rolePortrait, residentPortrait } from '../portraits';
 import { useGame } from '../store';
 import { useName } from './people';
 
@@ -68,7 +68,7 @@ export function EventModal() {
           </div>
           {(resident || staff[0]) && (
             <img
-              src={resident ? residentPortrait(resident.name) : ROLE_PORTRAIT[staff[0].role]}
+              src={resident ? residentPortrait(resident.name, resident.needs, def.tone === 'urgent' ? 'surprise' : 'smile') : rolePortrait(staff[0].role, 'sad')}
               alt=""
               className="size-14 rounded-full object-cover ml-auto shrink-0 border-2 border-white shadow"
             />

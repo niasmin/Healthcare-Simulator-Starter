@@ -24,6 +24,8 @@ export const EQUIPMENT: Record<EquipmentId, EquipmentDef> = {
   lockers: { id: 'lockers', costSatang: thb(15_000), color: 0x7c86a8 },
   rest_sofa: { id: 'rest_sofa', costSatang: thb(12_000), color: 0xd98a6c },
   door_sensor: { id: 'door_sensor', costSatang: thb(35_000), color: 0x8a5a9e },
+  feeding_pump: { id: 'feeding_pump', costSatang: thb(12_000), color: 0xe8eef2 },
+  suction_unit: { id: 'suction_unit', costSatang: thb(20_000), color: 0xdfe8f0 },
 };
 
 export interface EquipmentSlot {
@@ -66,6 +68,9 @@ export const ROOMS: Record<RoomType, RoomDef> = {
       { id: 'call_system', required: 1, max: () => 1 },
       // Optional: secures the ward so residents living with dementia can stay there.
       { id: 'door_sensor', required: 0, max: () => 1 },
+      // Optional: let the ward take tube-feeding (pump) and tracheostomy (pump + suction) residents.
+      { id: 'feeding_pump', required: 0, max: () => 1 },
+      { id: 'suction_unit', required: 0, max: () => 1 },
     ],
     floorColor: 0xb9d7cf,
     wallColor: 0x4f8a80,

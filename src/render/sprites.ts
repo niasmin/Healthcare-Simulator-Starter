@@ -1,5 +1,5 @@
 import { Texture } from 'pixi.js';
-import type { DecorType, EquipmentId } from '../domain/types';
+import type { DecorType, EquipmentId, StaffRole } from '../domain/types';
 
 /** Sprite art cut from the project's Game Assets Pack (fictional, owned by the project). */
 const urls = import.meta.glob('../assets/sprites/*.webp', { eager: true, import: 'default' }) as Record<string, string>;
@@ -17,7 +17,15 @@ export const EQUIP_SPRITE: Partial<Record<EquipmentId, { name: string; width: nu
   exercise_mat: { name: 'eq_ball', width: 26 },
   parallel_bars: { name: 'eq_bars', width: 56 },
   lockers: { name: 'eq_cabinet', width: 34 },
+  rest_sofa: { name: 'eq_sofa', width: 44 },
+  feeding_pump: { name: 'eq_pump', width: 22 },
+  suction_unit: { name: 'eq_suction', width: 26 },
 };
+
+/** Full-body chibi sprite per staff role (from the character sheet). RN and PN share the nurse uniform. */
+export const STAFF_SPRITE: Record<StaffRole, string> = { rn: 'ch_nurse', pn: 'ch_nurse', caregiver: 'ch_caregiver', pt: 'ch_pt', ot: 'ch_ot' };
+/** Map width of a standing character, in world px. */
+export const PERSON_SPRITE_WIDTH = 24;
 
 export const DECOR_SPRITE: Record<DecorType, { name: string; width: number }> = {
   tree: { name: 'dc_tree', width: 70 },

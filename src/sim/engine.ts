@@ -202,7 +202,15 @@ export function applyCommand(state: GameState, cmd: Command): CommandOutcome {
       const c = state.waitlist.find((x) => x.id === cmd.candidateId);
       if (!c) return fail(state, 'not_found');
       const bed = freeBeds(state, c.group)[0];
-      if (!bed) return fail(state, GROUP_WARD_EQUIPMENT[c.group] && freeBeds(state).length ? 'needs_secure_ward' : 'no_free_bed');
+      if (!bed) {
+        const needs = GROUP_WARD_EQUIPMENT[c.group];
+        if (needs && freeBeds(state).length) {
+          // Name the first fitting no operational ward has yet.
+          const missing = needs.find((k) => !state.site.rooms.some((r) => r.type === 'ward' && (r.equipment[k] ?? 0) > 0)) ?? needs[0];
+          return fail(state, 'needs_ward_equipment', { equipment: missing });
+        }
+        return fail(state, 'no_free_bed');
+      }
       let [s, id] = allocId(state, 'res');
       const resident: Resident = { id, name: c.name, age: c.age, group: c.group, careLevel: c.careLevel, needs: { ...c.needs }, bedId: bed, admittedAt: s.minute, carePlan: null };
       s = { ...s, waitlist: s.waitlist.filter((x) => x.id !== c.id), residents: [...s.residents, resident] };

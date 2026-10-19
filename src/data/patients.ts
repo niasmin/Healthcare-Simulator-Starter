@@ -1,4 +1,4 @@
-import type { CareGroup, NeedKey, PersonName, Skill, TaskKind } from '../domain/types';
+import type { CareGroup, EquipmentId, NeedKey, PersonName, Skill, TaskKind } from '../domain/types';
 
 /**
  * Care groups and task templates. Everything is ABSTRACT and fictional:
@@ -16,8 +16,14 @@ export const GROUP_LEVELS: Record<CareGroup, [number, number]> = {
   airway: [4, 4],
 };
 
-/** Programmes that need a ward fitted with this equipment (dementia: a door-sensor secured ward). */
-export const GROUP_WARD_EQUIPMENT: Partial<Record<CareGroup, 'door_sensor'>> = { dementia: 'door_sensor' };
+/** Programmes that need a ward fitted with all of this equipment. */
+export const GROUP_WARD_EQUIPMENT: Partial<Record<CareGroup, EquipmentId[]>> = {
+  dementia: ['door_sensor'],
+  tube_feeding: ['feeding_pump'],
+  airway: ['feeding_pump', 'suction_unit'],
+};
+/** Fittings that make a ward "specialised"; other residents fill ordinary wards first. */
+export const PROGRAMME_EQUIPMENT: EquipmentId[] = ['door_sensor', 'feeding_pump', 'suction_unit'];
 
 export interface TaskKindDef {
   kind: TaskKind;

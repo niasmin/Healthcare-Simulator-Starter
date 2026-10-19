@@ -5,6 +5,7 @@ import type { Cell, Rect } from '../../domain/types';
 import { IsoRenderer } from '../../render/IsoRenderer';
 import { ROLES } from '../../data/staff';
 import { peopleMarkers } from '../../sim/selectors';
+import { STAFF_SPRITE } from '../../render/sprites';
 import type { CareGroup, StaffRole } from '../../domain/types';
 import { isMobileNow, useMoney, useSummary, useT } from '../hooks';
 import { useGame } from '../store';
@@ -93,6 +94,7 @@ export function GameCanvas() {
       peopleMarkers(game).map((m) => ({
         ...m,
         color: m.kind === 'staff' ? ROLES[m.role as StaffRole].color : GROUP_HEX[m.group as CareGroup],
+        ...(m.kind === 'staff' ? { sprite: STAFF_SPRITE[m.role as StaffRole] } : {}),
       })),
     [game],
   );

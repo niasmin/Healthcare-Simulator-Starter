@@ -1,4 +1,4 @@
-import { buildObjectives, careKpis } from '../../sim/selectors';
+import { buildObjectives, careKpis, cashRunway } from '../../sim/selectors';
 import { useMoney, useSummary, useT } from '../hooks';
 import { useGame } from '../store';
 
@@ -21,6 +21,7 @@ export function Dashboard() {
   const summary = useSummary();
   const goals = buildObjectives(game, summary);
   const kpi = careKpis(game, summary);
+  const runway = cashRunway(game);
   const invested = -(summary.spentByCategory.construction + summary.spentByCategory.equipment + summary.spentByCategory.refund);
   const recent = [...game.ledger].reverse().slice(0, 4);
 
@@ -31,6 +32,12 @@ export function Dashboard() {
         <Kpi label={t('dash.invested')} value={money(invested)} />
         <Kpi label={t('dash.upkeep')} value={money(summary.dailyUpkeepSatang)} />
         <Kpi label={t('dash.payroll')} value={money(kpi.payrollPerDaySatang)} />
+        <Kpi
+          label={t('dash.runway')}
+          value={runway.days === null ? '—' : t('dash.runway_days', { n: runway.days })}
+          sub={runway.days === null ? undefined : t(runway.short ? 'dash.runway_short' : 'dash.runway_sub', { n: runway.untilBilling })}
+          tone={runway.short ? 'bad' : runway.days === null ? 'muted' : undefined}
+        />
         <Kpi
           label={t('dash.occupancy')}
           value={kpi.occupancy === null ? '—' : `${Math.round(kpi.occupancy * 100)}%`}

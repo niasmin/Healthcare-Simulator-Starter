@@ -1,5 +1,5 @@
 import { Application, Container, Graphics, Sprite, Text, type Texture } from 'pixi.js';
-import { DECOR_SPRITE, EQUIP_SPRITE, loadSpriteTextures } from './sprites';
+import { DECOR_SPRITE, EQUIP_SPRITE, PERSON_SPRITE_WIDTH, loadSpriteTextures } from './sprites';
 import { EQUIPMENT, ROOMS } from '../data/rooms';
 import { cellIndex } from '../domain/grid';
 import type { RoomStatus } from '../domain/rules/rooms';
@@ -21,6 +21,8 @@ export interface PersonMarker {
   bed?: number;
   /** Spot index for idle staff inside a room. */
   spot?: number;
+  /** Standing sprite (staff); falls back to the vector figure when missing. */
+  sprite?: string;
 }
 
 export interface RenderInput {
@@ -72,6 +74,8 @@ const PROP: Record<EquipmentId, PropStyle> = {
   lockers: { s: 0.4, h: 28 },
   rest_sofa: { s: 0.6, h: 10 },
   door_sensor: { s: 0.2, h: 20 },
+  feeding_pump: { s: 0.25, h: 18 },
+  suction_unit: { s: 0.3, h: 18 },
 };
 
 export class IsoRenderer {
@@ -80,7 +84,8 @@ export class IsoRenderer {
   private staticLayer = new Container();
   private overlay = new Graphics();
   private labelLayer = new Container();
-  private peopleLayer = new Graphics();
+  private peopleLayer = new Container();
+  private peopleShapes = new Graphics();
   private lastPeople = '';
   /** Per room: cells holding beds (in bed order) and free floor cells, for placing people. */
   private roomCells = new Map<string, { beds: Cell[]; free: Cell[] }>();
@@ -503,8 +508,10 @@ export class IsoRenderer {
     const key = people.map((p) => `${p.key}:${p.roomId}:${p.bed ?? ''}:${p.spot ?? ''}`).join('|');
     if (key === this.lastPeople) return;
     this.lastPeople = key;
-    const g = this.peopleLayer;
+    const g = this.peopleShapes;
     g.clear();
+    for (const child of this.peopleLayer.removeChildren()) if (child !== g) child.destroy();
+    this.peopleLayer.addChild(g);
     const items: Array<{ x: number; y: number; p: PersonMarker }> = [];
     for (const p of people) {
       const rc = p.roomId ? this.roomCells.get(p.roomId) : undefined;
@@ -526,6 +533,15 @@ export class IsoRenderer {
         g.ellipse(x + 1, y - 9, 13, 6.5).fill({ color: p.color, alpha: 0.95 }).stroke({ width: 1, color: shade(p.color, 0.7) });
         g.circle(x - 12, y - 14, 6).fill(0xf1c9a5).stroke({ width: 1.2, color: 0x9b7653 });
         g.ellipse(x - 12, y - 18.5, 6, 3).fill(0xe2ddd4);
+      } else if (p.sprite && this.tex.has(p.sprite)) {
+        // Role-coloured ground ring, then the character standing on it (sprites sort by depth).
+        g.ellipse(x, y, 11, 5).fill({ color: p.color, alpha: 0.45 }).stroke({ width: 1.2, color: shade(p.color, 0.7), alpha: 0.8 });
+        const t = this.tex.get(p.sprite)!;
+        const sp = new Sprite(t);
+        sp.anchor.set(0.5, 0.97);
+        sp.scale.set(PERSON_SPRITE_WIDTH / t.width);
+        sp.position.set(x, y + 1);
+        this.peopleLayer.addChild(sp);
       } else {
         g.ellipse(x, y, 10, 4.5).fill({ color: 0x000000, alpha: 0.2 });
         g.roundRect(x - 7, y - 25, 14, 24, 6).fill(p.color).stroke({ width: 1.2, color: shade(p.color, 0.65) });

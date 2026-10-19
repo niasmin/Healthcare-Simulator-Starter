@@ -35,7 +35,9 @@ export type EquipmentId =
   | 'parallel_bars'
   | 'lockers'
   | 'rest_sofa'
-  | 'door_sensor';
+  | 'door_sensor'
+  | 'feeding_pump'
+  | 'suction_unit';
 
 export interface Room {
   id: string;
@@ -415,7 +417,7 @@ export type ReasonCode =
   | 'no_event'
   | 'invalid_choice'
   | 'needs_rn_on_shift'
-  | 'needs_secure_ward'
+  | 'needs_ward_equipment'
   | 'chapter_locked';
 
 export type CommandResult =

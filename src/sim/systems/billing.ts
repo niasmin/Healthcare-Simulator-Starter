@@ -116,11 +116,18 @@ export function collectPayments(state: GameState, closingDay: number): GameState
 }
 
 /** Daily food and care supplies, one ledger entry each per day. */
+/** Today's food and supplies for every resident. */
+export function dailyResidentCosts(state: GameState): { food: number; supplies: number } {
+  return {
+    food: FOOD_PER_RESIDENT_DAY * state.residents.length,
+    supplies: state.residents.reduce((a, r) => a + SUPPLIES_BASE_PER_DAY + SUPPLIES_PER_LEVEL_DAY * r.careLevel + (PROGRAMME_SUPPLIES_PER_DAY[r.group] ?? 0), 0),
+  };
+}
+
 export function chargeDailyResidentCosts(state: GameState): GameState {
   if (!state.residents.length) return state;
   const day = dayOf(state.minute - 1);
-  const food = FOOD_PER_RESIDENT_DAY * state.residents.length;
-  const supplies = state.residents.reduce((a, r) => a + SUPPLIES_BASE_PER_DAY + SUPPLIES_PER_LEVEL_DAY * r.careLevel + (PROGRAMME_SUPPLIES_PER_DAY[r.group] ?? 0), 0);
+  const { food, supplies } = dailyResidentCosts(state);
   let s = post(state, -food, 'food', 'ledger.food', { ref: `food-day-${day}`, memoParams: { day, n: state.residents.length } });
   s = post(s, -supplies, 'supplies', 'ledger.supplies', { ref: `supplies-day-${day}`, memoParams: { day } });
   return s;

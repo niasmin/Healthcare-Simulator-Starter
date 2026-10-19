@@ -1,4 +1,4 @@
-import { ROLE_PORTRAIT, residentPortrait } from '../portraits';
+import { rolePortrait, residentPortrait } from '../portraits';
 import { useMemo } from 'react';
 import { CORRIDOR_COST_PER_TILE, REFUND_PERCENT, ROOMS, ROOM_TYPES } from '../../data/rooms';
 import { DECOR, DECOR_ORDER, gardenAppeal, MAX_APPEAL } from '../../data/decor';
@@ -141,7 +141,7 @@ function HireList() {
       {game.applicants.map((a) => (
         <div key={a.id} className="rounded-xl border border-line bg-white p-2.5 flex flex-col gap-1.5">
           <div className="flex items-center gap-2">
-            <Avatar src={ROLE_PORTRAIT[a.role]} name={a.name} color={ROLES[a.role].cssColor} size={34} />
+            <Avatar src={rolePortrait(a.role, 'smile')} name={a.name} color={ROLES[a.role].cssColor} size={34} />
             <div className="min-w-0 flex-1">
               <div className="font-semibold text-sm truncate">{name(a.name, true)}</div>
               <div className="text-[11px] text-ink-soft">{t('hire.exp', { n: a.experienceYears })}</div>
@@ -191,7 +191,7 @@ function AdmitList() {
       {game.waitlist.map((c) => (
         <div key={c.id} className="rounded-xl border border-line bg-white p-2.5 flex flex-col gap-1.5">
           <div className="flex items-center gap-2">
-            <Avatar src={residentPortrait(c.name)} name={c.name} color={GROUP_COLOR[c.group]} size={34} />
+            <Avatar src={residentPortrait(c.name, c.needs)} name={c.name} color={GROUP_COLOR[c.group]} size={34} />
             <div className="min-w-0 flex-1">
               <div className="font-semibold text-sm truncate">
                 {name(c.name, true)} <span className="font-normal text-ink-soft text-xs">{t('res.age', { age: c.age })}</span>
@@ -203,7 +203,7 @@ function AdmitList() {
               {PROGRAMME_FEE[c.group] !== undefined && (
                 <div className="text-[10px] font-semibold text-teal truncate">
                   ★ {t('admit.programme')}
-                  {GROUP_WARD_EQUIPMENT[c.group] ? ` · ${t('admit.needs_secure')}` : ''}
+                  {GROUP_WARD_EQUIPMENT[c.group] ? ` · ${t('admit.needs', { list: GROUP_WARD_EQUIPMENT[c.group]!.map((k) => t(`equip.${k}`)).join(' + ') })}` : ''}
                 </div>
               )}
             </div>
