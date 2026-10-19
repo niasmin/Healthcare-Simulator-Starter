@@ -59,7 +59,7 @@ export const ROOMS: Record<RoomType, RoomDef> = {
     maxArea: 30,
     baseCostSatang: thb(50_000),
     costPerTileSatang: thb(12_000),
-    upkeepPerTileSatang: thb(40),
+    upkeepPerTileSatang: thb(25),
     equipment: [
       { id: 'care_bed', required: 1, max: (r) => Math.floor(rectArea(r) / TILES_PER_BED) },
       { id: 'call_system', required: 1, max: () => 1 },
@@ -74,7 +74,7 @@ export const ROOMS: Record<RoomType, RoomDef> = {
     maxArea: 16,
     baseCostSatang: thb(40_000),
     costPerTileSatang: thb(12_000),
-    upkeepPerTileSatang: thb(40),
+    upkeepPerTileSatang: thb(25),
     equipment: [
       { id: 'nurse_desk', required: 1, max: () => 2 },
       { id: 'med_cart', required: 1, max: () => 2 },
@@ -89,7 +89,7 @@ export const ROOMS: Record<RoomType, RoomDef> = {
     maxArea: 24,
     baseCostSatang: thb(40_000),
     costPerTileSatang: thb(12_000),
-    upkeepPerTileSatang: thb(35),
+    upkeepPerTileSatang: thb(20),
     equipment: [
       { id: 'exercise_mat', required: 1, max: (r) => Math.max(1, Math.floor(rectArea(r) / 4)) },
       { id: 'parallel_bars', required: 1, max: () => 2 },
@@ -104,7 +104,7 @@ export const ROOMS: Record<RoomType, RoomDef> = {
     maxArea: 12,
     baseCostSatang: thb(30_000),
     costPerTileSatang: thb(12_000),
-    upkeepPerTileSatang: thb(30),
+    upkeepPerTileSatang: thb(15),
     equipment: [
       { id: 'lockers', required: 1, max: () => 2 },
       { id: 'rest_sofa', required: 0, max: () => 2 },

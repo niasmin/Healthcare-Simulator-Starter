@@ -308,8 +308,30 @@ export interface LogItem {
   params?: Record<string, string | number>;
 }
 
+// ---------------------------------------------------------------------------
+// Chapter challenge (Phase 4): the 30-day story goal, judged once by the engine.
+// ---------------------------------------------------------------------------
+
+export type ChapterCheckId = 'solvent' | 'beds' | 'residents' | 'cashflow' | 'quality';
+
+export interface ChapterCheck {
+  id: ChapterCheckId;
+  have: number;
+  need: number;
+  ok: boolean;
+}
+
+export interface ChapterResult {
+  outcome: 'won' | 'failed';
+  /** Day the verdict was reached. */
+  day: number;
+  /** complete = all targets met; bankrupt = cash fell below zero; targets = day 30 closed with targets missed. */
+  reason: 'complete' | 'bankrupt' | 'targets';
+  checks: ChapterCheck[];
+}
+
 export interface GameState {
-  schemaVersion: 4;
+  schemaVersion: 5;
   seed: number;
   /** Current PRNG state (mulberry32). Advancing the RNG updates this. */
   rngState: number;
@@ -342,6 +364,8 @@ export interface GameState {
   /** Billable services delivered this month, per resident, not yet invoiced. */
   unbilled: Record<string, { therapy: number; activity: number; special: number }>;
   events: EventsState;
+  // Phase 4
+  chapter: { result: ChapterResult | null };
 }
 
 export type ReasonCode =

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { GameSpeed } from '../../domain/types';
-import { buildObjectives, headline, rosterView, summarize } from '../../sim/selectors';
+import { headline, rosterView, summarize } from '../../sim/selectors';
+import { TutorialCard } from './Tutorial';
 import { dayOf, formatClock } from '../../sim/systems/time';
 import { useMoney, useT } from '../hooks';
 import { useGame, type View } from '../store';
@@ -161,7 +162,6 @@ export function MobileShell() {
   const setLeftTab = useGame((s) => s.setLeftTab);
 
   const summary = useMemo(() => summarize(game), [game]);
-  const goal = useMemo(() => buildObjectives(game, summary).find((g) => !g.done), [game, summary]);
   const alertCount = useMemo(() => {
     const roster = rosterView(game);
     return (
@@ -218,16 +218,7 @@ export function MobileShell() {
                 🏗 {t('m.build')}
               </button>
             )}
-            {goal && !placing && (
-              <button
-                type="button"
-                onClick={() => setSheet('info')}
-                className="pointer-events-auto min-w-0 flex-1 rounded-xl bg-white/95 border border-line px-3 py-1.5 text-left shadow"
-              >
-                <div className="text-[10px] text-ink-soft">{t('m.next_goal')}</div>
-                <div className="text-xs font-semibold truncate">{t(goal.key, goal.params)}</div>
-              </button>
-            )}
+            {!placing && <TutorialCard compact />}
           </div>
         )}
       </main>

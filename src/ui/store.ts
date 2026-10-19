@@ -54,6 +54,12 @@ interface UIStore {
   setSaveOpen: (v: boolean) => void;
   chaptersOpen: boolean;
   setChaptersOpen: (v: boolean) => void;
+  /** The tutorial card is folded into a small chip (remembered per browser). */
+  tutorialHidden: boolean;
+  setTutorialHidden: (v: boolean) => void;
+  /** The chapter verdict card was closed for the current game. */
+  chapterSeen: boolean;
+  setChapterSeen: (v: boolean) => void;
   dismissToast: () => void;
 }
 
@@ -65,6 +71,14 @@ function initialLang(): Lang {
     /* storage unavailable */
   }
   return 'th';
+}
+
+function initialTutorialHidden(): boolean {
+  try {
+    return localStorage.getItem('he.tut.hidden') === '1';
+  } catch {
+    return false;
+  }
 }
 
 let toastSeq = 0;
@@ -121,10 +135,10 @@ export const useGame = create<UIStore>((set, get) => ({
     dispatch({ type: 'setSpeed', speed: game.speed === 0 ? lastSpeed : 0 });
   },
   newGame: () =>
-    set({ game: createInitialState(), selectedRoomId: null, drag: null, tool: { kind: 'select' }, toast: null, view: 'map', leftTab: 'build', sheet: null }),
+    set({ game: createInitialState(), selectedRoomId: null, drag: null, tool: { kind: 'select' }, toast: null, view: 'map', leftTab: 'build', sheet: null, chapterSeen: false }),
   dismissToast: () => set({ toast: null }),
   loadGame: (game) =>
-    set({ game: { ...game, speed: 0 }, selectedRoomId: null, drag: null, tool: { kind: 'select' }, view: 'map', sheet: null, started: true, saveOpen: false }),
+    set({ game: { ...game, speed: 0 }, selectedRoomId: null, drag: null, tool: { kind: 'select' }, view: 'map', sheet: null, started: true, saveOpen: false, chapterSeen: !!game.chapter.result }),
   started: false,
   setStarted: (started) => set({ started }),
   notify: (key, level = 'ok', params) => set({ toast: { id: ++toastSeq, key, level, ...(params ? { params } : {}) } }),
@@ -132,4 +146,15 @@ export const useGame = create<UIStore>((set, get) => ({
   setSaveOpen: (saveOpen) => set({ saveOpen }),
   chaptersOpen: false,
   setChaptersOpen: (chaptersOpen) => set({ chaptersOpen }),
+  tutorialHidden: initialTutorialHidden(),
+  setTutorialHidden: (tutorialHidden) => {
+    try {
+      localStorage.setItem('he.tut.hidden', tutorialHidden ? '1' : '0');
+    } catch {
+      /* storage unavailable */
+    }
+    set({ tutorialHidden });
+  },
+  chapterSeen: false,
+  setChapterSeen: (chapterSeen) => set({ chapterSeen }),
 }));

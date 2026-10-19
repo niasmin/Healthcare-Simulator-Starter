@@ -25,12 +25,39 @@ Add `?debug` to the URL to expose `window.__HE__` (store + renderer) for automat
 | **1** | 20×20 isometric map, room building and validation, camera | ✅ Done (first playable build) |
 | **2** | Residents, staff, needs, care plans, care tasks, role × shift roster | ✅ Done |
 | **3** | Pricing, monthly invoices and payments, running costs, Financial Dashboard, 4 events, title screen, character portraits | ✅ Done |
-| 4 | **Save/load ✅ done** · tutorial and balancing ⏳ next | 🟡 In progress |
+| **4** | Save/load, guided tutorial, 30-day chapter goal with win/lose verdict, three scripted events, balancing | ✅ Done (**MVP complete**) |
 | 5–6 | Premium living, home care, workforce, hospital, multi-site | ⏳ Not started |
 
 ## What you can play now
 
-Everything playable today is **Chapter 1 — First Care Home** of the campaign in the concept art. Chapters 2–7 (30–80 beds, Tranquila villas, Home Care, PHC workforce, Neuro Hospital, multi-site empire) start after Phase 4.
+Everything playable today is **Chapter 1 — First Care Home** of the campaign in the concept art, from the first corridor tile to the day-30 verdict. Chapters 2–7 (30–80 beds, Tranquila villas, Home Care, PHC workforce, Neuro Hospital, multi-site empire) come in Phase 5.
+
+### Phase 4, part 2: tutorial, the 30-day goal and balancing
+
+- **Guided tutorial (คู่มือ):** a card over the map shows the current step of Chapter 1 (14 steps), why it matters and how to do it, plus a **พาไปทำ / Show me** button that opens the right tool, tab, room or view.
+  - Steps: corridor → ward → 10 beds → nursing station → therapy room → staff room → hire an RN → admit → care plans → roster → start the clock → 8 residents → first payment → finish 30 days in profit.
+  - Steps are derived from the game state (no stored flags), so the guide is always in sync, even after loading a save or doing steps out of order.
+  - A toast confirms each finished step. "ซ่อนคู่มือ" folds the card into a small chip; the choice is remembered per browser.
+  - On phones the card replaces the "next goal" chip and folds to one line; tap to open it.
+  - The last step shows live chapter targets (day counter, lowest cash, operating result, residents, beds, quality).
+- **Chapter goal and verdict** (the CLAUDE.md user story). When day 30 closes the engine judges the chapter once and stores the verdict:
+  - **Win** needs all five: cash never below zero, 10 operational beds, at least 8 residents, revenue above running costs over days 1–30 (construction excluded), and care quality of at least 70 on day 30.
+  - **Bankrupt:** the first midnight that closes with cash below zero fails the chapter at once.
+  - The game pauses on the verdict and a result card lists each target. The player can keep playing freely or restart chapter 1. The verdict never changes afterwards and survives saves.
+- **Three scripted events:** a family visit on day 3, a resident's condition change on day 8 and a nurse resignation on day 15 teach each kind of decision. A scripted event that can't fire on its day (for example, fewer than two nurses) tries again for up to 5 days. Until then the random roll won't spend that event early. Random events fill the remaining days as before.
+- **Staffing advice now follows rush hours:** the roster's "needed" count checks every busy window of each shift against the time allowed to start the tasks (90 minutes for routine care), not just the shift total. Broader roles cover narrower work, the way task assignment does: the RN does PN work in a quiet evening, and RNs and PNs help with personal care and meals.
+- **Sessions moved into the morning:** therapy and activity sessions are booked from 10:00 and can start any time until 14:00. Before, bedridden residents' activity at 15:30 forced a second OT on the afternoon shift.
+- **Balancing:** see *Assumptions* below. Measured with the scripted player:
+
+  | Play style (30 days, 7 seeds) | Month-1 operating result | Verdict |
+  |---|---|---|
+  | Fill all 10 beds in the first days, staff to the advice | +฿11k to +฿30k | won on 7 of 7 seeds |
+  | Stop at 8 residents | −฿11k to +฿14k | won on 2 of 7 seeds |
+  | Stop at 6 residents | −฿25k to −฿71k | failed on 7 of 7 seeds |
+  | Full home plus a second full team | loss | failed |
+
+  A full, well-run home then makes about 16–21% in month 2. Cash never comes close to zero with sensible play (the build costs about ฿1.1M of the ฿2M), so the real challenge is operating profit: filling beds quickly without overhiring.
+- **Save format:** schema 5 adds `chapter.result`. Schema-3 and schema-4 saves migrate automatically; a migrated game already past day 30 is judged at its next midnight.
 
 ### Visual upgrade from the Game Assets Pack
 
@@ -161,7 +188,8 @@ src/
   sim/systems/staffing.ts  Applicant/waitlist generation (seeded), energy per tick, morale per day
   sim/systems/care.ts      Care Plan Engine: task generation, finish / miss / assign each tick
   sim/systems/billing.ts   Invoices (admission / monthly / final), service counters, payments, food and supplies
-  sim/systems/events.ts    Seeded event roll, triggers, choice effects, expiry, referral deadlines
+  sim/systems/events.ts    Seeded event roll, scripted chapter events, triggers, choice effects, expiry, referral deadlines
+  sim/systems/chapter.ts   Chapter 1 targets and the one-time day-30 / bankruptcy verdict
   assets/                  Portraits and the world-map title image (from the project's own concept art)
   data/decor.ts            Garden items: cost, appeal, upkeep
   render/sprites.ts        Sprite URLs, map sizes, texture loading
@@ -174,7 +202,8 @@ src/
   render/iso.ts            Pure isometric projection math
   render/IsoRenderer.ts    PixiJS renderer: reads state, reports pointer cells, never mutates
   ui/                      React components, Zustand store, i18n (TH/EN), game loop
-  tests/                   Vitest specs
+  ui/components/Tutorial.tsx  Guided tutorial card, "Show me" actions, step toasts
+  tests/                   Vitest specs; tests/bot.ts is the scripted player used for playthroughs and balancing
 ```
 
 **Separation rule:** the simulation (`domain/`, `sim/`, `data/`) doesn't import React or Pixi. The UI turns input into `Command`s, the engine returns a new state, and the renderer draws it. Swapping the 2.5D renderer for 3D later won't touch any business logic.
@@ -200,7 +229,7 @@ src/
   - Food, supplies, upkeep and payroll are each charged once per day.
   - An event's cost is charged once, and a resolved event can't be resolved again.
 
-## Tests (79 passing)
+## Tests (93 passing)
 
 | File | Covers |
 |---|---|
@@ -214,9 +243,12 @@ src/
 | `events.test.ts` | Auto-pause and speed restore; no double resolve; a choice cost charged once; urgent assessment needs an RN on duty; raise (+10%) vs accept (both nurses leave); referral deadline costs reputation; default choice after 12 h; seeded and deterministic over 30 days with cooldowns; at least 3 quiet days between events |
 | `saves.test.ts` | **Save and reload gives identical state**, and the reloaded game then runs identically for 300 ticks; gzip makes it at least 3× smaller; corrupt, tampered (cash ≠ ledger) and incompatible saves rejected without throwing; IndexedDB store round-trip (fake-indexeddb); cloud store splits large saves into parts under 256 KiB and reassembles them; the newest copy wins across two devices sharing one account; works without cloud; local save survives cloud failure |
 | `decor.test.ts` | Decor placed on an empty tile and charged once; can't overlap rooms, corridor, entrance or decor, and blocks building over it; demolish refunds half; appeal is capped and makes residents happier; schema-3 saves migrate to schema 4 |
+| `chapter.test.ts` | **30-day playthrough** by a scripted sensible player using only public commands and the real applicant and waiting-list pools: wins chapter 1 with cash positive every day; every invariant holds (ledger, unique beds, no overlapping shifts, no care without the skill); roster ready and >95% of tasks done; the three scripted events fire on their days; the same seed plays byte-identically; the verdict pauses the game and survives a save. **Balance:** a full home wins on more seeds, a 40% empty home and an overstaffed home fail on targets. **Verdict rules:** bankrupt at the first negative midnight, decided once and never changed; nothing decided before day 30; a migrated save past day 30 is judged at the next midnight. **Tutorial:** step order, derived from state, a goal and a how-to hint in Thai and English for every step. **Staffing advice:** rush-hour windows, RN covering PN work, one OT for ten sessions |
 | `i18n-iso.test.ts` | TH/EN key parity; labels for every room, equipment and reason; Thai interpolation; iso projection inverts for all 400 cells |
 
 GDD acceptance tests covered so far: *place a room and deduct construction cost once*, *reject collisions*, *admit up to capacity*, *reject excess admission*, *schedule a qualified staff member*, *prevent overlapping shifts*, *advance 30 days deterministically with a fixed seed*, *reconcile cash ledger*, *show Thai text correctly*, *run production build without errors*. *Create monthly invoice once* is now covered too. *Save and reload identical state* is now covered as well, so **all GDD acceptance tests pass**.
+
+The Phase 4 browser playtest (Playwright on the production build, run outside the repo) started from the title screen at 1440 × 900. It followed the tutorial card through every step. "Show me" opened the corridor tool and the Hire tab, and the card advanced as the home was built, staffed and filled. It then played 30 days, answering each event, and the win card appeared on day 30 with all five targets met. "Keep playing freely" closed it. At 390 × 844 with touch, the folded card opened and "Show me" picked the corridor tool, with no horizontal scroll. No console errors.
 
 The Phase 3 browser playtest started from the title screen, built and staffed the home through the UI, and admitted 6 residents. It then played 35 days, answering every event through the event card: 12 invoices issued, 11 paid, cash still positive, and no console errors.
 
@@ -230,20 +262,23 @@ A browser playtest (Playwright, run outside the repo) drove the production build
 ## Assumptions
 
 - **Balancing (fictional):**
-  - Costs: start THB 2,000,000; corridor THB 3,000/tile; rooms THB 30–50k base + THB 12,000/tile; equipment THB 12–60k; upkeep THB 30–40/tile/day.
-  - Fees: monthly room & care THB 24k / 28k / 33k / 38k for care levels 1–4.
-  - Result: a full 10-bed starter build costs about THB 1.1M. A full, well-staffed 10-bed home earns a modest monthly profit; half full, it roughly breaks even.
+  - Costs: start THB 2,000,000; corridor THB 3,000/tile; rooms THB 30–50k base + THB 12,000/tile; equipment THB 12–60k; upkeep THB 15–25/tile/day (THB 5 per corridor tile).
+  - Fees: monthly room & care THB 26k / 30k / 36k / 42k for care levels 1–4.
+  - Result: a full 10-bed starter build costs about THB 1.1M. A full home staffed to the roster advice (8–10 people) is slightly profitable in month 1 and makes about 16–21% from month 2. At 60% occupancy it loses money.
+- The chapter's "positive cashflow" is read as **operating** cash flow: payments received minus payroll, upkeep, food, supplies and event costs over days 1–30. Construction and equipment are investment and don't count against it. Therapy and activity sessions are billed on the next month's invoice, so month 1 earns room & care only.
 - The GDD's CMNH figures are kept as scenario reference only and aren't used for tuning. Real organisation names aren't used in-game.
 - Doors are automatic, not hand-placed: the first front-facing perimeter tile that touches a reachable corridor.
 - A room can sit next to another room, but you can't walk through one room to reach another. Access is only by corridor.
 - 50% refund on demolition and on selling equipment.
 - Reputation starts at 50 and drifts each day with average resident satisfaction (above 60 raises it).
-- Staffing "needed" counts assume 384 productive minutes per 8-hour shift and one RN on each day shift while residents are present. Night shifts only need the skills their tasks use.
+- Staffing "needed" counts: one RN on each day shift while residents are present, plus enough people that every busy window of the shift fits (each task may start until its grace time runs out, capped at the shift end). Night shifts only need the skills their tasks use.
 - Care is abstract and non-prescriptive. Tasks name only a kind of work and the qualification it needs, never a treatment.
 
 ## Known limitations
 
-- No guided tutorial yet (Phase 4, part 2). The goal list and the phone "next goal" chip guide play for now.
+- The tutorial guides through text and a "Show me" button; it doesn't yet spotlight individual buttons on screen.
+- Only Chapter 1 is playable. After the verdict the game continues as a sandbox, and chapters 2–7 stay locked until Phase 5.
+- The scripted player used for balancing hires strictly by the roster advice. Real players can do better, for example with the premium price level, so the chapter is meant to be a fair first challenge, not a hard one.
 - Starting a **new game** overwrites the autosave once the new game has progress. Use a manual slot to keep an older game.
 - Cloud saves need a signed-in viewer allowed to use the page (the owner always is). Anyone opening a public link with view-only access saves in their browser only.
 - Months are a flat 30 game days. Discharge mid-month doesn't refund prepaid room & care. Families always pay; there are no bad debts or late fees yet.
@@ -252,7 +287,6 @@ A browser playtest (Playwright, run outside the repo) drove the production build
 - Shifts are a standing daily roster (the same every day). There's no weekly pattern, leave or sick days yet.
 - Staff don't walk. They appear at the station or at the bedside when a task starts, and travel time isn't simulated.
 - Morale is tracked and shown but doesn't yet cause resignations.
-- No save/load yet (Phase 4). Refreshing the page starts a new game. State is already JSON-serialisable and tested for round-trips, so Dexie persistence is a thin addition.
 - Room rotation and room moving aren't supported (demolish and rebuild instead). On phones the staff table still scrolls sideways.
 - The UI font loads from Google Fonts with Thai system-font fallbacks. Offline it falls back to Noto Sans Thai, Leelawadee UI or Tahoma.
 - The renderer redraws the static layer whenever the site changes. That's fine for 20×20 but should be layered/cached before larger maps.

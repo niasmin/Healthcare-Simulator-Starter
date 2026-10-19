@@ -52,16 +52,19 @@ describe('garden decorations', () => {
     expect(lush.residents[0].needs.happiness).toBeGreaterThan(plain.residents[0].needs.happiness + 5);
   });
 
-  it('old saves (schema 3) upgrade to schema 4 with an empty garden', () => {
+  it('old saves (schema 3) upgrade step by step to the current schema with an empty garden', () => {
     const s = createInitialState(1);
     const { decor: _d, ...siteV3 } = s.site;
+    const { chapter: _c, ...rest } = s;
     void _d;
-    const v3 = { ...s, schemaVersion: 3, site: siteV3 } as unknown as GameState;
+    void _c;
+    const v3 = { ...rest, schemaVersion: 3, site: siteV3 } as unknown as GameState;
     const res = validate(v3);
     expect(res.ok).toBe(true);
     if (res.ok) {
-      expect(res.state.schemaVersion).toBe(4);
+      expect(res.state.schemaVersion).toBe(5);
       expect(res.state.site.decor).toEqual([]);
+      expect(res.state.chapter).toEqual({ result: null });
     }
   });
 });

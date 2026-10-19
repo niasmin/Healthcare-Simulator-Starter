@@ -24,16 +24,23 @@ export interface TaskKindDef {
   missPenalty: Partial<Record<NeedKey, number>>;
   /** Needs an operational room of this type to be fully effective. */
   room?: 'therapy';
+  /** Minutes after the due time the task can still be started; later it is missed. */
+  grace: number;
 }
 
+/** Routine care must start within 90 minutes of its time. */
+export const TASK_GRACE_MINUTES = 90;
+/** Therapy and activity sessions are booked for the late morning and can run any time before 14:00. */
+export const SESSION_GRACE_MINUTES = 240;
+
 export const TASK_KINDS: Record<TaskKind, TaskKindDef> = {
-  vital_signs: { kind: 'vital_signs', skill: 'vital_signs', duration: 10, priority: 2, effects: { physical: 3, satisfaction: 1 }, missPenalty: { physical: -2, satisfaction: -2 } },
-  med_round: { kind: 'med_round', skill: 'med_round', duration: 10, priority: 1, effects: { physical: 5 }, missPenalty: { physical: -6, satisfaction: -3 } },
-  personal_care: { kind: 'personal_care', skill: 'personal_care', duration: 30, priority: 2, effects: { physical: 6, happiness: 2, satisfaction: 2 }, missPenalty: { physical: -4, happiness: -3, satisfaction: -4 } },
-  meal_assist: { kind: 'meal_assist', skill: 'feeding', duration: 20, priority: 1, effects: { nutrition: 30, happiness: 1 }, missPenalty: { nutrition: -8, satisfaction: -4 } },
-  repositioning: { kind: 'repositioning', skill: 'personal_care', duration: 10, priority: 2, effects: { physical: 3, mobility: 1 }, missPenalty: { physical: -4, satisfaction: -2 } },
-  mobility_session: { kind: 'mobility_session', skill: 'mobility', duration: 40, priority: 3, effects: { mobility: 10, mental: 2, satisfaction: 2 }, missPenalty: { satisfaction: -2 }, room: 'therapy' },
-  activity: { kind: 'activity', skill: 'activity', duration: 20, priority: 3, effects: { happiness: 10, mental: 8, mobility: 2, satisfaction: 2 }, missPenalty: { satisfaction: -1 } },
+  vital_signs: { kind: 'vital_signs', skill: 'vital_signs', duration: 10, priority: 2, effects: { physical: 3, satisfaction: 1 }, missPenalty: { physical: -2, satisfaction: -2 }, grace: 90 },
+  med_round: { kind: 'med_round', skill: 'med_round', duration: 10, priority: 1, effects: { physical: 5 }, missPenalty: { physical: -6, satisfaction: -3 }, grace: 90 },
+  personal_care: { kind: 'personal_care', skill: 'personal_care', duration: 30, priority: 2, effects: { physical: 6, happiness: 2, satisfaction: 2 }, missPenalty: { physical: -4, happiness: -3, satisfaction: -4 }, grace: 90 },
+  meal_assist: { kind: 'meal_assist', skill: 'feeding', duration: 20, priority: 1, effects: { nutrition: 30, happiness: 1 }, missPenalty: { nutrition: -8, satisfaction: -4 }, grace: 90 },
+  repositioning: { kind: 'repositioning', skill: 'personal_care', duration: 10, priority: 2, effects: { physical: 3, mobility: 1 }, missPenalty: { physical: -4, satisfaction: -2 }, grace: 90 },
+  mobility_session: { kind: 'mobility_session', skill: 'mobility', duration: 40, priority: 3, effects: { mobility: 10, mental: 2, satisfaction: 2 }, missPenalty: { satisfaction: -2 }, room: 'therapy', grace: SESSION_GRACE_MINUTES },
+  activity: { kind: 'activity', skill: 'activity', duration: 20, priority: 3, effects: { happiness: 10, mental: 8, mobility: 2, satisfaction: 2 }, missPenalty: { satisfaction: -1 }, grace: SESSION_GRACE_MINUTES },
 };
 
 /** Fixed meal times (minute of day). Residents who eat independently restore nutrition here. */
@@ -58,9 +65,9 @@ export function carePlanSchedule(group: CareGroup, level: number): Array<[TaskKi
     out.push(['vital_signs', h(20)]);
   }
   if (group === 'bedridden') for (const t of [h(2), h(6), h(10), h(14), h(18, 30), h(22)]) out.push(['repositioning', t]);
+  // Sessions are booked from 10:00 and may run until 14:00, inside the morning shift.
   if (group === 'stroke_rehab') out.push(['mobility_session', h(10)]);
-  if (group !== 'bedridden') out.push(['activity', h(14)]);
-  else out.push(['activity', h(15, 30)]);
+  out.push(['activity', h(10)]);
   return out.sort((a, b) => a[1] - b[1] || a[0].localeCompare(b[0]));
 }
 
@@ -68,9 +75,6 @@ export function carePlanSchedule(group: CareGroup, level: number): Array<[TaskKi
 export function selfFeeds(group: CareGroup, level: number): boolean {
   return !(level >= 3 || group === 'bedridden');
 }
-
-/** A task stays doable this long after it is due; after that it counts as missed. */
-export const TASK_GRACE_MINUTES = 90;
 
 /** Fictional resident names (Thai, with romanisation). Many are Northern Thai names. */
 export const RESIDENT_NAMES: PersonName[] = [

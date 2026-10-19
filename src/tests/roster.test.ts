@@ -12,7 +12,7 @@ describe('roster view (role × shift)', () => {
     [s] = hire(s, 'caregiver', ['morning']);
     const morning = rosterView(s).slots.find((x) => x.slot === 'morning')!;
     expect(morning.missingRn).toBe(true);
-    expect(morning.missingSkills).toEqual(expect.arrayContaining(['vital_signs', 'med_round'])); // bedridden activity is at 15:30 (afternoon)
+    expect(morning.missingSkills).toEqual(expect.arrayContaining(['vital_signs', 'med_round', 'activity']));
     expect(morning.ready).toBe(false);
   });
 

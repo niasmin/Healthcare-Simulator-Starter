@@ -9,7 +9,7 @@ import { dayOf } from '../sim/systems/time';
  * CompressionStream, so even long games stay far below storage limits.
  */
 export const SAVE_FORMAT = 1;
-export const CURRENT_SCHEMA = 4;
+export const CURRENT_SCHEMA = 5;
 
 export type SlotId = 'auto' | 'slot1' | 'slot2' | 'slot3';
 export const SLOTS: SlotId[] = ['auto', 'slot1', 'slot2', 'slot3'];
@@ -107,6 +107,10 @@ export function migrate(state: GameState): GameState {
     // v4 adds garden decorations to the site.
     s = { ...s, schemaVersion: 4, site: { ...s.site, decor: [] } };
   }
+  if (s.schemaVersion === 4) {
+    // v5 adds the chapter verdict; a game already past day 30 is judged at its next midnight.
+    s = { ...s, schemaVersion: 5, chapter: { result: null } };
+  }
   return s as GameState;
 }
 
@@ -117,7 +121,7 @@ export function validate(input: GameState): { ok: true; state: GameState } | { o
   if (state.schemaVersion !== CURRENT_SCHEMA) return { ok: false, error: 'incompatible' };
   const arrays = [state.ledger, state.site?.rooms, state.site?.corridor, state.site?.decor, state.residents, state.employees, state.shifts, state.tasks, state.invoices, state.queue];
   if (arrays.some((a) => !Array.isArray(a))) return { ok: false, error: 'corrupt' };
-  if (!Number.isFinite(state.minute) || !state.organization || !state.events) return { ok: false, error: 'corrupt' };
+  if (!Number.isFinite(state.minute) || !state.organization || !state.events || !state.chapter) return { ok: false, error: 'corrupt' };
   if (!reconcile(state).ok) return { ok: false, error: 'corrupt' };
   return { ok: true, state };
 }
