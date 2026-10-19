@@ -52,6 +52,7 @@ export function TopBar() {
             key={s.speed}
             type="button"
             title={s.speed === 0 ? t('top.pause') : s.label}
+            data-tour={`speed-${s.speed}`}
             onClick={() => dispatch({ type: 'setSpeed', speed: s.speed })}
             className={`min-w-10 px-2.5 py-1 rounded-md text-sm font-semibold transition-colors ${
               speed === s.speed ? (s.speed === 0 ? 'bg-coral text-white' : 'bg-white text-ink') : 'text-white/80 hover:bg-white/15'
@@ -105,10 +106,20 @@ export function TopBar() {
       <div className="flex gap-2">
         <button
           type="button"
+          data-tour="save"
           onClick={() => useGame.getState().setSaveOpen(true)}
           className="px-3 py-1 rounded-md bg-white/15 border border-white/30 text-sm hover:bg-white/25 font-semibold"
         >
           💾 {t('save.open')}
+        </button>
+        <button
+          type="button"
+          onClick={() => useGame.getState().restartTutorial()}
+          title={t('tut.restart')}
+          aria-label={t('tut.restart')}
+          className="px-2.5 py-1 rounded-md border border-white/30 text-sm hover:bg-white/10"
+        >
+          🎓
         </button>
         <button
           type="button"

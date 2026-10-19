@@ -25,12 +25,45 @@ Add `?debug` to the URL to expose `window.__HE__` (store + renderer) for automat
 | **1** | 20×20 isometric map, room building and validation, camera | ✅ Done (first playable build) |
 | **2** | Residents, staff, needs, care plans, care tasks, role × shift roster | ✅ Done |
 | **3** | Pricing, monthly invoices and payments, running costs, Financial Dashboard, 4 events, title screen, character portraits | ✅ Done |
-| 4 | **Save/load ✅ done** · tutorial and balancing ⏳ next | 🟡 In progress |
+| **4** | Save/load, guided tutorial, balancing pass | ✅ Done |
 | 5–6 | Premium living, home care, workforce, hospital, multi-site | ⏳ Not started |
 
 ## What you can play now
 
 Everything playable today is **Chapter 1 — First Care Home** of the campaign in the concept art. Chapters 2–7 (30–80 beds, Tranquila villas, Home Care, PHC workforce, Neuro Hospital, multi-site empire) start after Phase 4.
+
+### Guided tutorial (Phase 4, part 2)
+
+- **Coach card:** a new game opens a 15-step Chapter 1 tutorial. The card shows the step, a progress bar, **ข้ามบทเรียน** (skip) and a minimise button. 🎓 in the top bar (or the phone ⋯ menu) restarts it.
+- **Steps:** welcome → corridor tool → draw corridor → ward tool → place ward → select ward → beds and equipment → nursing station (pick, place, select, equip) → hire an RN → hire a caregiver → admit → Care Plan → shifts → start the clock → wrap-up.
+- **Pointing:**
+  - A pulsing orange ring marks the button to press next. The card moves away from it so it never covers the thing it points at.
+  - Blue tiles on the map show a suggested spot. Suggestions appear only while the spot is still buildable.
+- **Derived from game state:** progress isn't scripted. Each step checks the game and current tool or selection, so the tutorial always points at the next thing not yet done. It steps back if you undo something (for example, demolish the corridor), and it works when you load a mid-tutorial save. Saves already past the build-up skip it.
+- **Phones:** while a bottom sheet is open, the card shrinks to a one-line bar so it never hides the sheet. Tap the bar to expand it.
+- **Storage:** tutorial progress and the skip choice are kept per browser (`he.tutorial`), as a convenience only. Losing them just shows the tutorial again.
+
+### Balancing pass (Phase 4, part 3)
+
+The old numbers had a loophole: a lean, neglectful home was the *most* profitable, earning about ฿100k/month at 0 reputation with no consequences. Now:
+
+- **Families can move residents out.** Below 40 satisfaction, there's a seeded daily chance that grows with dissatisfaction (1.5% per point, so 15% a day at 30). The move-out frees the bed, issues the final bill, costs 2 reputation and is logged. A red "family is unhappy" alert appears at 45, before it can happen. A poorly run home shrinks toward what its staff can actually look after.
+- **Missed care costs reputation:** 0.08 per missed task at day end, capped at 3 per day.
+- **Reputation drives enquiries:** 70 or more adds one per day; below 30 removes one; below 15 stops them.
+- **Fair care triage:** when staff are short, equal-priority tasks go first to the least satisfied resident. Before, the shortfall always fell on the same last-admitted residents until they left.
+- **Premium expectations:** premium prices pull satisfaction down harder (−0.06 per tick). Value prices nudge it up (+0.02).
+- **Fees:** +฿2–3k per care level (now ฿26k / 30k / 36k / 41k).
+- **Result.** Month-3 net over a 90-day simulation, seed 41, 10 residents:
+
+  | Strategy | Month-3 net | Residents after 90 days | Reputation |
+  |---|---|---|---|
+  | Good staffing, premium prices | **+฿134k** | 10 | 91 |
+  | Mid staffing, standard prices | +฿92k | 10 | 0 |
+  | Good staffing, standard prices | +฿64k | 10 | 100 |
+  | Mid staffing, premium prices | +฿53k | 7 | 0.5 |
+  | Lean staffing | −฿2k | 6 | 0 |
+
+  A well-staffed but half-empty home (6 residents) loses money. These rankings are locked in by `balance.test.ts`.
 
 ### Visual upgrade from the Game Assets Pack
 
@@ -200,7 +233,7 @@ src/
   - Food, supplies, upkeep and payroll are each charged once per day.
   - An event's cost is charged once, and a resolved event can't be resolved again.
 
-## Tests (79 passing)
+## Tests (93 passing)
 
 | File | Covers |
 |---|---|
@@ -214,9 +247,13 @@ src/
 | `events.test.ts` | Auto-pause and speed restore; no double resolve; a choice cost charged once; urgent assessment needs an RN on duty; raise (+10%) vs accept (both nurses leave); referral deadline costs reputation; default choice after 12 h; seeded and deterministic over 30 days with cooldowns; at least 3 quiet days between events |
 | `saves.test.ts` | **Save and reload gives identical state**, and the reloaded game then runs identically for 300 ticks; gzip makes it at least 3× smaller; corrupt, tampered (cash ≠ ledger) and incompatible saves rejected without throwing; IndexedDB store round-trip (fake-indexeddb); cloud store splits large saves into parts under 256 KiB and reassembles them; the newest copy wins across two devices sharing one account; works without cloud; local save survives cloud failure |
 | `decor.test.ts` | Decor placed on an empty tile and charged once; can't overlap rooms, corridor, entrance or decor, and blocks building over it; demolish refunds half; appeal is capped and makes residents happier; schema-3 saves migrate to schema 4 |
+| `balance.test.ts` | 90-day strategy comparison: good care + premium beats every other strategy; a well-staffed full home stays full at ≥80 reputation; mediocre care at premium prices and lean staffing lose residents; lean and half-empty homes lose money; shortfalls are shared evenly. Family move-out frees the bed, clears pending tasks and costs reputation; move-outs are deterministic per seed; missed tasks cost reputation at day end; low reputation dries up enquiries |
+| `tutorial.test.ts` | Plays the whole tutorial with real engine commands on the suggested layout. Every step is visited in order and the result is an operational ward and station. Undoing progress moves the tutorial back. Suggestions are hidden once their tiles are blocked. Thai and English text exists for every step and variant |
 | `i18n-iso.test.ts` | TH/EN key parity; labels for every room, equipment and reason; Thai interpolation; iso projection inverts for all 400 cells |
 
 GDD acceptance tests covered so far: *place a room and deduct construction cost once*, *reject collisions*, *admit up to capacity*, *reject excess admission*, *schedule a qualified staff member*, *prevent overlapping shifts*, *advance 30 days deterministically with a fixed seed*, *reconcile cash ledger*, *show Thai text correctly*, *run production build without errors*. *Create monthly invoice once* is now covered too. *Save and reload identical state* is now covered as well, so **all GDD acceptance tests pass**.
+
+The Phase 4 tutorial playtest followed the coach through the real UI from the title screen to the wrap-up card, on desktop (1440 × 900, mouse) and phone (390 × 844, CDP touch). It checked that the ring found its target at every step that has one, with no console errors. It also found and fixed a phone bug: the card covered the roster's staff picker.
 
 The Phase 3 browser playtest started from the title screen, built and staffed the home through the UI, and admitted 6 residents. It then played 35 days, answering every event through the event card: 12 invoices issued, 11 paid, cash still positive, and no console errors.
 
@@ -231,19 +268,20 @@ A browser playtest (Playwright, run outside the repo) drove the production build
 
 - **Balancing (fictional):**
   - Costs: start THB 2,000,000; corridor THB 3,000/tile; rooms THB 30–50k base + THB 12,000/tile; equipment THB 12–60k; upkeep THB 30–40/tile/day.
-  - Fees: monthly room & care THB 24k / 28k / 33k / 38k for care levels 1–4.
-  - Result: a full 10-bed starter build costs about THB 1.1M. A full, well-staffed 10-bed home earns a modest monthly profit; half full, it roughly breaks even.
+  - Fees: monthly room & care THB 26k / 30k / 36k / 41k for care levels 1–4.
+  - Result: a full 10-bed starter build costs about THB 1.1M. A full, well-staffed 10-bed home earns about THB 64k a month at standard prices, or about THB 134k at premium. Half full, it loses money. See *Balancing pass* above.
 - The GDD's CMNH figures are kept as scenario reference only and aren't used for tuning. Real organisation names aren't used in-game.
 - Doors are automatic, not hand-placed: the first front-facing perimeter tile that touches a reachable corridor.
 - A room can sit next to another room, but you can't walk through one room to reach another. Access is only by corridor.
 - 50% refund on demolition and on selling equipment.
-- Reputation starts at 50 and drifts each day with average resident satisfaction (above 60 raises it).
+- Reputation starts at 50. Each day it drifts with average resident satisfaction (above 60 raises it), loses 0.08 per missed task (capped at 3), and loses 2 per family move-out.
 - Staffing "needed" counts assume 384 productive minutes per 8-hour shift and one RN on each day shift while residents are present. Night shifts only need the skills their tasks use.
 - Care is abstract and non-prescriptive. Tasks name only a kind of work and the qualification it needs, never a treatment.
 
 ## Known limitations
 
-- No guided tutorial yet (Phase 4, part 2). The goal list and the phone "next goal" chip guide play for now.
+- The tutorial covers the Chapter 1 build-up only. Price levels, events, the finance view and decor are explained by the wrap-up card and the goal list, not by guided steps.
+- Family move-outs happen only from low satisfaction. There's no natural turnover (end of stay, hospital transfer) yet, so a well-run full home never frees a bed.
 - Starting a **new game** overwrites the autosave once the new game has progress. Use a manual slot to keep an older game.
 - Cloud saves need a signed-in viewer allowed to use the page (the owner always is). Anyone opening a public link with view-only access saves in their browser only.
 - Months are a flat 30 game days. Discharge mid-month doesn't refund prepaid room & care. Families always pay; there are no bad debts or late fees yet.
@@ -252,7 +290,6 @@ A browser playtest (Playwright, run outside the repo) drove the production build
 - Shifts are a standing daily roster (the same every day). There's no weekly pattern, leave or sick days yet.
 - Staff don't walk. They appear at the station or at the bedside when a task starts, and travel time isn't simulated.
 - Morale is tracked and shown but doesn't yet cause resignations.
-- No save/load yet (Phase 4). Refreshing the page starts a new game. State is already JSON-serialisable and tested for round-trips, so Dexie persistence is a thin addition.
 - Room rotation and room moving aren't supported (demolish and rebuild instead). On phones the staff table still scrolls sideways.
 - The UI font loads from Google Fonts with Thai system-font fallbacks. Offline it falls back to Noto Sans Thai, Leelawadee UI or Tahoma.
 - The renderer redraws the static layer whenever the site changes. That's fine for 20×20 but should be layered/cached before larger maps.

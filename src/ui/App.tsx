@@ -11,6 +11,7 @@ import { SidePanel } from './components/Inspector';
 import { MobileShell } from './components/MobileShell';
 import { Toast } from './components/Toast';
 import { TopBar } from './components/TopBar';
+import { Coach } from './components/Coach';
 import { useGameLoop, useIsMobile, useKeyboard } from './hooks';
 import { useGame } from './store';
 
@@ -59,8 +60,9 @@ function DesktopLayout() {
         <div className="min-h-0 flex flex-col">
           <LeftPanel />
         </div>
-        <div className="min-h-0 flex flex-col">
+        <div className="relative min-h-0 flex flex-col">
           <CenterArea />
+          <Coach />
         </div>
         <div className="min-h-0 flex flex-col">
           <SidePanel />

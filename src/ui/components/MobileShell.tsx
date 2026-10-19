@@ -3,6 +3,7 @@ import type { GameSpeed } from '../../domain/types';
 import { buildObjectives, headline, rosterView, summarize } from '../../sim/selectors';
 import { dayOf, formatClock } from '../../sim/systems/time';
 import { useMoney, useT } from '../hooks';
+import { Coach, useTutorial } from './Coach';
 import { useGame, type View } from '../store';
 import { LeftPanel } from './BuildPanel';
 import { CenterArea } from './CenterArea';
@@ -65,6 +66,7 @@ function MobileTopBar({ alertCount }: { alertCount: number }) {
             <button
               key={s.speed}
               type="button"
+              data-tour={`speed-${s.speed}`}
               onClick={() => dispatch({ type: 'setSpeed', speed: s.speed })}
               aria-pressed={game.speed === s.speed}
               className={`min-w-10 h-9 px-2 rounded-md text-sm font-semibold ${game.speed === s.speed ? (s.speed === 0 ? 'bg-coral text-white' : 'bg-white text-ink') : 'text-white/80'}`}
@@ -73,7 +75,7 @@ function MobileTopBar({ alertCount }: { alertCount: number }) {
             </button>
           ))}
         </div>
-        <button type="button" onClick={() => setSheet('info')} className="relative size-9 grid place-items-center rounded-lg bg-white/10" aria-label={t('m.info')}>
+        <button type="button" data-tour="m-info" onClick={() => setSheet('info')} className="relative size-9 grid place-items-center rounded-lg bg-white/10" aria-label={t('m.info')}>
           <svg viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" aria-hidden>
             <path d="M6 16V11a6 6 0 1112 0v5l2 2H4l2-2zM10 20a2 2 0 004 0" />
           </svg>
@@ -134,6 +136,16 @@ function MenuSheet() {
       >
         🗺 {t('chapters.open')}
       </button>
+      <button
+        type="button"
+        onClick={() => {
+          setSheet(null);
+          useGame.getState().restartTutorial();
+        }}
+        className="rounded-xl bg-white border border-line px-4 py-3 text-left"
+      >
+        🎓 {t('tut.restart')}
+      </button>
       <button type="button" onClick={() => setLang(lang === 'th' ? 'en' : 'th')} className="rounded-xl bg-white border border-line px-4 py-3 text-left">
         {t('m.language')}: <span className="font-semibold">{lang === 'th' ? 'ไทย → English' : 'English → ไทย'}</span>
       </button>
@@ -161,6 +173,7 @@ export function MobileShell() {
   const setLeftTab = useGame((s) => s.setLeftTab);
 
   const summary = useMemo(() => summarize(game), [game]);
+  const tutorialOn = !!useTutorial();
   const goal = useMemo(() => buildObjectives(game, summary).find((g) => !g.done), [game, summary]);
   const alertCount = useMemo(() => {
     const roster = rosterView(game);
@@ -209,6 +222,7 @@ export function MobileShell() {
             ) : (
               <button
                 type="button"
+                data-tour="m-build"
                 onClick={() => {
                   setLeftTab('build');
                   setSheet('tools');
@@ -218,7 +232,7 @@ export function MobileShell() {
                 🏗 {t('m.build')}
               </button>
             )}
-            {goal && !placing && (
+            {goal && !placing && !tutorialOn && (
               <button
                 type="button"
                 onClick={() => setSheet('info')}
@@ -232,6 +246,7 @@ export function MobileShell() {
         )}
       </main>
 
+      <Coach />
       <nav className="shrink-0 grid grid-cols-5 bg-paper border-t border-line" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }} aria-label="views">
         {tabs.map((x) => {
           const active = x.id === 'manage' ? sheet === 'tools' : view === x.id && !sheet;
@@ -239,6 +254,7 @@ export function MobileShell() {
             <button
               key={x.id}
               type="button"
+              data-tour={`nav-${x.id}`}
               onClick={() => {
                 if (x.id === 'manage') setSheet(sheet === 'tools' ? null : 'tools');
                 else {

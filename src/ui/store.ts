@@ -3,6 +3,7 @@ import { applyCommand, step, type Command } from '../sim/engine';
 import { createInitialState } from '../sim/state';
 import type { Cell, CommandResult, DecorType, GameState, RoomType } from '../domain/types';
 import type { Lang } from './i18n';
+import { currentStep, STEPS, tutorialCtx } from './tutorial';
 
 export type Tool = { kind: 'select' } | { kind: 'corridor' } | { kind: 'bulldoze' } | { kind: 'room'; roomType: RoomType } | { kind: 'decor'; decor: DecorType };
 
@@ -55,6 +56,46 @@ interface UIStore {
   chaptersOpen: boolean;
   setChaptersOpen: (v: boolean) => void;
   dismissToast: () => void;
+  /** Guided Chapter-1 tutorial: acknowledged info steps and whether it is switched off. */
+  tutorial: TutorialState;
+  ackTutorial: (stepId: string) => void;
+  setTutorialOff: (off: boolean) => void;
+  restartTutorial: () => void;
+}
+
+export interface TutorialState {
+  ack: string[];
+  off: boolean;
+}
+
+const TUTORIAL_KEY = 'he.tutorial';
+
+function loadTutorial(): TutorialState {
+  try {
+    const v = JSON.parse(localStorage.getItem(TUTORIAL_KEY) ?? 'null');
+    if (v && Array.isArray(v.ack) && typeof v.off === 'boolean') return { ack: v.ack.filter((x: unknown) => typeof x === 'string'), off: v.off };
+  } catch {
+    /* storage unavailable or corrupt */
+  }
+  return { ack: [], off: false };
+}
+
+/** Per-viewer convenience only: losing it just shows the tutorial again. */
+function saveTutorial(t: TutorialState): TutorialState {
+  try {
+    localStorage.setItem(TUTORIAL_KEY, JSON.stringify(t));
+  } catch {
+    /* ignore */
+  }
+  return t;
+}
+
+/** A loaded save that is already past the build-up does not need the tutorial. */
+function tutorialForLoaded(game: GameState, prev: TutorialState): TutorialState {
+  const ack = new Set([...prev.ack, 'welcome']);
+  const i = currentStep(tutorialCtx(game, { tool: { kind: 'select' }, selectedRoomId: null, ack }));
+  const late = i < 0 || STEPS[i].id === 'play' || STEPS[i].id === 'finish';
+  return { ack: [...ack], off: prev.off || late };
 }
 
 function initialLang(): Lang {
@@ -121,10 +162,30 @@ export const useGame = create<UIStore>((set, get) => ({
     dispatch({ type: 'setSpeed', speed: game.speed === 0 ? lastSpeed : 0 });
   },
   newGame: () =>
-    set({ game: createInitialState(), selectedRoomId: null, drag: null, tool: { kind: 'select' }, toast: null, view: 'map', leftTab: 'build', sheet: null }),
+    set({
+      game: createInitialState(),
+      selectedRoomId: null,
+      drag: null,
+      tool: { kind: 'select' },
+      toast: null,
+      view: 'map',
+      leftTab: 'build',
+      sheet: null,
+      tutorial: saveTutorial({ ack: [], off: false }),
+    }),
   dismissToast: () => set({ toast: null }),
   loadGame: (game) =>
-    set({ game: { ...game, speed: 0 }, selectedRoomId: null, drag: null, tool: { kind: 'select' }, view: 'map', sheet: null, started: true, saveOpen: false }),
+    set({
+      game: { ...game, speed: 0 },
+      selectedRoomId: null,
+      drag: null,
+      tool: { kind: 'select' },
+      view: 'map',
+      sheet: null,
+      started: true,
+      saveOpen: false,
+      tutorial: saveTutorial(tutorialForLoaded(game, get().tutorial)),
+    }),
   started: false,
   setStarted: (started) => set({ started }),
   notify: (key, level = 'ok', params) => set({ toast: { id: ++toastSeq, key, level, ...(params ? { params } : {}) } }),
@@ -132,4 +193,11 @@ export const useGame = create<UIStore>((set, get) => ({
   setSaveOpen: (saveOpen) => set({ saveOpen }),
   chaptersOpen: false,
   setChaptersOpen: (chaptersOpen) => set({ chaptersOpen }),
+  tutorial: loadTutorial(),
+  ackTutorial: (id) => {
+    const t = get().tutorial;
+    if (!t.ack.includes(id)) set({ tutorial: saveTutorial({ ...t, ack: [...t.ack, id] }) });
+  },
+  setTutorialOff: (off) => set({ tutorial: saveTutorial({ ...get().tutorial, off }) }),
+  restartTutorial: () => set({ tutorial: saveTutorial({ ack: [], off: false }) }),
 }));

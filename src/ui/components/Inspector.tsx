@@ -97,6 +97,7 @@ function RoomInspector({ roomId }: { roomId: string }) {
                 <button
                   type="button"
                   aria-label="+"
+                  data-tour={`equip-${slot.id}`}
                   disabled={have >= max || cash < price}
                   onClick={() => dispatch({ type: 'installEquipment', roomId: room.id, equipment: slot.id })}
                   className="size-7 rounded-md bg-teal text-white disabled:opacity-30 hover:bg-teal-dark"
