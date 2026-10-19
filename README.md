@@ -229,7 +229,7 @@ src/
   - Food, supplies, upkeep and payroll are each charged once per day.
   - An event's cost is charged once, and a resolved event can't be resolved again.
 
-## Tests (93 passing)
+## Tests (95 passing)
 
 | File | Covers |
 |---|---|
@@ -244,6 +244,7 @@ src/
 | `saves.test.ts` | **Save and reload gives identical state**, and the reloaded game then runs identically for 300 ticks; gzip makes it at least 3× smaller; corrupt, tampered (cash ≠ ledger) and incompatible saves rejected without throwing; IndexedDB store round-trip (fake-indexeddb); cloud store splits large saves into parts under 256 KiB and reassembles them; the newest copy wins across two devices sharing one account; works without cloud; local save survives cloud failure |
 | `decor.test.ts` | Decor placed on an empty tile and charged once; can't overlap rooms, corridor, entrance or decor, and blocks building over it; demolish refunds half; appeal is capped and makes residents happier; schema-3 saves migrate to schema 4 |
 | `chapter.test.ts` | **30-day playthrough** by a scripted sensible player using only public commands and the real applicant and waiting-list pools: wins chapter 1 with cash positive every day; every invariant holds (ledger, unique beds, no overlapping shifts, no care without the skill); roster ready and >95% of tasks done; the three scripted events fire on their days; the same seed plays byte-identically; the verdict pauses the game and survives a save. **Balance:** a full home wins on more seeds, a 40% empty home and an overstaffed home fail on targets. **Verdict rules:** bankrupt at the first negative midnight, decided once and never changed; nothing decided before day 30; a migrated save past day 30 is judged at the next midnight. **Tutorial:** step order, derived from state, a goal and a how-to hint in Thai and English for every step. **Staffing advice:** rush-hour windows, RN covering PN work, one OT for ten sessions |
+| `care-fairness.test.ts` | Regression for care triage: when staff are briefly short, equal-priority tasks go to the least satisfied resident first, so no resident in a 30-day scripted playthrough is left far below the rest (seeds 1 and 3 used to leave the last-admitted resident near 60 satisfaction while everyone else was near 100) |
 | `i18n-iso.test.ts` | TH/EN key parity; labels for every room, equipment and reason; Thai interpolation; iso projection inverts for all 400 cells |
 
 GDD acceptance tests covered so far: *place a room and deduct construction cost once*, *reject collisions*, *admit up to capacity*, *reject excess admission*, *schedule a qualified staff member*, *prevent overlapping shifts*, *advance 30 days deterministically with a fixed seed*, *reconcile cash ledger*, *show Thai text correctly*, *run production build without errors*. *Create monthly invoice once* is now covered too. *Save and reload identical state* is now covered as well, so **all GDD acceptance tests pass**.
