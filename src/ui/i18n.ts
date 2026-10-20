@@ -781,7 +781,10 @@ const th: Dict = {
   'auto.carePlan.desc': 'ผู้พักที่ยังไม่มีแผนการดูแลจะได้แผนทันที (ต้องมี RN ในทีม)',
   'auto.staff': 'จ้างและจัดเวรตามคำแนะนำ',
   'auto.staff.desc': 'เติมช่องที่ขาดในตารางเวรด้วยพนักงานที่ยังไม่มีเวร หรือจ้างผู้สมัครใหม่ (ไม่จ้างจนเงินติดลบ และไม่เลิกจ้างใคร)',
-  'auto.note': 'ระบบอัตโนมัติไม่สร้างห้อง ไม่ซื้อของ และไม่เลิกจ้าง ยังต้องวางแผนการก่อสร้างเอง ตรวจทุกชั่วโมงในเกม',
+  'auto.build': 'สร้างห้องสำเร็จรูปอัตโนมัติ',
+  'auto.build.desc': 'วันละไม่เกิน 1 ห้อง ตอน 08:00: สร้างห้องพื้นฐานที่ยังขาด (ห้องพัก สถานีพยาบาล ห้องพักพนักงาน ห้องกายภาพ) และห้องพัก 10 เตียงเพิ่มเมื่อเตียงเต็มและมีคนรอ 3 รายขึ้นไป หรือวิลล่าเมื่อมีครอบครัวพรีเมียมรอ วางติดทางเดินที่มีอยู่ใกล้ทางเข้าที่สุด และต้องเหลือเงินพอค่าใช้จ่าย 30 วันบวกเงินสำรอง ฿200,000',
+  'auto.log.build': 'ระบบอัตโนมัติสร้าง{prefab}แล้ว',
+  'auto.note': 'ระบบอัตโนมัติไม่ซื้อที่ดิน ไม่ต่อทางเดิน ไม่ซื้ออัปเกรด และไม่เลิกจ้าง ตรวจทุกชั่วโมงในเกม',
   'auto.log.event': 'ระบบอัตโนมัติตอบเหตุการณ์ให้แล้ว',
   'canvas.exterior': 'มุมมองภายนอกอาคาร',
   'canvas.interior': 'มุมมองภายในห้อง',
@@ -1795,7 +1798,10 @@ const en: Dict = {
   'auto.carePlan.desc': 'Every resident without a care plan gets one straight away (needs an RN on the staff)',
   'auto.staff': 'Hire and roster to the advice',
   'auto.staff.desc': 'Fills roster gaps with staff who have no shift yet, or hires an applicant (never into debt, never dismisses anyone)',
-  'auto.note': 'The autopilot never builds, buys or dismisses: construction is still yours. It checks once every game hour.',
+  'auto.build': 'Build ready-made rooms',
+  'auto.build.desc': 'At most one room a day, at 08:00: the basic rooms still missing (ward, nursing station, staff room, therapy), another 10-bed ward when every bed is taken and 3+ families wait, or a villa for waiting premium families. Placed next to an existing corridor, as near the entrance as possible, only with 30 days of running costs plus a ฿200,000 reserve left',
+  'auto.log.build': 'Autopilot built a {prefab}',
+  'auto.note': 'The autopilot never buys land, lays corridors, buys upgrades or dismisses anyone. It checks once every game hour.',
   'auto.log.event': 'Autopilot answered the event',
   'canvas.exterior': 'Exterior view',
   'canvas.interior': 'Interior view',
@@ -2033,7 +2039,7 @@ const en: Dict = {
 export const DICTS: Record<Lang, Dict> = { th, en };
 
 /** Params whose values are themselves i18n keys (e.g. room type ids) are translated too. */
-const PARAM_PREFIX: Record<string, string> = { room: 'room.', equipment: 'equip.', role: 'role.', slot: 'slot.', task: 'task.', decor: 'decor.', course: 'course.', upgrade: 'shop.' };
+const PARAM_PREFIX: Record<string, string> = { room: 'room.', equipment: 'equip.', role: 'role.', slot: 'slot.', task: 'task.', decor: 'decor.', course: 'course.', upgrade: 'shop.', prefab: 'prefab.' };
 
 export function translate(lang: Lang, key: string, params?: Record<string, string | number>): string {
   const dict = DICTS[lang];
