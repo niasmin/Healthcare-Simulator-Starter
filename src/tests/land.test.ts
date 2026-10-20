@@ -2,7 +2,7 @@ import { applyCommand } from '../sim/engine';
 import { createInitialState } from '../sim/state';
 import { reconcile } from '../domain/rules/ledger';
 import { cellIndex } from '../domain/grid';
-import { LAND_PLOTS, nextPlot } from '../data/chapters';
+import { EXTRA_PLOT_GROWTH, EXTRA_PLOT_WIDTH, LAND_PLOTS, MAX_LOT_WIDTH, nextPlot } from '../data/chapters';
 import type { GameState } from '../domain/types';
 import { post } from '../sim/helpers';
 import { thb } from '../domain/money';
@@ -31,8 +31,6 @@ describe('buying more land', () => {
       for (let y = 0; y < s.site.height; y++)
         for (let x = 0; x < before.site.width; x++) expect(s.site.corridor[cellIndex(x, y, s.site.width)]).toBe(before.site.corridor[cellIndex(x, y, before.site.width)]);
     }
-    expect(nextPlot(s.site.width)).toBeNull();
-    expect(applyCommand(s, { type: 'expandLot' }).result).toMatchObject({ ok: false, reason: 'already_done' });
     expect(reconcile(s).ok).toBe(true);
   });
 
@@ -67,5 +65,27 @@ describe('buying more land', () => {
     }
     expect(t.site.rooms.some((r) => r.type === 'villa' && r.rect.x >= 20)).toBe(true);
     expect(reconcile(t).ok).toBe(true);
+  });
+
+  it('after the listed plots the street goes on, 12 columns a plot, each dearer, up to the far end', () => {
+    const last = LAND_PLOTS[LAND_PLOTS.length - 1];
+    let w = last.width;
+    let price = last.priceSatang;
+    while (nextPlot(w)) {
+      const p = nextPlot(w)!;
+      expect(p.width).toBe(w + EXTRA_PLOT_WIDTH);
+      expect(p.priceSatang).toBeGreaterThan(price);
+      expect(p.priceSatang / price).toBeCloseTo(EXTRA_PLOT_GROWTH, 1);
+      w = p.width;
+      price = p.priceSatang;
+    }
+    expect(w).toBeLessThanOrEqual(MAX_LOT_WIDTH);
+    expect(nextPlot(w)).toBeNull();
+    // The game itself sells them too.
+    let s = post(inChapter(5), thb(100_000_000), 'capital', 'ledger.capital');
+    for (let i = 0; i < 6; i++) s = ok(s, { type: 'expandLot' });
+    expect(s.site.width).toBe(last.width + 3 * EXTRA_PLOT_WIDTH);
+    expect(s.site.corridor).toHaveLength(s.site.width * s.site.height);
+    expect(reconcile(s).ok).toBe(true);
   });
 });

@@ -1,9 +1,9 @@
 import { residentPortrait } from '../portraits';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { parseBedId } from '../../domain/rules/beds';
 import type { CareTask, NeedKey, Resident } from '../../domain/types';
 import { formatClock } from '../../sim/systems/time';
-import { useT } from '../hooks';
+import { useRoomLabel, useSummary, useT } from '../hooks';
 import { useGame } from '../store';
 import { Avatar, GROUP_COLOR, StatBar, useName } from './people';
 
@@ -24,7 +24,7 @@ const STATUS_STYLE: Record<CareTask['status'], string> = {
   pending: 'bg-line',
 };
 
-function ResidentCard({ r }: { r: Resident }) {
+function ResidentCard({ r, building }: { r: Resident; building: string }) {
   const t = useT();
   const name = useName();
   const dispatch = useGame((s) => s.dispatch);
@@ -54,7 +54,7 @@ function ResidentCard({ r }: { r: Resident }) {
           {t('res.level', { n: r.careLevel })}
         </span>
         <span className="px-2 py-0.5 rounded-full bg-sand text-ink-soft">
-          {t('room.ward')} · {t('res.bed', { n: parseBedId(r.bedId).index + 1 })}
+          🏠 {building} · {t('res.bed', { n: parseBedId(r.bedId).index + 1 })}
         </span>
       </div>
 
@@ -123,15 +123,64 @@ function ResidentCard({ r }: { r: Resident }) {
   );
 }
 
+type Zone = 'all' | 'ward' | 'villa';
+
+/**
+ * Residents by building: one section per ward or villa (named as the player named it), with how
+ * full it is, so it is easy to see who lives where and to discharge from a particular building.
+ */
 export function ResidentsView() {
   const t = useT();
   const residents = useGame((s) => s.game.residents);
+  const rooms = useGame((s) => s.game.site.rooms);
+  const summary = useSummary();
+  const roomLabel = useRoomLabel();
+  const [zone, setZone] = useState<Zone>('all');
+  const sections = useMemo(() => {
+    const homes = rooms.filter((r) => r.type === 'ward' || r.type === 'villa').sort((a, b) => (a.type === b.type ? a.builtAt - b.builtAt : a.type === 'ward' ? -1 : 1));
+    return homes.map((room) => ({ room, people: residents.filter((r) => parseBedId(r.bedId).roomId === room.id) })).filter((x) => x.people.length);
+  }, [rooms, residents]);
   if (!residents.length) return <div className="grid place-items-center h-full p-8 text-center text-ink-soft text-sm">{t('res.empty')}</div>;
+  const hasVilla = sections.some((x) => x.room.type === 'villa');
+  const shown = sections.filter((x) => zone === 'all' || x.room.type === zone);
+  const count = (z: Zone) => sections.filter((x) => z === 'all' || x.room.type === z).reduce((a, x) => a + x.people.length, 0);
   return (
-    <div className="grid gap-3 p-3 grid-cols-[repeat(auto-fill,minmax(260px,1fr))] content-start">
-      {residents.map((r) => (
-        <ResidentCard key={r.id} r={r} />
-      ))}
+    <div className="p-3 flex flex-col gap-3">
+      {hasVilla && (
+        <div className="flex gap-1.5" role="tablist">
+          {(['all', 'ward', 'villa'] as const).map((z) => (
+            <button
+              key={z}
+              type="button"
+              role="tab"
+              aria-selected={zone === z}
+              onClick={() => setZone(z)}
+              className={`rounded-full px-3 py-1.5 text-sm font-semibold ${zone === z ? 'bg-ink text-white' : 'bg-white border border-line text-ink-soft'}`}
+            >
+              {t(`res.zone.${z}`)} <span className="tabular opacity-75">{count(z)}</span>
+            </button>
+          ))}
+        </div>
+      )}
+      {shown.map(({ room, people }) => {
+        const cap = summary.statuses.get(room.id)?.capacity ?? people.length;
+        const label = roomLabel(room);
+        return (
+          <section key={room.id} className="flex flex-col gap-2">
+            <h2 className="flex items-center gap-2 text-sm font-bold">
+              <span aria-hidden>{room.type === 'villa' ? '🏡' : '🏥'}</span>
+              <span className="truncate">{label}</span>
+              <span className="text-xs font-normal text-ink-soft">{t(`room.${room.type}`)}</span>
+              <span className="ml-auto text-xs tabular font-semibold rounded-full bg-sand px-2 py-0.5">{t('res.occupied', { n: people.length, cap })}</span>
+            </h2>
+            <div className="grid gap-3 grid-cols-[repeat(auto-fill,minmax(260px,1fr))] content-start">
+              {people.map((r) => (
+                <ResidentCard key={r.id} r={r} building={label} />
+              ))}
+            </div>
+          </section>
+        );
+      })}
     </div>
   );
 }

@@ -9,7 +9,7 @@ import { STAFF_SPRITE } from '../../render/sprites';
 import { prefabCost, prefabDef, prefabRect } from '../../data/prefabs';
 import { nextPlot } from '../../data/chapters';
 import type { CareGroup, StaffRole } from '../../domain/types';
-import { isMobileNow, useMoney, useSummary, useT } from '../hooks';
+import { isMobileNow, useMoney, useSummary, useT, useRoomLabel } from '../hooks';
 import { useGame } from '../store';
 import { useTourPointer } from './Tutorial';
 
@@ -33,6 +33,7 @@ export function GameCanvas({ controls = true }: { controls?: boolean } = {}) {
   const selectedRoomId = useGame((s) => s.selectedRoomId);
   const showLabels = useGame((s) => s.showLabels);
   const exterior = useGame((s) => s.exterior);
+  const roomLabel = useRoomLabel();
   const summary = useSummary();
   const tourHint = useTourPointer()?.hint ?? null;
 
@@ -131,7 +132,7 @@ export function GameCanvas({ controls = true }: { controls?: boolean } = {}) {
       people,
       game,
       statuses: summary.statuses,
-      labelFor: (room) => t(`room.${room.type}`),
+      labelFor: (room) => (room.id ? roomLabel(room) : t(`room.${room.type}`)),
       entranceLabel: t('room.entrance'),
       selectedRoomId,
       hover,
@@ -143,7 +144,7 @@ export function GameCanvas({ controls = true }: { controls?: boolean } = {}) {
       exterior,
       sale: plot ? { toX: plot.width, label: game.chapter.id >= plot.chapter ? t('world.sale_now', { price: money(plot.priceSatang) }) : t('world.sale_later', { c: plot.chapter }) } : null,
     });
-  }, [game, people, summary, selectedRoomId, hover, preview, tool, t, ready, lang, showLabels, exterior, tourHint]);
+  }, [game, people, summary, selectedRoomId, hover, preview, tool, t, ready, lang, showLabels, exterior, tourHint, roomLabel]);
 
   // The phone HUD's "overview map" button recenters through this event.
   useEffect(() => {

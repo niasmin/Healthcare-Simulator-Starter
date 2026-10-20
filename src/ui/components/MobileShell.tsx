@@ -15,6 +15,7 @@ import mapIcon from '../../assets/hud/map.png';
 import hatIcon from '../../assets/hud/hat.png';
 import peopleIcon from '../../assets/hud/people.png';
 import chartIcon from '../../assets/hud/chart.png';
+import staffIcon from '../../assets/title/ic_staff.png';
 import { dayOf, formatClock } from '../../sim/systems/time';
 import { useMoney, useT } from '../hooks';
 import { useGame, type View } from '../store';
@@ -217,11 +218,15 @@ function EventLog() {
 function ActionCards() {
   const t = useT();
   const residents = useGame((s) => s.game.residents.length);
+  const applicants = useGame((s) => s.game.applicants.length);
   const setSheet = useGame((s) => s.setSheet);
   const setLeftTab = useGame((s) => s.setLeftTab);
   const setView = useGame((s) => s.setView);
+  const card = 'relative h-14 rounded-xl flex flex-col items-center justify-center gap-0.5 overflow-visible';
+  const badge = (n: number) =>
+    n > 0 && <span className="absolute -top-1.5 right-1 min-w-5 h-5 px-1 rounded-full bg-coral text-white text-[11px] font-bold grid place-items-center tabular">{n}</span>;
   return (
-    <div className="shrink-0 bg-white/95 border-t border-line px-2 py-1.5 grid grid-cols-3 gap-1.5">
+    <div className="shrink-0 bg-white/95 border-t border-line px-2 py-1.5 grid grid-cols-4 gap-1.5">
       <button
         type="button"
         data-tour="m-build"
@@ -229,28 +234,32 @@ function ActionCards() {
           setLeftTab('build');
           setSheet('tools');
         }}
-        className="relative h-14 rounded-xl bg-gradient-to-b from-[#26b383] to-[#138a62] text-white shadow flex items-center gap-1 pl-1 pr-2 overflow-hidden"
+        className={`${card} bg-gradient-to-b from-[#26b383] to-[#138a62] text-white shadow`}
       >
-        <img src={hatIcon} alt="" className="h-8 shrink-0" />
-        <span className="text-left leading-tight min-w-0">
-          <span className="block font-black text-[15px]">{t('hud.build')}</span>
-          <span className="block text-[10px] text-white/85 truncate">{t('hud.build_sub')}</span>
-        </span>
+        <img src={hatIcon} alt="" className="h-7 object-contain" />
+        <span className="font-black text-[12px] leading-none">{t('hud.build')}</span>
       </button>
-      <button type="button" onClick={() => setView('residents')} className="relative h-14 rounded-xl bg-[#e3f0fb] text-[#14365f] flex items-center gap-1 pl-0.5 pr-1.5 overflow-visible">
-        <img src={peopleIcon} alt="" className="h-9 shrink-0" />
-        <span className="text-left leading-tight min-w-0">
-          <span className="block font-bold text-[12px] truncate">{t('hud.residents')}</span>
-          <span className="block text-[10px] text-ink-soft truncate">{t('hud.residents_sub')}</span>
-        </span>
-        {residents > 0 && <span className="absolute -top-1.5 right-1 min-w-5 h-5 px-1 rounded-full bg-coral text-white text-[11px] font-bold grid place-items-center tabular">{residents}</span>}
+      {/* Hiring is always one tap away. */}
+      <button
+        type="button"
+        onClick={() => {
+          setLeftTab('hire');
+          setSheet('tools');
+        }}
+        className={`${card} bg-[#fff1d6] text-[#14365f]`}
+      >
+        <img src={staffIcon} alt="" className="h-7 object-contain" />
+        <span className="font-bold text-[12px] leading-none">{t('hud.hire')}</span>
+        {badge(applicants)}
       </button>
-      <button type="button" onClick={() => setSheet('report')} className="h-14 rounded-xl bg-[#e3f0fb] text-[#14365f] flex items-center gap-1 pl-1 pr-1.5">
-        <img src={chartIcon} alt="" className="h-9 shrink-0" />
-        <span className="text-left leading-tight min-w-0">
-          <span className="block font-bold text-[12px] truncate">{t('hud.report')}</span>
-          <span className="block text-[10px] text-ink-soft truncate">{t('hud.report_sub')}</span>
-        </span>
+      <button type="button" onClick={() => setView('residents')} className={`${card} bg-[#e3f0fb] text-[#14365f]`}>
+        <img src={peopleIcon} alt="" className="h-7 object-contain" />
+        <span className="font-bold text-[12px] leading-none">{t('hud.residents')}</span>
+        {badge(residents)}
+      </button>
+      <button type="button" onClick={() => setSheet('report')} className={`${card} bg-[#e3f0fb] text-[#14365f]`}>
+        <img src={chartIcon} alt="" className="h-7 object-contain" />
+        <span className="font-bold text-[12px] leading-none">{t('hud.report')}</span>
       </button>
     </div>
   );

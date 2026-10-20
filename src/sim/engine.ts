@@ -42,6 +42,7 @@ export type Command =
   | { type: 'paintCorridor'; rect: Rect }
   | { type: 'bulldoze'; cell: Cell }
   | { type: 'deleteRoom'; roomId: string }
+  | { type: 'renameRoom'; roomId: string; name: string }
   | { type: 'installEquipment'; roomId: string; equipment: EquipmentId }
   | { type: 'removeEquipment'; roomId: string; equipment: EquipmentId }
   | { type: 'hireStaff'; candidateId: string }
@@ -99,6 +100,9 @@ function deleteRoom(state: GameState, roomId: string): CommandOutcome {
   return { state: s, result: { ok: true, id: roomId, costSatang: -refund } };
 }
 
+/** Longest building name the player can give. */
+export const ROOM_NAME_MAX = 30;
+
 export function applyCommand(state: GameState, cmd: Command): CommandOutcome {
   switch (cmd.type) {
     case 'setSpeed': {
@@ -130,6 +134,18 @@ export function applyCommand(state: GameState, cmd: Command): CommandOutcome {
 
     case 'deleteRoom':
       return deleteRoom(state, cmd.roomId);
+
+    case 'renameRoom': {
+      // A building's name is only a label: trimmed, at most 30 characters, empty brings back the default.
+      if (!state.site.rooms.some((r) => r.id === cmd.roomId)) return fail(state, 'not_found');
+      const name = cmd.name.trim().slice(0, ROOM_NAME_MAX);
+      const rooms = state.site.rooms.map((r) => {
+        if (r.id !== cmd.roomId) return r;
+        const { name: _old, ...rest } = r;
+        return name ? { ...rest, name } : rest;
+      });
+      return { state: { ...state, site: { ...state.site, rooms } }, result: { ok: true } };
+    }
 
     case 'bulldoze': {
       const { cell } = cmd;

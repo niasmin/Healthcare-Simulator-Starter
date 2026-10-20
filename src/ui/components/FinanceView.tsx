@@ -1,3 +1,4 @@
+import { autoSettings, effectiveSettings } from '../../sim/autopilot';
 import { useMemo, useState } from 'react';
 import { monthlyFee, PRICE_LEVELS } from '../../data/finance';
 import type { LedgerCategory, RevenueStream } from '../../domain/types';
@@ -160,6 +161,7 @@ function Donut({ mix }: { mix: { stream: RevenueStream; amount: number }[] }) {
 }
 
 export function FinanceView() {
+  const autoPrice = effectiveSettings(autoSettings(useGame((st) => st.game))).pricing;
   const t = useT();
   const money = useMoney();
   const game = useGame((s) => s.game);
@@ -265,20 +267,37 @@ export function FinanceView() {
 
         <section className="rounded-2xl bg-white border border-line p-3 min-w-0">
           <h3 className="font-semibold text-sm mb-2">{t('fin.price')}</h3>
-          <div className="grid grid-cols-3 gap-1.5" role="radiogroup">
-            {PRICE_LEVELS.map((p) => (
-              <button
-                key={p}
-                type="button"
-                role="radio"
-                aria-checked={game.priceLevel === p}
-                onClick={() => dispatch({ type: 'setPriceLevel', level: p })}
-                className={`rounded-lg border px-2 py-1.5 text-left ${game.priceLevel === p ? 'border-teal bg-teal text-white' : 'border-line hover:border-teal/50'}`}
-              >
-                <div className="text-sm font-semibold">{t(`fin.price.${p}`)}</div>
-                <div className={`text-[10px] leading-snug ${game.priceLevel === p ? 'text-white/80' : 'text-ink-soft'}`}>{t(`fin.price.desc.${p}`)}</div>
-              </button>
-            ))}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5" role="radiogroup">
+            {PRICE_LEVELS.map((p) => {
+              const on = !autoPrice && game.priceLevel === p;
+              return (
+                <button
+                  key={p}
+                  type="button"
+                  role="radio"
+                  aria-checked={on}
+                  onClick={() => {
+                    // Picking a level by hand switches automatic pricing off.
+                    if (autoPrice) dispatch({ type: 'setAuto', settings: { pricing: false } });
+                    dispatch({ type: 'setPriceLevel', level: p });
+                  }}
+                  className={`rounded-lg border px-2 py-1.5 text-left ${on ? 'border-teal bg-teal text-white' : autoPrice && game.priceLevel === p ? 'border-teal/60 bg-teal/5' : 'border-line hover:border-teal/50'}`}
+                >
+                  <div className="text-sm font-semibold">{t(`fin.price.${p}`)}</div>
+                  <div className={`text-[10px] leading-snug ${on ? 'text-white/80' : 'text-ink-soft'}`}>{t(`fin.price.desc.${p}`)}</div>
+                </button>
+              );
+            })}
+            <button
+              type="button"
+              role="radio"
+              aria-checked={autoPrice}
+              onClick={() => dispatch({ type: 'setAuto', settings: { pricing: !autoPrice } })}
+              className={`rounded-lg border px-2 py-1.5 text-left ${autoPrice ? 'border-[#d9901a] bg-[#f2b631] text-ink' : 'border-line hover:border-[#f2b631]'}`}
+            >
+              <div className="text-sm font-semibold">🤖 {t('fin.price.auto')}</div>
+              <div className="text-[10px] leading-snug text-ink-soft">{autoPrice ? t('fin.price.auto_now', { level: t(`fin.price.${game.priceLevel}`) }) : t('fin.price.desc.auto')}</div>
+            </button>
           </div>
           <table className="w-full text-xs mt-2 tabular">
             <tbody>

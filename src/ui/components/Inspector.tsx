@@ -3,12 +3,12 @@ import { cellIndex, rectArea } from '../../domain/grid';
 import { pctOf } from '../../domain/money';
 import type { EquipmentId } from '../../domain/types';
 import { dayOf, formatClock } from '../../sim/systems/time';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { EQUIP_SPRITE, spriteUrl } from '../../render/sprites';
 import { rosterView } from '../../sim/selectors';
 import { EXHAUSTED_ENERGY } from '../../sim/systems/staffing';
 import { WITHDRAW_SATISFACTION } from '../../sim/engine';
-import { useMoney, useSummary, useT } from '../hooks';
+import { useMoney, useSummary, useT, useRoomLabel } from '../hooks';
 import { useGame } from '../store';
 import { useName } from './people';
 
@@ -19,6 +19,7 @@ function RoomInspector({ roomId }: { roomId: string }) {
   const t = useT();
   const money = useMoney();
   const room = useGame((s) => s.game.site.rooms.find((r) => r.id === roomId));
+  const roomLabel = useRoomLabel();
   const cash = useGame((s) => s.game.organization.cashSatang);
   const dispatch = useGame((s) => s.dispatch);
   const summary = useSummary();
@@ -33,7 +34,7 @@ function RoomInspector({ roomId }: { roomId: string }) {
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-start justify-between gap-2">
-        <h3 className="font-bold text-base leading-tight">{t(`room.${room.type}`)}</h3>
+        <RoomNameField roomId={room.id} label={roomLabel(room)} kind={t(`room.${room.type}`)} />
         <span
           className={`shrink-0 text-xs font-semibold px-2 py-0.5 rounded-full ${st.operational ? 'bg-ok/15 text-ok' : 'bg-bad/15 text-bad'}`}
         >
@@ -122,6 +123,7 @@ function RoomInspector({ roomId }: { roomId: string }) {
 }
 
 function CellInfo() {
+  const roomLabel = useRoomLabel();
   const t = useT();
   const hover = useGame((s) => s.hover);
   const site = useGame((s) => s.game.site);
@@ -144,7 +146,7 @@ function CellInfo() {
       : decor
         ? t(`decor.${decor.type}`)
         : room
-        ? t(`room.${room.type}`)
+        ? roomLabel(room)
         : site.corridor[cellIndex(hover.x, hover.y, site.width)]
           ? t('room.corridor')
           : t('room.empty');
@@ -221,6 +223,7 @@ function TasksPanel() {
 }
 
 function Alerts() {
+  const roomLabel = useRoomLabel();
   const t = useT();
   const name = useName();
   const game = useGame((s) => s.game);
@@ -266,7 +269,7 @@ function Alerts() {
           onClick={() => select(r.id)}
           className="text-left text-xs rounded-lg bg-warn/12 border border-warn/30 px-2 py-1.5 hover:bg-warn/20"
         >
-          ⚠ {t(`room.${r.type}`)} — {t('inspector.not_operational')}
+          ⚠ {roomLabel(r)} — {t('inspector.not_operational')}
         </button>
       ))}
       {items.length === 0 && problems.length === 0 && noPlan.length === 0 && unhappy.length === 0 && <p className="text-xs text-ink-soft">{t('alerts.empty')}</p>}
@@ -300,5 +303,61 @@ export function SidePanel() {
         <Alerts />
       </div>
     </aside>
+  );
+}
+
+/** The building's name, editable: tap the pencil, type, Enter (empty brings back the default). */
+function RoomNameField({ roomId, label, kind }: { roomId: string; label: string; kind: string }) {
+  const t = useT();
+  const dispatch = useGame((s) => s.dispatch);
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(label);
+  if (!editing)
+    return (
+      <div className="min-w-0">
+        <h3 className="font-bold text-base leading-tight flex items-center gap-1.5">
+          <span className="truncate">{label}</span>
+          <button
+            type="button"
+            title={t('inspector.rename')}
+            aria-label={t('inspector.rename')}
+            onClick={() => {
+              setValue(label);
+              setEditing(true);
+            }}
+            className="shrink-0 text-xs px-1.5 py-0.5 rounded-md border border-line text-ink-soft hover:text-teal hover:border-teal"
+          >
+            ✏️
+          </button>
+        </h3>
+        {label !== kind && <div className="text-[11px] text-ink-soft">{kind}</div>}
+      </div>
+    );
+  const save = () => {
+    dispatch({ type: 'renameRoom', roomId, name: value });
+    setEditing(false);
+  };
+  return (
+    <form
+      className="flex gap-1.5 min-w-0 flex-1"
+      onSubmit={(e) => {
+        e.preventDefault();
+        save();
+      }}
+    >
+      <input
+        autoFocus
+        maxLength={30}
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onKeyDown={(e) => e.key === 'Escape' && setEditing(false)}
+        placeholder={t('inspector.name_placeholder')}
+        aria-label={t('inspector.rename')}
+        className="min-w-0 flex-1 rounded-lg border border-line px-2 py-1 text-sm"
+      />
+      <button type="submit" className="shrink-0 px-2.5 py-1 rounded-lg bg-teal text-white text-sm font-semibold">
+        {t('inspector.save_name')}
+      </button>
+    </form>
   );
 }

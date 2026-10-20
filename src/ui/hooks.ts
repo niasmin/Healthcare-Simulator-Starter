@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { formatTHB } from '../domain/money';
-import { summarize } from '../sim/selectors';
+import { roomNumber, summarize } from '../sim/selectors';
+import type { Room } from '../domain/types';
 import { localeOf, translate } from './i18n';
 import { useGame } from './store';
 import { MS_PER_TICK_1X } from './constants';
@@ -100,4 +101,18 @@ export function useIsMobile(): boolean {
     return () => mq.removeEventListener('change', on);
   }, []);
   return mobile;
+}
+
+/** A building's label: the player's name for it, or the default "Ward 1", "Villa 2", "Nursing station". */
+export function useRoomLabel() {
+  const t = useT();
+  const site = useGame((s) => s.game.site);
+  return useCallback(
+    (room: Room) => {
+      if (room.name) return room.name;
+      const n = roomNumber(site, room);
+      return n === null ? t(`room.${room.type}`) : `${t(`room.${room.type}`)} ${n}`;
+    },
+    [t, site],
+  );
 }

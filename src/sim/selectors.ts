@@ -1,6 +1,6 @@
 import { chapterDef, EXPANDED_WIDTH, type ChapterDef } from '../data/chapters';
 import { allRoomStatuses, type RoomStatus } from '../domain/rules/rooms';
-import type { GameState, LedgerCategory, RoomType, Satang } from '../domain/types';
+import type { GameState, LedgerCategory, Room, RoomType, Satang } from '../domain/types';
 import { dailyPayroll, dailyUpkeep } from './systems/finance';
 import { dailyResidentCosts } from './systems/billing';
 import { VISIT_DURATION, VISIT_GRACE, VISIT_SKILL, hasHomecareOffice, visitRate } from './systems/homecare';
@@ -648,4 +648,15 @@ export function headline(state: GameState, summary: SiteSummary = summarize(stat
     satisfaction: n ? state.residents.reduce((a, r) => a + r.needs.satisfaction, 0) / n : null,
     cashDelta: state.organization.cashSatang - (last ? last.cash : startCash),
   };
+}
+
+/**
+ * A building's number among its own kind (1-based, oldest first), for default names such as
+ * "Ward 2". Kinds the home usually has once get no number unless there are several.
+ */
+export function roomNumber(site: GameState['site'], room: Room): number | null {
+  const same = site.rooms.filter((r) => r.type === room.type).sort((a, b) => a.builtAt - b.builtAt || (a.id < b.id ? -1 : 1));
+  const numbered = room.type === 'ward' || room.type === 'villa';
+  if (!numbered && same.length < 2) return null;
+  return same.findIndex((r) => r.id === room.id) + 1;
 }
