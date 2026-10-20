@@ -5,7 +5,7 @@ import type { SlotInfo } from '../../storage/saves';
 import { formatClock } from '../../sim/systems/time';
 import { localeOf } from '../i18n';
 import { useT } from '../hooks';
-import { saves, saveTo, useSaveStatus, supabase } from '../saveService';
+import { saves, saveTo, useSaveStatus } from '../saveService';
 import { useGame } from '../store';
 
 function useAgo() {
@@ -22,56 +22,24 @@ function useAgo() {
   };
 }
 
-/** On the deployed site: who the saves belong to, and an email link to carry them to other devices. */
+/** On the deployed site: who the saves belong to, and sign-in to keep them in the cloud. */
 function SupabaseAccountBox() {
   const t = useT();
   const { provider, account } = useSaveStatus();
-  const notify = useGame((s) => s.notify);
-  const [email, setEmail] = useState('');
-  const [sent, setSent] = useState(false);
   if (provider !== 'supabase') return null;
   const signedIn = account && !account.anonymous && account.email;
   return (
-    <div className="rounded-xl border border-line bg-white p-3 flex flex-col gap-2 text-sm">
-      <div className="font-semibold">☁️ {t('save.sb.title')}</div>
-      {signedIn ? (
-        <div className="flex items-center gap-2">
-          <span className="flex-1 text-xs text-ink-soft">{t('save.sb.signed_in', { email: account.email! })}</span>
-          <button type="button" className="px-2.5 py-1 rounded-lg border border-line text-xs" onClick={() => void supabase?.signOut()}>
-            {t('save.sb.sign_out')}
-          </button>
-        </div>
-      ) : (
-        <>
-          <p className="text-xs text-ink-soft leading-relaxed">{t(account ? 'save.sb.anon' : 'save.sb.none')}</p>
-          {sent ? (
-            <p className="text-xs text-ok">{t('save.sb.sent', { email })}</p>
-          ) : (
-            <form
-              className="flex gap-2"
-              onSubmit={async (e) => {
-                e.preventDefault();
-                if (!supabase || !email.includes('@')) return;
-                const r = await supabase.sendLink(email.trim());
-                if (r.ok) setSent(true);
-                else notify('save.sb.error', 'error', { msg: r.error ?? '' });
-              }}
-            >
-              <input
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder={t('save.sb.email')}
-                className="flex-1 min-w-0 rounded-lg border border-line px-2.5 py-1.5 text-sm"
-              />
-              <button type="submit" className="px-3 py-1.5 rounded-lg bg-teal text-white text-sm font-semibold">
-                {t('save.sb.send')}
-              </button>
-            </form>
-          )}
-        </>
-      )}
+    <div className="rounded-xl border border-line bg-white p-3 flex items-center gap-3 text-sm">
+      <span className="text-xl" aria-hidden>
+        {signedIn ? '☁️' : '👤'}
+      </span>
+      <span className="flex-1 min-w-0">
+        <span className="block font-semibold truncate">{signedIn ? t('auth.signed_in_as', { name: account.name || account.email! }) : t('save.sb.guest')}</span>
+        <span className="block text-xs text-ink-soft leading-snug">{t(signedIn ? 'auth.synced' : 'save.sb.sign_in_hint')}</span>
+      </span>
+      <button type="button" onClick={() => useGame.getState().setAccountOpen(true)} className={`shrink-0 px-3 py-1.5 rounded-lg text-sm font-semibold ${signedIn ? 'border border-line' : 'bg-teal text-white'}`}>
+        {t(signedIn ? 'auth.account' : 'auth.mode.signin')}
+      </button>
     </div>
   );
 }

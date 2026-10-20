@@ -12,12 +12,13 @@ import { create } from 'zustand';
 /** One save manager per page: this browser's IndexedDB plus the player's cloud space when available. */
 export const saves = new SaveManager(new LocalStore());
 
-export const useSaveStatus = create<{ cloud: CloudStatus; lastAutoAt: number | null; version: number; provider: 'claude' | 'supabase' | null; account: SupabaseAccount | null }>(() => ({
+export const useSaveStatus = create<{ cloud: CloudStatus; lastAutoAt: number | null; version: number; provider: 'claude' | 'supabase' | null; account: SupabaseAccount | null; recovering: boolean }>(() => ({
   cloud: 'connecting',
   lastAutoAt: null,
   version: 0,
   provider: null,
   account: null,
+  recovering: false,
 }));
 
 /** The Supabase connection on the deployed site (null inside the Claude artifact or without config). */
@@ -34,10 +35,10 @@ export function initCloud(): Promise<void> {
     }
     supabase = await connectSupabase();
     saves.attachCloud(supabase?.store ?? null);
-    useSaveStatus.setState((s) => ({ cloud: saves.cloudStatus, version: s.version + 1, provider: supabase ? 'supabase' : null, account: supabase?.account ?? null }));
+    useSaveStatus.setState((s) => ({ cloud: saves.cloudStatus, version: s.version + 1, provider: supabase ? 'supabase' : null, account: supabase?.account ?? null, recovering: !!supabase?.recovering }));
     supabase?.onChange((next, account) => {
       saves.attachCloud(next);
-      useSaveStatus.setState((s) => ({ cloud: saves.cloudStatus, version: s.version + 1, account }));
+      useSaveStatus.setState((s) => ({ cloud: saves.cloudStatus, version: s.version + 1, account, recovering: !!supabase?.recovering }));
       // Bring this browser's newest game into the newly signed-in account.
       void autosave();
     });

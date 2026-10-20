@@ -69,6 +69,8 @@ interface UIStore {
   setExterior: (v: boolean) => void;
   autoOpen: boolean;
   setAutoOpen: (v: boolean) => void;
+  accountOpen: boolean;
+  setAccountOpen: (v: boolean) => void;
   /** Keep an autopilot game running while the player is away (remembered per browser). */
   awayPlay: boolean;
   setAwayPlay: (v: boolean) => void;
@@ -160,6 +162,8 @@ export const useGame = create<UIStore>((set, get) => ({
   setExterior: (exterior) => set({ exterior }),
   autoOpen: false,
   setAutoOpen: (autoOpen) => set({ autoOpen }),
+  accountOpen: false,
+  setAccountOpen: (accountOpen) => set({ accountOpen }),
   awayPlay: initialAwayPlay(),
   setAwayPlay: (awayPlay) => {
     try {

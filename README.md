@@ -29,10 +29,13 @@ One-time setup:
 - **Cloudflare Pages:** add two repository secrets, `CLOUDFLARE_API_TOKEN` (a token with *Cloudflare Pages: Edit*) and `CLOUDFLARE_ACCOUNT_ID`. The workflow creates the `healthcare-empire` Pages project on first run, then deploys to `https://healthcare-empire.pages.dev`. Without the secrets this job is skipped with a notice.
 - **Supabase (cloud saves):** the deployed site saves to the project's `public.game_saves` table.
   - The table has one row per player and slot, own-row RLS policies and a 256 KiB check per row. `CloudStore` splits big saves into 200,000-character parts, one row each.
-  - Players start with an anonymous account per browser (anonymous sign-ins are enabled on the project). They can sign in with an email link in the Save window, which makes their saves follow them to every device.
+  - **Player accounts:** players sign up or sign in with an email and password from the 👤 button on the title screen, the phone menu, or the Save window. They can reset a forgotten password by email, or change it while signed in. Signed-in players' saves follow them to every device.
+  - **Guests:** players can also play without signing in. Their saves stay in that browser. No account is made automatically anymore (earlier builds made an anonymous one per browser).
+  - **Email confirmation:** if the project requires it (Auth → Providers → Email → *Confirm email*), a new player confirms by email, then signs in. Supabase's built-in mailer sends only a few emails an hour, so a real launch should set custom SMTP in Auth → Emails.
   - The project URL and publishable key are in `.env.production`. The publishable key is meant to be public; RLS protects the rows.
   - In Supabase Auth → URL Configuration, add the two site URLs above as redirect URLs so the email links come back to the game.
   - Inside the Claude artifact, the artifact's own per-person storage is used instead.
+  - Play statistics come from signed-in players only. Guests have no account, so nothing is sent for them.
 
 ### Launch polish
 
@@ -598,7 +601,7 @@ src/
   - Food, supplies, upkeep and payroll are each charged once per day.
   - An event's cost is charged once, and a resolved event can't be resolved again.
 
-## Tests (220 passing)
+## Tests (221 passing)
 
 | File | Covers |
 |---|---|
@@ -617,7 +620,7 @@ src/
 | `support.test.ts` | Support applicants appear only once their room exists; pharmacy supply cut; dining meal bonuses; nutritionist and cleaner daily lift; laundry upkeep cut; a receptionist adds an enquiry and a security guard lifts satisfaction; the storage room cuts supplies on top of the pharmacy; the bath & hygiene room shortens personal care; pharmacists take med rounds and nutritionists meals, with no missed meals; support rooms are optional |
 | `autopilot.test.ts` | Off by default and switched by command; with all switches on, a built home runs 30 days on its own (8+ residents, every one with a plan, an RN hired, >90% of care done, cash positive, ledger and unique beds intact); from the starter campus it builds every basic room, staffs and fills the home and wins chapter 1 solvent; it builds only what is missing or needed and never without money to spare; "play every chapter" wins chapters 1–3 back to back unattended and carries straight on into chapter 4; after a verdict it starts the next chapter on a win or replays on a loss, at the speed before; Home Care, training, placements and the shop each work on their own (from their chapter, touching nothing else, and the shop never buys when short); time away is played out at the game's speed, capped at 30 days; pricing picks value, premium or standard by demand; staff care gives a tired person their second shift off and builds a staff room; the garden switch plants up to full appeal away from corridors; alerts fire for low cash and for a paused game; events answered at once without pausing, accepting the staff request; nothing happens with it off |
 | `land.test.ts` | Three plots sold in order for their prices, each from its chapter, keeping every room and corridor tile; then already done; locked by chapter and by cash; a room can be built on the newest plot; the autopilot's land purchase runs a corridor into the new plot so a villa can open there |
-| `supabase.test.ts` | A save round-trips through `game_saves` rows: one row per part, each under the size check, keyed by the player's id; another player sees none of it; removal deletes every part; off without the build settings |
+| `supabase.test.ts` | A save round-trips through `game_saves` rows: one row per part, each under the size check, keyed by the player's id; another player sees none of it; removal deletes every part; off without the build settings; Supabase auth messages map to the reasons the sign-in window explains |
 | `shop.test.ts` | Upgrades are bought once, for their price, from their chapter (all at once in the sandbox); the central kitchen and laundry cut food and supplies by their percentages; staff welfare adds morale; online marketing adds an enquiry; the family app lifts reputation while residents are content; the smart call system keeps late routine care pending 30 minutes longer |
 | `modes.test.ts` | Campaign games are unchanged; sandbox books ฿50M as capital, unlocks every room, has no tutorial steps and is never judged after 70 days; each challenge opens with its own cash, reputation or chapter; each challenge is won by the scripted player and ends without a next chapter |
 | `chapter7.test.ts` | **Full 390-day campaign:** all 7 chapters won on schedule and solvent, ledger reconciles; one branch of each kind, each manager of the right role and off the roster; branch invoices exact; network occupancy ≥ 70%. **Opening:** locked before chapter 7; manager role checked; full opening cost charged; managers can’t take shifts or a second branch; cap of 5. **Running:** good branches fill and bill daily, poor ones empty, a poor name at headquarters stops growth; certificates raise the quality target; a lost manager leaves the branch leaderless until one is appointed; support visits lift quality, cost money and have a cooldown; closing refunds 30% and frees the manager; busy clinic branches refer to the stroke unit. Guide order; v9→v10 migration |
