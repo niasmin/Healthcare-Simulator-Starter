@@ -3,7 +3,7 @@ import { AUTO_KEYS, autoSettings } from '../../sim/autopilot';
 import { useT } from '../hooks';
 import { useGame } from '../store';
 
-const ICON: Record<(typeof AUTO_KEYS)[number], string> = { events: '✉️', admit: '🛏', carePlan: '📋', staff: '👥', build: '🏗' };
+const ICON: Record<(typeof AUTO_KEYS)[number], string> = { events: '✉️', admit: '🛏', carePlan: '📋', staff: '👥', build: '🏗', chapters: '🏆' };
 
 /** Autopilot switches: the home makes its own routine decisions, so the player can just watch. */
 export function AutoModal({ onClose }: { onClose: () => void }) {

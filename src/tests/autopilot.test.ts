@@ -3,6 +3,8 @@ import { createInitialState } from '../sim/state';
 import { reconcile } from '../domain/rules/ledger';
 import { fireEvent } from '../sim/systems/events';
 import { AUTO_CHOICES, BUILD_RESERVE, autoSettings, nextBuild } from '../sim/autopilot';
+import { advanceChapter } from '../sim/autoCampaign';
+import { LAND_PLOTS } from '../data/chapters';
 import { newGameState } from '../sim/modes';
 import { makeResidentCandidate } from '../sim/systems/staffing';
 import { allRoomStatuses } from '../domain/rules/rooms';
@@ -12,6 +14,7 @@ import type { GameState } from '../domain/types';
 import { buildHome, hire, ok, quietEvents } from './helpers';
 
 const ALL_ON = { events: true, admit: true, carePlan: true, staff: true, build: true };
+const EVERYTHING = { ...ALL_ON, chapters: true };
 const days = (s: GameState, n: number) => {
   for (let i = 0; i < n * (MINUTES_PER_DAY / 10); i++) s = step(s);
   return s;
@@ -20,7 +23,7 @@ const days = (s: GameState, n: number) => {
 describe('autopilot', () => {
   it('is off by default and is switched with a command', () => {
     const s = createInitialState(8);
-    expect(autoSettings(s)).toEqual({ events: false, admit: false, carePlan: false, staff: false, build: false });
+    expect(autoSettings(s)).toEqual({ events: false, admit: false, carePlan: false, staff: false, build: false, chapters: false });
     const on = ok(s, { type: 'setAuto', settings: { admit: true } });
     expect(autoSettings(on)).toMatchObject({ admit: true, events: false });
   });
@@ -84,6 +87,42 @@ describe('autopilot', () => {
     const poor = { ...s, organization: { ...s.organization, cashSatang: 30 * dailyRunningCost(s) + BUILD_RESERVE } };
     const after = days(poor, 1);
     expect(after.site.rooms.length).toBe(s.site.rooms.length);
+  });
+
+  it('"play every chapter" runs the campaign unattended: chapters 1–3 won back to back, villas built', () => {
+    let s = ok({ ...newGameState('starter', 'campaign', undefined, 3), speed: 1 }, { type: 'setAuto', settings: EVERYTHING });
+    let minCash = Infinity;
+    for (let d = 0; d < 151; d++) {
+      s = days(s, 1);
+      minCash = Math.min(minCash, s.organization.cashSatang);
+    }
+    const verdicts = [...s.chapter.past, ...(s.chapter.result ? [s.chapter.result] : [])].map((v) => [v.chapter, v.outcome, v.day]);
+    expect(verdicts).toEqual([
+      [1, 'won', 30],
+      [2, 'won', 90],
+      [3, 'won', 150],
+    ]);
+    // Straight on into chapter 4 without stopping.
+    expect(s.chapter.id).toBe(4);
+    expect(s.speed).toBe(1);
+    // Land is bought only once the lot is full, so the width is the start or a later plot.
+    expect([20, ...LAND_PLOTS.map((p) => p.width)]).toContain(s.site.width);
+    expect(s.site.rooms.filter((r) => r.type === 'villa').length).toBeGreaterThanOrEqual(4);
+    expect(minCash).toBeGreaterThan(0);
+    expect(reconcile(s).ok).toBe(true);
+  }, 60_000);
+
+  it('after a verdict: the next chapter on a win, the same chapter again on a loss, at the speed before', () => {
+    const base = quietEvents(buildHome(createInitialState(8)));
+    const won = { ...base, speed: 0 as const, chapter: { id: 1, startDay: 1, result: { chapter: 1, outcome: 'won' as const, day: 30, checks: [] as never[] }, past: [] } };
+    const next = advanceChapter(won as unknown as GameState, applyCommand, 4);
+    expect(next.chapter.id).toBe(2);
+    expect(next.speed).toBe(4);
+    const lost = { ...won, chapter: { ...won.chapter, result: { ...won.chapter.result, outcome: 'failed' as const } } };
+    const again = advanceChapter(lost as unknown as GameState, applyCommand, 2);
+    expect(again.chapter.id).toBe(1);
+    expect(again.chapter.result).toBeNull();
+    expect(again.speed).toBe(2);
   });
 
   it('with autopilot off nothing happens by itself', () => {

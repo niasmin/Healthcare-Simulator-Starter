@@ -237,7 +237,7 @@ export function buildObjectives(state: GameState, summary: SiteSummary = summari
 // ---------------------------------------------------------------------------
 
 /** Which role is the natural owner of each skill (for staffing recommendations). */
-const SKILL_OWNER: Record<Skill, StaffRole> = {
+export const SKILL_OWNER: Record<Skill, StaffRole> = {
   assessment: 'rn',
   vital_signs: 'pn',
   med_round: 'pn',

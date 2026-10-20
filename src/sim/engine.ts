@@ -523,7 +523,7 @@ export function step(state: GameState): GameState {
   }
   s = eventExpiryTick(s);
   // Autopilot (if switched on) answers events and does the routine admin through public commands.
-  s = autopilot(s, applyCommand);
+  s = autopilot(s, applyCommand, state.speed);
   // Home visits are booked appointments, so they claim staff before in-house tasks.
   s = homecareTick(s);
   s = hospitalTick(s);
