@@ -22,6 +22,12 @@ export const EQUIP_SPRITE: Partial<Record<EquipmentId, { name: string; width: nu
   rest_sofa: { name: 'eq_sofa', width: 44 },
   feeding_pump: { name: 'eq_pump', width: 22 },
   suction_unit: { name: 'eq_suction', width: 26 },
+  // Chapter 5–6 rooms (from the rooms & equipment sheet).
+  exam_desk: { name: 'eq_reception', width: 52 },
+  waiting_chairs: { name: 'eq_waiting', width: 46 },
+  vital_monitor: { name: 'eq_exam', width: 26 },
+  training_manikin: { name: 'eq_therapy', width: 44 },
+  whiteboard: { name: 'eq_board', width: 30 },
 };
 
 /** Map-label pill per room type: glyph texture name and pill colour. */
@@ -38,7 +44,7 @@ export const ROOM_BADGE: Record<RoomType, { glyph: string; color: number }> = {
 };
 
 /** Full-body chibi sprite per staff role (from the character sheet). RN and PN share the nurse uniform. */
-export const STAFF_SPRITE: Record<StaffRole, string> = { rn: 'ch_nurse', pn: 'ch_nurse', caregiver: 'ch_caregiver', pt: 'ch_pt', ot: 'ch_ot', doctor: 'ch_owner_m' };
+export const STAFF_SPRITE: Record<StaffRole, string> = { rn: 'ch_nurse', pn: 'ch_nurse', caregiver: 'ch_caregiver', pt: 'ch_pt', ot: 'ch_ot', doctor: 'ch_doctor' };
 /** Map width of a standing character, in world px. */
 export const PERSON_SPRITE_WIDTH = 24;
 

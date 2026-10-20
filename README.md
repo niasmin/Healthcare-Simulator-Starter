@@ -60,7 +60,12 @@ The shop (the floating Shop button on the phone map, 🛒 in the desktop top bar
 
 The sandbox can buy everything from day 1. The scripted player never buys upgrades, so the campaign balance figures are unchanged.
 
-**Art:** the training room, neuro clinic and stroke unit now use isometric room pictures cropped from the play-screen concept art. Branches in the Network tab use the business-card art from the title key art. There is still no doctor portrait: the only doctor figure in the supplied art is too small for a face.
+**Art** (from the characters, rooms and equipment sheet):
+- **Doctor:** the neurologist has their own portrait and map figure, cut from the sheet with OpenCV GrabCut. The sheet has one expression, so all five moods use it.
+- **Rooms:** the ward, villa, therapy room, neuro clinic, stroke unit (the recovery room picture) and training room (the activity room picture) use the sheet's isometric rooms in the build list.
+- **Equipment:** the examination desk, waiting chairs, vital-signs monitor, training manikin and whiteboard get map sprites cut from the sheet's equipment row.
+- **Branches:** the Network tab uses the business-card art from the title key art.
+- **Not used yet:** the pharmacist, nutritionist, receptionist, cleaner and security characters, and rooms such as the pharmacy, dining area, laundry and storage. These roles and rooms don't exist in the game yet.
 
 ### Game modes: campaign, challenge and sandbox
 
@@ -113,7 +118,7 @@ All hospital work is abstract: a consultation, a nursing round and a doctor's ro
 - **Neurologist** (new role; ฿75,000/month + ฿2,500 per year of experience; qualification "consultation").
   - Doctors do only doctors' work, never general care.
   - Two apply when the chapter opens, and from then on one is always in the applicant pool.
-  - The portrait and map figure reuse the man-in-a-suit character until doctor art is supplied.
+  - Portrait and map figure from the characters sheet.
 - **Neuro clinic (OPD)**, unlocks in chapter 6, ready-made 4×3 with 2 examination desks.
   - Bookings: each desk takes 6 appointments a day between 09:00 and 14:10 (only 4 while reputation is below 60). Bookings start the day after a doctor is on the staff.
   - Consultations: a free doctor on shift sees each patient at a free desk, 30 minutes each.
