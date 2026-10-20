@@ -2,7 +2,12 @@ import { applyCommand, step } from '../sim/engine';
 import { createInitialState } from '../sim/state';
 import { reconcile } from '../domain/rules/ledger';
 import { fireEvent } from '../sim/systems/events';
-import { AUTO_CHOICES, BUILD_RESERVE, autoSettings, nextBuild } from '../sim/autopilot';
+import { AUTO_CHOICES, AUTO_KEYS, BUILD_RESERVE, autoSettings, nextBuild } from '../sim/autopilot';
+import { campaignTurn } from '../sim/autoCampaign';
+import { buildSomewhere } from '../sim/autoBuild';
+import { post } from '../sim/helpers';
+import { thb } from '../domain/money';
+import { ticksFor, MAX_AWAY_DAYS } from '../ui/away';
 import { advanceChapter } from '../sim/autoCampaign';
 import { LAND_PLOTS } from '../data/chapters';
 import { newGameState } from '../sim/modes';
@@ -23,7 +28,8 @@ const days = (s: GameState, n: number) => {
 describe('autopilot', () => {
   it('is off by default and is switched with a command', () => {
     const s = createInitialState(8);
-    expect(autoSettings(s)).toEqual({ events: false, admit: false, carePlan: false, staff: false, build: false, chapters: false });
+    expect(Object.values(autoSettings(s)).every((v) => v === false)).toBe(true);
+    expect(Object.keys(autoSettings(s)).sort()).toEqual([...AUTO_KEYS].sort());
     const on = ok(s, { type: 'setAuto', settings: { admit: true } });
     expect(autoSettings(on)).toMatchObject({ admit: true, events: false });
   });
@@ -123,6 +129,58 @@ describe('autopilot', () => {
     expect(again.chapter.id).toBe(1);
     expect(again.chapter.result).toBeNull();
     expect(again.speed).toBe(2);
+  });
+
+  describe('business switches work on their own', () => {
+    const OFF = { chapters: false, build: false, estate: false, homecare: false, training: false, placements: false, branches: false, shop: false };
+    const rich = (chapter: number): GameState => {
+      const s = post(quietEvents(buildHome(createInitialState(8))), thb(5_000_000), 'capital', 'ledger.capital');
+      return { ...s, chapter: { id: chapter, startDay: 1, result: null, past: [] } };
+    };
+
+    it('Home Care opens the centre (from chapter 4 only) and takes clients the vans can serve', () => {
+      expect(campaignTurn(rich(3), applyCommand, { ...OFF, homecare: true }).site.rooms.some((r) => r.type === 'homecare_office')).toBe(false);
+      let s = campaignTurn(rich(4), applyCommand, { ...OFF, homecare: true });
+      expect(s.site.rooms.some((r) => r.type === 'homecare_office')).toBe(true);
+      for (let d = 0; d < 3 && !s.homecare.clients.length; d++) s = campaignTurn(days(s, 1), applyCommand, { ...OFF, homecare: true });
+      expect(s.homecare.clients.length).toBeGreaterThan(0);
+      // Nothing else is touched.
+      expect(s.site.rooms.some((r) => r.type === 'villa' || r.type === 'training_room')).toBe(false);
+    });
+
+    it('training builds the training room and sends someone for a certificate', () => {
+      const s = campaignTurn(rich(5), applyCommand, { ...OFF, training: true });
+      expect(s.site.rooms.some((r) => r.type === 'training_room')).toBe(true);
+      expect(s.workforce.training.length).toBeGreaterThan(0);
+      expect(s.workforce.contracts).toHaveLength(0);
+    });
+
+    it('placements build the training room partners require, then accept their offers with a suitable person', () => {
+      let s = rich(5);
+      for (let d = 0; d < 10 && !s.workforce.contracts.length; d++) s = campaignTurn(days(s, 1), applyCommand, { ...OFF, placements: true });
+      expect(s.workforce.contracts.length).toBeGreaterThan(0);
+      // Partners only make offers to a home with a training room, so it builds one; nobody is sent to class.
+      expect(s.site.rooms.some((r) => r.type === 'training_room')).toBe(true);
+      expect(s.workforce.training).toHaveLength(0);
+    });
+
+    it('the shop buys the cheapest unlocked upgrade with money to spare, and nothing when short', () => {
+      // Not before the home has 30 beds.
+      expect(campaignTurn(rich(1), applyCommand, { ...OFF, shop: true }).upgrades ?? []).toEqual([]);
+      let big = rich(1);
+      for (let i = 0; i < 2; i++) big = buildSomewhere(big, applyCommand, 'ward10')!.state;
+      const s = campaignTurn(big, applyCommand, { ...OFF, shop: true });
+      expect(s.upgrades).toEqual(['online_marketing']);
+      const base = quietEvents(buildHome(createInitialState(8)));
+      const poor = campaignTurn({ ...base, organization: { ...base.organization, cashSatang: thb(200_000) } }, applyCommand, { ...OFF, shop: true });
+      expect(poor.upgrades ?? []).toEqual([]);
+    });
+  });
+
+  it('time away is played out at the speed the game ran at, capped at 30 game days', () => {
+    expect(ticksFor(60_000, 1, 500)).toBe(120);
+    expect(ticksFor(60_000, 4, 500)).toBe(480);
+    expect(ticksFor(24 * 3_600_000, 4, 500)).toBe(MAX_AWAY_DAYS * 144);
   });
 
   it('with autopilot off nothing happens by itself', () => {

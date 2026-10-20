@@ -1,5 +1,5 @@
 import { ShopModal } from './components/ShopModal';
-import { AutoModal } from './components/AutoModal';
+import { AutoModal, AwayProgress, AwayReportModal } from './components/AutoModal';
 import { useEffect } from 'react';
 import { SaveModal } from './components/SaveModal';
 import { ChaptersModal } from './components/ChaptersModal';
@@ -50,6 +50,8 @@ export function App() {
       {chaptersOpen && <ChaptersModal onClose={() => setChaptersOpen(false)} />}
       {shopOpen && <ShopModal onClose={() => useGame.getState().setShopOpen(false)} />}
       {autoOpen && <AutoModal onClose={() => useGame.getState().setAutoOpen(false)} />}
+      <AwayProgress />
+      <AwayReportModal />
     </>
   );
 

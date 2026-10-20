@@ -595,6 +595,13 @@ export interface AutoSettings {
   build?: boolean;
   /** Play every chapter: its goals, then straight on to the next (or again after a loss). */
   chapters?: boolean;
+  /** Business helpers that can run on their own (all are covered by `chapters`). */
+  estate?: boolean;
+  homecare?: boolean;
+  training?: boolean;
+  placements?: boolean;
+  branches?: boolean;
+  shop?: boolean;
 }
 
 export interface GameState {
