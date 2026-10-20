@@ -199,6 +199,7 @@ export function TutorialCard({ compact = false }: { compact?: boolean }) {
   const idx = goals.findIndex((g) => !g.done);
   const goal = idx >= 0 ? goals[idx] : null;
   const doneCount = goals.filter((g) => g.done).length;
+  const sandbox = useGame((s) => s.game.mode === 'sandbox');
 
   if (!goal && next && !hidden)
     return (
@@ -219,7 +220,7 @@ export function TutorialCard({ compact = false }: { compact?: boolean }) {
         onClick={() => setHidden(!goal)}
         className="pointer-events-auto rounded-xl bg-white/95 border border-line px-3 py-1.5 text-xs font-semibold shadow tabular"
       >
-        📘 {goal ? t('tut.open', { n: doneCount, total: goals.length }) : t('tut.all_done')}
+        📘 {goal ? t('tut.open', { n: doneCount, total: goals.length }) : sandbox ? t('mode.sandbox_card') : t('tut.all_done')}
       </button>
     );
   }
@@ -276,7 +277,8 @@ export function MissionCard() {
   const idx = goals.findIndex((g) => !g.done);
   const goal = idx >= 0 ? goals[idx] : null;
   const doneCount = goals.filter((g) => g.done).length;
-  const title = goal ? t(goal.key, goal.params) : next ? t('tut.chapter_done', { c: chapter }) : t('tut.all_done');
+  const sandbox = useGame((s) => s.game.mode === 'sandbox');
+  const title = sandbox ? t('mode.sandbox_card') : goal ? t(goal.key, goal.params) : next ? t('tut.chapter_done', { c: chapter }) : t('tut.all_done');
   return (
     <section className="pointer-events-auto rounded-2xl bg-white/97 shadow-lg border border-white" aria-label={t('tut.header', { c: chapter, n: Math.max(1, idx + 1), total: goals.length })}>
       <div className="flex items-center gap-2 pl-2 pr-1 py-1.5">
@@ -284,7 +286,7 @@ export function MissionCard() {
           <img src={clipIcon} alt="" className="h-10" />
         </button>
         <button type="button" onClick={() => setOpen(!open)} className="min-w-0 flex-1 text-left" aria-expanded={open}>
-          <span className="block text-[11px] text-ink-soft tabular">{t('tut.header', { c: chapter, n: goal ? idx + 1 : goals.length, total: goals.length })}</span>
+          <span className="block text-[11px] text-ink-soft tabular">{sandbox ? t('home.mode_sandbox') : t('tut.header', { c: chapter, n: goal ? idx + 1 : goals.length, total: goals.length })}</span>
           <span className={`block text-sm font-bold leading-snug ${open ? '' : 'truncate'}`}>
             {title}
             {goal?.progress && (

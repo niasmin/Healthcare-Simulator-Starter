@@ -104,6 +104,8 @@ function chapterStep(state: GameState, def: ChapterDef): Objective {
  * the tutorial always matches the game: the current step is the first one not done.
  */
 export function buildObjectives(state: GameState, summary: SiteSummary = summarize(state)): Objective[] {
+  // Sandbox games have no story steps.
+  if (state.mode === 'sandbox') return [];
   const def = chapterDef(state.chapter.id);
   const hasResidents = state.residents.length > 0;
   const rosterReady = hasResidents && rosterView(state).slots.every((s) => s.ready && s.staffCount > 0);

@@ -121,7 +121,8 @@ export function chapterChecks(state: GameState, def: ChapterDef = chapterDef(sta
 
 /** Runs at each midnight after the day is closed. `closingDay` is the day that just ended. */
 export function judgeChapter(state: GameState, closingDay: number): GameState {
-  if (state.chapter.result) return state;
+  // Sandbox games are free play: never judged.
+  if (state.chapter.result || state.mode === 'sandbox') return state;
   const chapter = state.chapter.id;
   let result: ChapterResult | null = null;
   if (state.organization.cashSatang < 0) {
@@ -140,6 +141,8 @@ export function judgeChapter(state: GameState, closingDay: number): GameState {
 /** The chapter after a won one, if it is playable in this version. */
 export function nextChapterAvailable(state: GameState): number | null {
   const { result, id } = state.chapter;
+  // A challenge is a single chapter: winning it ends the challenge.
+  if (state.mode === 'challenge') return null;
   return result?.outcome === 'won' && id < CHAPTERS.length ? id + 1 : null;
 }
 

@@ -11,6 +11,8 @@ import { useGame } from "../store";
 import { SaveModal } from "./SaveModal";
 import type { GameTemplate } from "../../sim/templates";
 import { ROADMAP_CHAPTERS } from "../../data/chapters";
+import { CHALLENGES, CHALLENGE_ORDER } from "../../sim/modes";
+import type { ChallengeId, GameMode } from "../../domain/types";
 
 const icons = import.meta.glob("../../assets/title/ic_*.png", {
   eager: true,
@@ -146,6 +148,32 @@ function Pill({ children }: { children: ReactNode }) {
   );
 }
 
+/** Campaign / challenge / sandbox: picks what New Game starts. */
+function ModeTabs({ mode, onChange, compact = false }: { mode: GameMode; onChange: (m: GameMode) => void; compact?: boolean }) {
+  const t = useT();
+  const tabs: Array<[GameMode, string, string]> = [
+    ["campaign", "🏠", "home.mode_normal"],
+    ["challenge", "📊", "home.mode_challenge"],
+    ["sandbox", "⚙️", "home.mode_sandbox"],
+  ];
+  return (
+    <div className={`w-full rounded-2xl bg-[#14365f]/85 border border-white/30 p-1 grid grid-cols-3 gap-1 ${compact ? "" : "max-w-4xl mx-auto"}`} role="tablist" aria-label={t("home.modes")}>
+      {tabs.map(([m, icon, key]) => (
+        <button
+          key={m}
+          type="button"
+          role="tab"
+          aria-selected={mode === m}
+          onClick={() => onChange(m)}
+          className={`rounded-xl px-1 ${compact ? "py-1 text-[12px]" : "py-1.5 text-xs sm:text-sm"} leading-tight whitespace-nowrap ${mode === m ? "bg-white text-[#14365f] font-bold" : "text-white/85 hover:bg-white/10"}`}
+        >
+          {icon} {t(key)}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function Modal({
   title,
   onClose,
@@ -206,6 +234,7 @@ export function TitleScreen() {
   const [loadOpen, setLoadOpen] = useState(false);
   const [panel, setPanel] = useState<Panel>(null);
   const portrait = usePortrait();
+  const [mode, setMode] = useState<GameMode>("campaign");
 
   useEffect(() => {
     let alive = true;
@@ -218,8 +247,8 @@ export function TitleScreen() {
     };
   }, [version]);
 
-  const begin = (template: GameTemplate) => {
-    newGame(template);
+  const begin = (template: GameTemplate, challenge?: ChallengeId) => {
+    newGame(template, mode, challenge);
     setStarted(true);
   };
   const resume = async () => {
@@ -394,46 +423,7 @@ export function TitleScreen() {
               </button>
             </div>
 
-            <div
-              className="rounded-2xl bg-[#14365f]/85 border border-white/30 p-1 grid grid-cols-3 gap-1"
-              role="tablist"
-              aria-label={t("home.modes")}
-            >
-              <button
-                type="button"
-                role="tab"
-                aria-selected
-                className="rounded-xl bg-white text-[#14365f] px-1 py-1 leading-tight"
-              >
-                <span className="block text-[12px] font-bold">
-                  🏠 {t("home.mode_normal")}
-                </span>
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={false}
-                disabled
-                title={t("home.soon")}
-                className="rounded-xl px-1 py-1 text-white/75 leading-tight"
-              >
-                <span className="block text-[12px]">
-                  {t("home.mode_challenge")} 🔒
-                </span>
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={false}
-                disabled
-                title={t("home.soon")}
-                className="rounded-xl px-1 py-1 text-white/75 leading-tight"
-              >
-                <span className="block text-[12px]">
-                  {t("home.mode_sandbox")} 🔒
-                </span>
-              </button>
-            </div>
+            <ModeTabs mode={mode} onChange={setMode} compact />
 
             <div
               className="flex gap-1.5 overflow-x-auto -mx-2.5 px-2.5 snap-x"
@@ -653,40 +643,7 @@ export function TitleScreen() {
             </div>
 
             {/* Modes */}
-            <div
-              className="w-full max-w-4xl mx-auto rounded-2xl bg-[#14365f]/80 border border-white/30 p-1 flex gap-1 overflow-x-auto"
-              role="tablist"
-              aria-label={t("home.modes")}
-            >
-              <button
-                type="button"
-                role="tab"
-                aria-selected
-                className="flex-1 min-w-0 rounded-xl bg-white text-[#14365f] px-1.5 sm:px-4 py-1.5 text-xs sm:text-sm font-bold whitespace-nowrap"
-              >
-                🏠 {t("home.mode_normal")}
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={false}
-                disabled
-                title={t("home.soon")}
-                className="flex-1 min-w-0 rounded-xl px-1.5 sm:px-4 py-1.5 text-xs sm:text-sm text-white/75 whitespace-nowrap"
-              >
-                📊 {t("home.mode_challenge")} 🔒
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={false}
-                disabled
-                title={t("home.soon")}
-                className="flex-1 min-w-0 rounded-xl px-1.5 sm:px-4 py-1.5 text-xs sm:text-sm text-white/75 whitespace-nowrap"
-              >
-                ⚙️ {t("home.mode_sandbox")} 🔒
-              </button>
-            </div>
+            <ModeTabs mode={mode} onChange={setMode} />
 
             {/* Businesses */}
             <div
@@ -735,28 +692,49 @@ export function TitleScreen() {
       )}
 
       {panel === "new" && (
-        <Modal title={t("title.new")} onClose={() => setPanel(null)}>
-          <button
-            type="button"
-            autoFocus
-            onClick={() => begin("starter")}
-            className="rounded-xl bg-coral text-white p-3 text-left shadow hover:brightness-110"
-          >
-            <span className="block font-bold">🏥 {t("title.tpl_starter")}</span>
-            <span className="block text-xs text-white/90 mt-0.5 leading-snug">
-              {t("title.tpl_starter_sub")}
-            </span>
-          </button>
-          <button
-            type="button"
-            onClick={() => begin("empty")}
-            className="rounded-xl bg-white border border-line p-3 text-left hover:border-teal"
-          >
-            <span className="block font-bold">🌱 {t("title.tpl_empty")}</span>
-            <span className="block text-xs text-ink-soft mt-0.5 leading-snug">
-              {t("title.tpl_empty_sub")}
-            </span>
-          </button>
+        <Modal title={t(`mode.new.${mode}`)} onClose={() => setPanel(null)}>
+          <p className="text-xs text-ink-soft leading-relaxed">{t(`mode.desc.${mode}`)}</p>
+          {mode === "challenge" ? (
+            CHALLENGE_ORDER.map((id, i) => (
+              <button
+                key={id}
+                type="button"
+                autoFocus={i === 0}
+                onClick={() => begin("starter", id)}
+                className="rounded-xl bg-white border border-line p-3 text-left hover:border-teal"
+              >
+                <span className="block font-bold">
+                  {t(`challenge.${id}.title`)}{" "}
+                  <span className="text-[11px] font-semibold text-ink-soft">· {t("challenge.chapter", { c: CHALLENGES[id].chapter })}</span>
+                </span>
+                <span className="block text-xs text-ink-soft mt-0.5 leading-snug">{t(`challenge.${id}.desc`)}</span>
+              </button>
+            ))
+          ) : (
+            <>
+            <button
+              type="button"
+              autoFocus
+              onClick={() => begin("starter")}
+              className="rounded-xl bg-coral text-white p-3 text-left shadow hover:brightness-110"
+            >
+              <span className="block font-bold">🏥 {t("title.tpl_starter")}</span>
+              <span className="block text-xs text-white/90 mt-0.5 leading-snug">
+                {t("title.tpl_starter_sub")}
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => begin("empty")}
+              className="rounded-xl bg-white border border-line p-3 text-left hover:border-teal"
+            >
+              <span className="block font-bold">🌱 {t("title.tpl_empty")}</span>
+              <span className="block text-xs text-ink-soft mt-0.5 leading-snug">
+                {t("title.tpl_empty_sub")}
+              </span>
+            </button>
+            </>
+          )}
           {meta && <p className="text-xs text-warn">{t("home.new_warning")}</p>}
         </Modal>
       )}

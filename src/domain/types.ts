@@ -573,8 +573,15 @@ export interface ChapterState {
   past: ChapterResult[];
 }
 
+/** campaign = the 7-chapter story; sandbox = free play, everything unlocked, no verdicts; challenge = one judged scenario. */
+export type GameMode = 'campaign' | 'sandbox' | 'challenge';
+export type ChallengeId = 'tight_budget' | 'bad_name' | 'big_start';
+
 export interface GameState {
   schemaVersion: 10;
+  /** Missing in saves made before modes existed: those are campaign games. */
+  mode?: GameMode;
+  challenge?: ChallengeId;
   seed: number;
   /** Current PRNG state (mulberry32). Advancing the RNG updates this. */
   rngState: number;

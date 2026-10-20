@@ -13,6 +13,8 @@ export function ChapterResultModal() {
   const startDay = useGame((s) => s.game.chapter.startDay);
   const seen = useGame((s) => s.chapterSeen);
   const setSeen = useGame((s) => s.setChapterSeen);
+  const mode = useGame((s) => s.game.mode);
+  const challenge = useGame((s) => s.game.challenge);
   if (!result || seen) return null;
   const won = result.outcome === 'won';
   const c = result.chapter;
@@ -20,7 +22,7 @@ export function ChapterResultModal() {
   const name = t(`chapters.c${c}.title`);
   const restart = () => {
     const st = useGame.getState();
-    st.newGame();
+    st.newGame('starter', mode, challenge);
     st.setStarted(true);
   };
   const startNext = () => {
@@ -40,7 +42,9 @@ export function ChapterResultModal() {
           </h2>
           <p className="text-sm text-white/90 mt-1 leading-relaxed">
             {won
-              ? `${t(`chapter.won.body${c}`, { n })} ${next ? t('chapter.won.next', { c: next, name: t(`chapters.c${next}.title`) }) : t(c >= ROADMAP_CHAPTERS ? 'chapter.won.final' : 'chapter.won.later')}`
+              ? challenge
+                ? t('challenge.won', { name: t(`challenge.${challenge}.title`) })
+                : `${t(`chapter.won.body${c}`, { n })} ${next ? t('chapter.won.next', { c: next, name: t(`chapters.c${next}.title`) }) : t(c >= ROADMAP_CHAPTERS ? 'chapter.won.final' : 'chapter.won.later')}`
               : t(`chapter.failed.${result.reason}`, { day: result.day, n })}
           </p>
         </div>

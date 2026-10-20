@@ -45,6 +45,23 @@ Playable today, as one 390-day campaign with the same business:
 
 After chapter 7 the game continues as a sandbox.
 
+### Game modes: campaign, challenge and sandbox
+
+The mode tabs on the title screen now work, and New Game starts the chosen mode. Every mode uses the same engine and rules; only the opening differs.
+
+- **Campaign:** the 7-chapter story from Chapter 1, as before. Older saves count as campaign games.
+- **Sandbox:** free play with ฿50,000,000 (booked as capital, so the ledger still reconciles) and every room and service unlocked from day 1. There are no tutorial steps and no verdicts, and two neurologists are among the applicants. Residents still need good care: reputation, turnover and refunds work as normal.
+- **Challenge:** one chapter, judged as usual, under harder opening conditions. Winning ends the challenge, so there is no follow-on chapter, and "play again" restarts the same challenge.
+
+  | Challenge | Judged as | Opening |
+  |---|---|---|
+  | 💸 Tight budget | Chapter 1 | ฿1,150,000 instead of ฿2,000,000 |
+  | 📰 Rebuild the name | Chapter 1 | Reputation 18: few enquiries, and waiting families drift away until care wins trust back |
+  | 🏗 Big from day one | Chapter 2 | ฿4,000,000; the programme candidates are on the waiting list from the start |
+
+  The scripted careful player wins each challenge on 3 seeds. Tight budget is genuinely tight (lowest cash about ฿37k–46k).
+- The shop is still locked.
+
 ### Phase 6, part 3: Chapter 7 (Healthcare Empire, the branch network)
 
 - **Branches** are run from headquarters at portfolio level (capacity, occupancy, quality), not as separate maps. A new **Network** tab is the multi-site dashboard. All figures are fictional.
@@ -439,7 +456,7 @@ src/
   - Food, supplies, upkeep and payroll are each charged once per day.
   - An event's cost is charged once, and a resolved event can't be resolved again.
 
-## Tests (175 passing)
+## Tests (181 passing)
 
 | File | Covers |
 |---|---|
@@ -455,6 +472,7 @@ src/
 | `decor.test.ts` | Decor placed on an empty tile and charged once; can't overlap rooms, corridor, entrance or decor, and blocks building over it; demolish refunds half; appeal is capped and makes residents happier; schema-3 saves migrate to schema 4 |
 | `chapter.test.ts` | **30-day playthrough** by a scripted sensible player using only public commands and the real applicant and waiting-list pools: wins chapter 1 with cash positive every day; every invariant holds (ledger, unique beds, no overlapping shifts, no care without the skill); roster ready and >95% of tasks done; the three scripted events fire on their days; the same seed plays byte-identically; the verdict pauses the game and survives a save. **Balance:** a full home wins on more seeds, a 40% empty home and an overstaffed home fail on targets. **Verdict rules:** bankrupt at the first negative midnight, decided once and never changed; nothing decided before day 30; a migrated save past day 30 is judged at the next midnight. **Tutorial:** step order, derived from state, a goal and a how-to hint in Thai and English for every step. **Staffing advice:** rush-hour windows, RN covering PN work, one OT for ten sessions |
 | `chapter2.test.ts` | **90-day campaign** by the scripted player: wins Chapter 1, starts Chapter 2 on day 31 and wins it on day 90 with every target; dementia residents only in secured wards; airway care only by RNs and tube feeding only by RNs/PNs; an RN on the night roster; >93% of tasks done; byte-identical rerun; a reckless builder's lowest cash falls far below the careful one, with at least one bankruptcy; a second full team fails the chapter. **Rules:** the next chapter only after a win, with one candidate per programme; secured-ward admission; RN-only airway care missed with only a PN on nights; programme fees; schema-5 migration; Thai and English text for every Chapter 2 step |
+| `modes.test.ts` | Campaign games are unchanged; sandbox books ฿50M as capital, unlocks every room, has no tutorial steps and is never judged after 70 days; each challenge opens with its own cash, reputation or chapter; each challenge is won by the scripted player and ends without a next chapter |
 | `chapter7.test.ts` | **Full 390-day campaign:** all 7 chapters won on schedule and solvent, ledger reconciles; one branch of each kind, each manager of the right role and off the roster; branch invoices exact; network occupancy ≥ 70%. **Opening:** locked before chapter 7; manager role checked; full opening cost charged; managers can’t take shifts or a second branch; cap of 5. **Running:** good branches fill and bill daily, poor ones empty, a poor name at headquarters stops growth; certificates raise the quality target; a lost manager leaves the branch leaderless until one is appointed; support visits lift quality, cost money and have a cooldown; closing refunds 30% and frees the manager; busy clinic branches refer to the stroke unit. Guide order; v9→v10 migration |
 | `chapter6.test.ts` | **Full 330-day campaign:** chapters 1–6 all won on schedule and solvent, ledger reconciles; OPD and IPD invoices are exact; inpatients only in unique stroke-unit beds, which don’t count as home beds; doctors only do doctors’ work. **Clinic:** locked before chapter 6; 6 bookings per desk from the next day and only with a doctor (4 below reputation 60); one doctor with two desks sees some patients and the rest leave; never more consultations at once than desks. **Stroke unit:** admission plans every round; full beds refuse; staffed stays go home as planned and bill their days, unstaffed ones end complicated; unserved referrals cost reputation. Guide order; v8→v9 migration |
 | `chapter5.test.ts` | **Full 270-day campaign:** chapters 1–5 all won on schedule and solvent, ledger reconciles, at least 6 certified staff, b2b invoices are quantity × rate, and placed staff hold no shifts. **Training:** needs a room, the right role and a free seat; the cost is charged; class is taken in the shift, in the room; passing adds the certificate and qualification; staff without shifts attend 08:00–16:00. **Placements:** role and certificate checks; placed staff leave the roster and can’t get shifts or courses; 07:00–15:00 away, billed per day, released at the end; ending early or dismissal costs reputation; requests only from chapter 5 with a room, and they expire. Guide order; v7→v8 save migration |
@@ -496,8 +514,9 @@ A browser playtest (Playwright, run outside the repo) drove the production build
 ## Known limitations
 
 - On-screen pointers (the coral ring and suggested tiles) cover Chapter 1; later chapters guide with text and the "Show me" button.
-- All 7 chapters are playable. After the Chapter 7 verdict the game continues as a sandbox. Challenge and sandbox modes and the shop on the title screen are still locked.
+- All 7 chapters are playable. After the Chapter 7 verdict the game continues as free play. The shop on the title screen is still locked.
 - Branches are portfolio-level numbers, not separate maps you can build on.
+- On a cash-poor seed (seed 5), the careful scripted player builds villas too late in chapter 3 and misses the premium target (3 of 4). Building villas earlier or keeping a spare one made other seeds go bankrupt in chapter 4, so the bot is unchanged; a human player can take that risk.
 - Daycare (the second half of the concept art's Chapter 4) isn't modelled yet. Home visits have no travel map; travel is folded into the 100-minute visit.
 - The bought lot is 32×20. Multi-site work (Phase 6) will add separate sites.
 - Chapter 2 is easy on profit once the home is full; its real challenge is cash flow during expansion. Later chapters should add new cost pressure.
