@@ -72,6 +72,9 @@ interface UIStore {
   /** Keep an autopilot game running while the player is away (remembered per browser). */
   awayPlay: boolean;
   setAwayPlay: (v: boolean) => void;
+  /** Alerts for low cash and decisions waiting (remembered per browser). */
+  alertsOn: boolean;
+  setAlertsOn: (v: boolean) => void;
   /** Catch-up in progress, in ticks. */
   away: { done: number; total: number } | null;
   awayReport: AwayReport | null;
@@ -95,12 +98,17 @@ function initialLang(): Lang {
   return 'th';
 }
 
-function initialAwayPlay(): boolean {
+/** A per-browser on/off preference that defaults to on. */
+function initialFlag(key: string): boolean {
   try {
-    return localStorage.getItem('he.away') !== '0';
+    return localStorage.getItem(key) !== '0';
   } catch {
     return true;
   }
+}
+
+function initialAwayPlay(): boolean {
+  return initialFlag('he.away');
 }
 
 function initialTutorialHidden(): boolean {
@@ -142,6 +150,15 @@ export const useGame = create<UIStore>((set, get) => ({
       /* storage unavailable */
     }
     set({ awayPlay });
+  },
+  alertsOn: initialFlag('he.alerts'),
+  setAlertsOn: (alertsOn) => {
+    try {
+      localStorage.setItem('he.alerts', alertsOn ? '1' : '0');
+    } catch {
+      /* storage unavailable */
+    }
+    set({ alertsOn });
   },
   away: null,
   awayReport: null,

@@ -89,24 +89,33 @@ Support staff only do their own skill, and they never count as the "narrowest" c
 
 ### Autopilot: let the home run itself
 
-The 🤖 Autopilot button (top bar; a floating button on the phone map) opens twelve switches in four groups. Everything they do goes through the same public commands a player uses, so every rule and invariant still holds. All are off by default, and the scripted player never uses them.
+The 🤖 Autopilot button (top bar; a floating button on the phone map) opens fifteen switches in four groups, plus two settings for when you are away. Everything they do goes through the same public commands a player uses, so every rule and invariant still holds. All are off by default, and the scripted player never uses them.
 
 | Group | Switch | What it does |
 |---|---|---|
 | Daily running | Answer events and staff requests | Answers each event at once without pausing, using the first possible choice from a preference list: accept a staff pay request (the raise), the standard family visit, an urgent RN assessment, referrals for the beds you have |
 | | Admit residents | Every game hour, fills each fitting free bed from the waiting list (urgent referrals first, then a chapter programme nobody is in yet), plus stroke-unit referrals |
 | | Write care plans | Every resident without a care plan gets one (needs an RN on the staff) |
+| | Look after tired or unhappy staff | Every morning at 05:00, anyone on a double shift with energy under 30 or morale under 50 gets the second shift off (the hire switch finds cover). A home without a staff room gets one |
 | | Hire as needed and roster | Fills each gap in the roster advice with someone who has no shift yet, or hires an applicant. This covers a missing RN or skill on a shift too. It never hires into debt, never dismisses anyone, and never rosters staff held for training or placements |
 | Growth | Build ready-made rooms | At most one room a day, at 08:00:<br>• a missing basic room (ward, nursing station, staff room, therapy);<br>• another 10-bed ward when every bed is taken and 3+ families wait;<br>• a villa for waiting premium families;<br>• by chapter: the specialised ward fittings, 30 beds and the RN team (ch. 2), the clinic and stroke unit (ch. 6).<br>Rooms go next to an existing corridor, as near the entrance as they fit and open, and only while running costs plus a reserve stay in the bank |
+| | Garden and decor from chapter 1 | Up to 3 garden items a turn around the wards (never next to a corridor, so room spots stay free) until appeal reaches 30, keeping a ฿300,000 reserve |
+| | Price to demand | Every morning at 06:00, it picks a price level:<br>• **value** while over 25% of beds are free (more enquiries);<br>• **premium** when the home is full, 6+ families wait, satisfaction is 75+ and reputation 60+, and the chapter's resident and programme targets are met (premium cuts enquiries);<br>• **standard** otherwise.<br>Bills already issued keep their price |
 | | Land, villas and garden | From chapter 3: villas and a garden up to full appeal. When the lot is full it buys the next plot and runs a corridor into it |
 | | Buy shop upgrades | Buys the cheapest unlocked upgrade once the home has 30 beds, while 30 days of running costs plus a ฿500,000 reserve stay in the bank (growth first: upgrades bought early starved the chapter 2 expansion) |
 | Business lines | Home Care | From chapter 4: the Home Care centre, a van for every four clients, and new clients the vans can serve |
 | | Send staff to training | From chapter 5: the training room, certificates up to the chapter target, and people prepared for placements that need a certificate |
 | | Place staff with partners | From chapter 5: accepts offers from factories, clinics and partner organisations with a suitable person, soonest expiry first, at most 4 contracts at once. It builds the training room partners require |
 | | Run branches | Chapter 7: one branch of each kind with a newly hired manager, replacement managers, and support visits when a branch drops below 72 quality |
-| Campaign | Play every chapter | Does all the growth and business work above as each chapter needs it. A won chapter leads straight into the next at the same speed; a failed one is played again |
+| Campaign | Play every chapter | Switches on every growth, business and staff-care helper with it (shown as covered in the window) and works through each chapter. A won chapter leads straight into the next at the same speed; a failed one is played again |
 
 The autopilot never dismisses anyone.
+
+**Alert me about important things** (a setting, on by default):
+- Fires when cash covers less than 14 days of running costs, or the game pauses for a decision.
+- On screen, low cash shows a toast; a pause already shows its own card.
+- In another tab, it marks the tab title and sends a browser notification if allowed.
+- Each alert fires once when its condition starts.
 
 **While you are away** (a setting in the same window, on by default, remembered per browser):
 - With at least one switch on, time spent away is played out at the speed the game was running when you come back. That covers another tab, a sleeping screen, or a closed game reopened with Continue.
@@ -123,9 +132,13 @@ Results:
   - Seed 8 loses chapter 2 once, plays it again and wins chapters 2–6.
   - Cash stays positive throughout and the ledger reconciles on every seed.
   - No single tick takes more than about 40 ms.
-- **Every switch on (shop included), 390 days with no input:**
-  - Seeds 1 and 3 win all seven chapters and buy all six upgrades.
-  - Seed 8 replays chapter 2 once, then wins through chapter 6.
+- **The four daily switches plus "Play every chapter", 390 days with no input:**
+  - Seeds 1, 3 and 8 all win all seven chapters on schedule.
+  - They buy all six upgrades and reach full garden appeal and reputation 100.
+  - The ledger reconciles on every seed.
+  - Two fixes got there:
+    - Chapter 2's specialised fittings go into another ward while a programme still has nobody and no fitted bed is free.
+    - The land purchase counts as the day's spend, so a room waits until the money is back. Before that fix, seed 8 went bankrupt on day 151.
 
 ### More land
 
@@ -551,7 +564,7 @@ src/
   - Food, supplies, upkeep and payroll are each charged once per day.
   - An event's cost is charged once, and a resolved event can't be resolved again.
 
-## Tests (214 passing)
+## Tests (218 passing)
 
 | File | Covers |
 |---|---|
@@ -568,7 +581,7 @@ src/
 | `chapter.test.ts` | **30-day playthrough** by a scripted sensible player using only public commands and the real applicant and waiting-list pools: wins chapter 1 with cash positive every day; every invariant holds (ledger, unique beds, no overlapping shifts, no care without the skill); roster ready and >95% of tasks done; the three scripted events fire on their days; the same seed plays byte-identically; the verdict pauses the game and survives a save. **Balance:** a full home wins on more seeds, a 40% empty home and an overstaffed home fail on targets. **Verdict rules:** bankrupt at the first negative midnight, decided once and never changed; nothing decided before day 30; a migrated save past day 30 is judged at the next midnight. **Tutorial:** step order, derived from state, a goal and a how-to hint in Thai and English for every step. **Staffing advice:** rush-hour windows, RN covering PN work, one OT for ten sessions |
 | `chapter2.test.ts` | **90-day campaign** by the scripted player: wins Chapter 1, starts Chapter 2 on day 31 and wins it on day 90 with every target; dementia residents only in secured wards; airway care only by RNs and tube feeding only by RNs/PNs; an RN on the night roster; >93% of tasks done; byte-identical rerun; a reckless builder's lowest cash falls far below the careful one, with at least one bankruptcy; a second full team fails the chapter. **Rules:** the next chapter only after a win, with one candidate per programme; secured-ward admission; RN-only airway care missed with only a PN on nights; programme fees; schema-5 migration; Thai and English text for every Chapter 2 step |
 | `support.test.ts` | Support applicants appear only once their room exists; pharmacy supply cut; dining meal bonuses; nutritionist and cleaner daily lift; laundry upkeep cut; a receptionist adds an enquiry and a security guard lifts satisfaction; the storage room cuts supplies on top of the pharmacy; the bath & hygiene room shortens personal care; pharmacists take med rounds and nutritionists meals, with no missed meals; support rooms are optional |
-| `autopilot.test.ts` | Off by default and switched by command; with all switches on, a built home runs 30 days on its own (8+ residents, every one with a plan, an RN hired, >90% of care done, cash positive, ledger and unique beds intact); from the starter campus it builds every basic room, staffs and fills the home and wins chapter 1 solvent; it builds only what is missing or needed and never without money to spare; "play every chapter" wins chapters 1–3 back to back unattended and carries straight on into chapter 4; after a verdict it starts the next chapter on a win or replays on a loss, at the speed before; Home Care, training, placements and the shop each work on their own (from their chapter, touching nothing else, and the shop never buys when short); time away is played out at the game's speed, capped at 30 days; events answered at once without pausing, accepting the staff request; nothing happens with it off |
+| `autopilot.test.ts` | Off by default and switched by command; with all switches on, a built home runs 30 days on its own (8+ residents, every one with a plan, an RN hired, >90% of care done, cash positive, ledger and unique beds intact); from the starter campus it builds every basic room, staffs and fills the home and wins chapter 1 solvent; it builds only what is missing or needed and never without money to spare; "play every chapter" wins chapters 1–3 back to back unattended and carries straight on into chapter 4; after a verdict it starts the next chapter on a win or replays on a loss, at the speed before; Home Care, training, placements and the shop each work on their own (from their chapter, touching nothing else, and the shop never buys when short); time away is played out at the game's speed, capped at 30 days; pricing picks value, premium or standard by demand; staff care gives a tired person their second shift off and builds a staff room; the garden switch plants up to full appeal away from corridors; alerts fire for low cash and for a paused game; events answered at once without pausing, accepting the staff request; nothing happens with it off |
 | `land.test.ts` | Three plots sold in order for their prices, each from its chapter, keeping every room and corridor tile; then already done; locked by chapter and by cash; a room can be built on the newest plot; the autopilot's land purchase runs a corridor into the new plot so a villa can open there |
 | `shop.test.ts` | Upgrades are bought once, for their price, from their chapter (all at once in the sandbox); the central kitchen and laundry cut food and supplies by their percentages; staff welfare adds morale; online marketing adds an enquiry; the family app lifts reputation while residents are content; the smart call system keeps late routine care pending 30 minutes longer |
 | `modes.test.ts` | Campaign games are unchanged; sandbox books ฿50M as capital, unlocks every room, has no tutorial steps and is never judged after 70 days; each challenge opens with its own cash, reputation or chapter; each challenge is won by the scripted player and ends without a next chapter |

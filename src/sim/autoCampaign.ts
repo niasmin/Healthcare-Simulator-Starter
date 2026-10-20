@@ -10,6 +10,7 @@ import { cellIndex } from '../domain/grid';
 import type { AutoSettings, BranchKind, CourseId, DecorType, GameState, StaffRole } from '../domain/types';
 import { UPGRADES, UPGRADE_ORDER, hasUpgrade } from '../data/shop';
 import { buildSomewhere, tryCmd, type Apply } from './autoBuild';
+import { freeBeds } from '../domain/rules/beds';
 import { log } from './helpers';
 import { dailyRunningCost, nextBillingDay, summarize } from './selectors';
 import { certifiedCount, isCertified, placementBlocker, trainingBlocker, trainingSeats } from './systems/workforce';
@@ -56,7 +57,8 @@ function build(s: GameState, apply: Apply, prefab: string): GameState {
   const built = buildSomewhere(s, apply, prefab);
   if (built) return log(built.state, 'good', 'auto.log.build', { prefab });
   const grown = buyLand(s, apply);
-  if (grown === s) return s;
+  // The land itself is the spend for today: the room waits until the money is there again.
+  if (grown === s || !affords(grown, prefabCost(def))) return grown;
   const again = buildSomewhere(grown, apply, prefab);
   return again ? log(again.state, 'good', 'auto.log.build', { prefab }) : grown;
 }
@@ -90,15 +92,22 @@ export function buyLand(s: GameState, apply: Apply): GameState {
   return log(laid, 'good', 'auto.log.land');
 }
 
-/** Chapter 2: the specialised fittings in one ward, more beds to the target, and the RN team. */
+/**
+ * Chapter 2: the specialised fittings in a ward, more beds to the target, and the RN team. While a
+ * programme still has nobody and no fitted bed is free, one more ward is fitted a turn: a home that
+ * is already full when the chapter starts would otherwise never open a fitted bed.
+ */
 function nursingCentre(s: GameState, apply: Apply): GameState {
   const def = chapterDef(s.chapter.id);
+  const fittedWard = (r: GameState['site']['rooms'][number]) => PROGRAMME_EQUIPMENT.every((k) => (r.equipment[k] ?? 0) > 0);
   const wards = s.site.rooms.filter((r) => r.type === 'ward');
-  if (!wards.some((r) => PROGRAMME_EQUIPMENT.every((k) => (r.equipment[k] ?? 0) > 0))) {
-    const ward = wards[wards.length - 1];
-    const cost = PROGRAMME_EQUIPMENT.reduce((a, k) => a + EQUIPMENT[k].costSatang, 0);
-    if (ward && affords(s, cost)) for (const k of PROGRAMME_EQUIPMENT) if (!(ward.equipment[k] ?? 0)) [s] = tryCmd(s, apply, { type: 'installEquipment', roomId: ward.id, equipment: k });
-  }
+  // One fitted ward always; more only while a programme still has nobody and no fitted bed is free.
+  const missing = (def.programmes ?? []).some((g) => !s.residents.some((r) => r.group === g));
+  const fittedFree = freeBeds(s, 'airway').length > 0;
+  const needMore = !wards.some(fittedWard) || (missing && !fittedFree);
+  const ward = needMore ? wards.find((r) => !fittedWard(r)) : undefined;
+  const cost = PROGRAMME_EQUIPMENT.reduce((a, k) => a + EQUIPMENT[k].costSatang, 0);
+  if (ward && affords(s, cost)) for (const k of PROGRAMME_EQUIPMENT) if (!(ward.equipment[k] ?? 0)) [s] = tryCmd(s, apply, { type: 'installEquipment', roomId: ward.id, equipment: k });
   if (summarize(s).bedsOperational < def.targetBeds) s = build(s, apply, 'ward10');
   const rn = s.employees.filter((e) => e.role === 'rn').length;
   if (def.targetRn && rn < def.targetRn) {
@@ -109,11 +118,15 @@ function nursingCentre(s: GameState, apply: Apply): GameState {
   return s;
 }
 
-/** Cells for garden items: empty, not next to a corridor (so rooms can still be built), nearest the villas. */
+/**
+ * Cells for garden items: empty, not next to a corridor (so rooms can still be built), nearest the
+ * villas (or, before there are any, the wards: residents enjoy the view either way).
+ */
 function gardenCell(s: GameState): { x: number; y: number } | null {
   const { site } = s;
   const villas = site.rooms.filter((r) => r.type === 'villa');
-  if (!villas.length) return null;
+  const anchors = villas.length ? villas : site.rooms.filter((r) => r.type === 'ward');
+  if (!anchors.length) return null;
   const taken = (x: number, y: number) =>
     site.corridor[cellIndex(x, y, site.width)] === 1 || site.rooms.some((r) => x >= r.rect.x && x < r.rect.x + r.rect.w && y >= r.rect.y && y < r.rect.y + r.rect.h) || site.decor.some((d) => d.cell.x === x && d.cell.y === y);
   let best: { x: number; y: number; d: number } | null = null;
@@ -126,10 +139,76 @@ function gardenCell(s: GameState): { x: number; y: number } | null {
         return i >= 0 && j >= 0 && i < site.width && j < site.height && site.corridor[cellIndex(i, j, site.width)] === 1;
       });
       if (nearCorridor) continue;
-      const d = Math.min(...villas.map((v) => Math.abs(x - (v.rect.x + v.rect.w / 2)) + Math.abs(y - (v.rect.y + v.rect.h / 2))));
+      const d = Math.min(...anchors.map((v) => Math.abs(x - (v.rect.x + v.rect.w / 2)) + Math.abs(y - (v.rect.y + v.rect.h / 2))));
       if (!best || d < best.d) best = { x, y, d };
     }
   return best;
+}
+
+/** Garden items the garden switch plants, in turn, for a varied look. */
+const GARDEN_MIX: DecorType[] = ['sakura', 'flowers', 'tree', 'planter', 'umbrella', 'tree2', 'hedge', 'fountain'];
+/** Gardening keeps this much in the bank on top of the running costs until billing day. */
+export const GARDEN_RESERVE = thb(300_000);
+
+/** From day 1: a few garden items a turn around the wards, up to full appeal, with money to spare. */
+function garden(s: GameState, apply: Apply): GameState {
+  for (let n = 0; n < 3 && gardenAppeal(s.site.decor) < MAX_APPEAL; n++) {
+    const type = GARDEN_MIX[s.site.decor.length % GARDEN_MIX.length];
+    if (s.organization.cashSatang < DECOR[type].costSatang + runwayNeed(s) + GARDEN_RESERVE) break;
+    const cell = gardenCell(s);
+    if (!cell) break;
+    const [next, ok] = tryCmd(s, apply, { type: 'placeDecor', decor: type, cell });
+    if (!ok) break;
+    s = next;
+  }
+  return s;
+}
+
+/**
+ * Pricing: the value level fills empty beds (more enquiries), the premium level earns more when
+ * families queue for a full, well-liked home; otherwise standard. Bills already issued keep their price.
+ */
+export function pricingFor(s: GameState): GameState['priceLevel'] {
+  const sum = summarize(s);
+  const beds = sum.bedsOperational;
+  if (!beds) return 'standard';
+  const free = (beds - s.residents.filter((r) => !r.premium).length) / beds;
+  const waiting = s.waitlist.filter((c) => !c.premium).length;
+  const sat = s.residents.length ? s.residents.reduce((a, r) => a + r.needs.satisfaction, 0) / s.residents.length : 0;
+  if (free > 0.25) return 'value';
+  // Premium cuts enquiries, so not while the chapter still needs residents or a programme is empty.
+  const def = chapterDef(s.chapter.id);
+  const programmesIn = (def.programmes ?? []).every((g) => s.residents.some((r) => r.group === g));
+  const enough = s.mode === 'sandbox' || (s.residents.length >= def.targetResidents && programmesIn);
+  if (enough && free <= 0.05 && waiting >= 6 && sat >= 75 && s.organization.reputation >= 60) return 'premium';
+  return 'standard';
+}
+
+function pricing(s: GameState, apply: Apply): GameState {
+  const level = pricingFor(s);
+  if (level === s.priceLevel) return s;
+  const [next, ok] = tryCmd(s, apply, { type: 'setPriceLevel', level });
+  return ok ? log(next, 'info', 'auto.log.price', { price: level }) : s;
+}
+
+/** Energy below TIRED_ENERGY, or morale below LOW_MORALE, on a double shift: give the second shift away. */
+export const TIRED_ENERGY = 30;
+export const LOW_MORALE = 50;
+
+/**
+ * Staff care: someone exhausted or unhappy on a double shift loses the second one (the hire switch
+ * covers the gap next hour), and a home without a staff room gets one.
+ */
+function staffCare(s: GameState, apply: Apply): GameState {
+  for (const e of s.employees) {
+    const shifts = s.shifts.filter((x) => x.employeeId === e.id);
+    if (shifts.length < 2 || (e.energy >= TIRED_ENERGY && e.morale >= LOW_MORALE)) continue;
+    const last = [...shifts].sort((a, b) => (a.slot === 'night' ? 1 : 0) - (b.slot === 'night' ? 1 : 0) || a.start - b.start)[shifts.length - 1];
+    const [next, ok] = tryCmd(s, apply, { type: 'unassignShift', employeeId: e.id, slot: last.slot });
+    if (ok) s = log(next, 'info', 'auto.log.rest', { name: e.name.th, nameEn: e.name.en });
+  }
+  if (s.residents.length && !s.site.rooms.some((r) => r.type === 'staff_room')) s = build(s, apply, 'staff');
+  return s;
 }
 
 /** Chapter 3: land, villas for premium families, and a garden worth living in. */
@@ -261,7 +340,7 @@ function network(s: GameState, apply: Apply): GameState {
 }
 
 /** The business switches this turn serves: each one, or all of them under "play every chapter". */
-export type BusinessSwitches = Pick<Required<AutoSettings>, 'chapters' | 'build' | 'estate' | 'homecare' | 'training' | 'placements' | 'branches' | 'shop'>;
+export type BusinessSwitches = Pick<Required<AutoSettings>, 'chapters' | 'build' | 'estate' | 'homecare' | 'training' | 'placements' | 'branches' | 'shop'> & Partial<Pick<AutoSettings, 'garden'>>;
 
 /** Twice a day: the business work each switched-on helper covers, from the chapter it unlocks in. */
 export function campaignTurn(state: GameState, apply: Apply, on: BusinessSwitches = { chapters: true, build: false, estate: false, homecare: false, training: false, placements: false, branches: false, shop: false }): GameState {
@@ -276,7 +355,17 @@ export function campaignTurn(state: GameState, apply: Apply, on: BusinessSwitche
   if (c >= 5 && (all || on.placements)) s = placements(s, apply);
   if (c >= 6 && (all || on.build)) s = hospital(s, apply);
   if (c >= 7 && (all || on.branches)) s = network(s, apply);
-  if (on.shop) s = shop(s, apply);
+  if (all || on.shop) s = shop(s, apply);
+  if (all || on.garden) s = garden(s, apply);
+  return s;
+}
+
+/** Once a day before the morning shift: staff care at 05:00, pricing at 06:00. */
+export function dailyCare(state: GameState, apply: Apply, on: Partial<AutoSettings>): GameState {
+  const mod = state.minute % (24 * 60);
+  let s = state;
+  if (on.staffCare && mod === 5 * 60) s = staffCare(s, apply);
+  if (on.pricing && mod === 6 * 60) s = pricing(s, apply);
   return s;
 }
 
