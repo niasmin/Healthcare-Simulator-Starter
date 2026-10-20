@@ -36,7 +36,7 @@ export function summarize(state: GameState): SiteSummary {
   let roomsOperational = 0;
   let bedsInstalled = 0;
   let bedsOperational = 0;
-  const operationalByType: Record<RoomType, number> = { ward: 0, nursing_station: 0, therapy: 0, staff_room: 0, villa: 0, homecare_office: 0, training_room: 0, neuro_clinic: 0, stroke_unit: 0 };
+  const operationalByType: Record<RoomType, number> = { ward: 0, nursing_station: 0, therapy: 0, staff_room: 0, villa: 0, homecare_office: 0, training_room: 0, neuro_clinic: 0, stroke_unit: 0, pharmacy: 0, dining_room: 0, laundry_room: 0 };
   for (const room of state.site.rooms) {
     const st = statuses.get(room.id)!;
     bedsInstalled += st.installedBeds;
@@ -248,6 +248,7 @@ const SKILL_OWNER: Record<Skill, StaffRole> = {
   tube_feeding: 'pn',
   airway_care: 'rn',
   consult: 'doctor',
+  cleaning: 'cleaner',
 };
 
 /** Share of staffed time that is productive, used for recommendations (80%). */
@@ -351,7 +352,7 @@ export function roleNeeds(demand: SlotDemand, shiftLength: number, rnOnDuty: boo
   const pn = Math.max(0, peopleFor(of('rn', 'pn'), shiftLength) - rn);
   // Caregiver work is planned for caregivers alone: in a rush, nurses' time goes to nurse-only work.
   const caregiver = peopleFor(of('caregiver'), shiftLength);
-  return { doctor: peopleFor(of('doctor'), shiftLength), rn, pn, caregiver, pt: peopleFor(of('pt'), shiftLength), ot: peopleFor(of('ot'), shiftLength) };
+  return { doctor: peopleFor(of('doctor'), shiftLength), rn, pn, caregiver, pt: peopleFor(of('pt'), shiftLength), ot: peopleFor(of('ot'), shiftLength), pharmacist: 0, nutritionist: 0, cleaner: 0 };
 }
 
 export interface RosterCell {

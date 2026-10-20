@@ -3,7 +3,7 @@ import { UPGRADES, UPGRADE_ORDER, hasUpgrade } from '../../data/shop';
 import { useMoney, useT } from '../hooks';
 import { useGame } from '../store';
 
-const ICON: Record<string, string> = { online_marketing: '📣', staff_welfare: '💝', central_kitchen: '🍲', family_app: '📱', laundry_supply: '🧺', smart_call: '🔔' };
+const ICON: Record<string, string> = { online_marketing: '📣', staff_welfare: '💝', central_kitchen: '🍲', family_app: '📱', laundry_supply: '📦', smart_call: '🔔' };
 
 /** The shop list. `browse` shows it without buy buttons (the title screen, before a game is running). */
 export function ShopList({ browse = false }: { browse?: boolean }) {

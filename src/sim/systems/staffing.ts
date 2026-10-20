@@ -1,3 +1,4 @@
+import { supportApplicants } from './support';
 import { hasUpgrade, MARKETING_EXTRA_ENQUIRIES, WELFARE_MORALE_PER_DAY } from '../../data/shop';
 import { GROUP_LEVELS, RESIDENT_NAMES } from '../../data/patients';
 import { chapterDef, PREMIUM_SHARE } from '../../data/chapters';
@@ -117,6 +118,7 @@ export function refreshCandidates(state: GameState): GameState {
   }
   // From Chapter 6 a neurologist is always among the applicants.
   if (s.chapter.id >= 6 && !s.applicants.some((a) => a.role === 'doctor')) s = makeApplicant(s, 'doctor');
+  s = supportApplicants(s);
   const [lo, hi] = WAITLIST_ARRIVALS[s.priceLevel];
   let add: number;
   [s, add] = randInt(s, lo, hi);

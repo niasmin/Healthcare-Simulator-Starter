@@ -62,9 +62,36 @@ export const ROLES: Record<StaffRole, RoleDef> = {
     color: 0x34495e,
     cssColor: '#34495e',
   },
+  // Support staff (optional). They join the applicant pool once their room exists.
+  pharmacist: {
+    role: 'pharmacist',
+    skills: ['med_round'],
+    baseWageSatang: thb(32_000),
+    wagePerYearSatang: thb(1_000),
+    color: 0x2e8b8b,
+    cssColor: '#2a7f7f',
+  },
+  nutritionist: {
+    role: 'nutritionist',
+    skills: ['feeding'],
+    baseWageSatang: thb(22_000),
+    wagePerYearSatang: thb(700),
+    color: 0xe08a2e,
+    cssColor: '#c9771f',
+  },
+  cleaner: {
+    role: 'cleaner',
+    skills: ['cleaning'],
+    baseWageSatang: thb(11_000),
+    wagePerYearSatang: thb(300),
+    color: 0x6f7c8a,
+    cssColor: '#5f6b78',
+  },
 };
 
-export const ROLE_ORDER: StaffRole[] = ['doctor', 'rn', 'pn', 'caregiver', 'pt', 'ot'];
+export const ROLE_ORDER: StaffRole[] = ['doctor', 'rn', 'pn', 'caregiver', 'pt', 'ot', 'pharmacist', 'nutritionist', 'cleaner'];
+/** Support roles: optional, offered only once their room exists, never required by the roster advice. */
+export const SUPPORT_ROLES: StaffRole[] = ['pharmacist', 'nutritionist', 'cleaner'];
 
 export function wageFor(role: StaffRole, experienceYears: number): number {
   const d = ROLES[role];

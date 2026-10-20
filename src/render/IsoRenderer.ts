@@ -89,6 +89,9 @@ const PROP: Record<EquipmentId, PropStyle> = {
   exam_desk: { s: 0.62, h: 13 },
   waiting_chairs: { s: 0.55, h: 9 },
   vital_monitor: { s: 0.24, h: 22 },
+  medicine_shelf: { s: 0.4, h: 26 },
+  dining_table: { s: 0.6, h: 10 },
+  washer: { s: 0.42, h: 18 },
 };
 
 export class IsoRenderer {

@@ -27,6 +27,7 @@ import { prefabCost, prefabDef, prefabRect } from '../data/prefabs';
 import { GROUP_WARD_EQUIPMENT } from '../data/patients';
 import { FAMILY_APP_REPUTATION, FAMILY_APP_SATISFACTION_LINE, UPGRADES, hasUpgrade } from '../data/shop';
 import { admitInpatient, hospitalDayEnd, hospitalTick } from './systems/hospital';
+import { supportDayEnd } from './systems/support';
 import { assignManager, closeBranch, networkDayEnd, openBranch, supportBranch } from './systems/network';
 import { acceptOffer, endContract, startTraining, workforceDayEnd, workforceTick } from './systems/workforce';
 
@@ -491,6 +492,7 @@ export function step(state: GameState): GameState {
         s = workforceDayEnd(s, closingDay);
         s = hospitalDayEnd(s, closingDay, ev.at);
         s = networkDayEnd(s, closingDay);
+        s = supportDayEnd(s);
         s = closeDay(s);
         s = residentDepartures(s);
         s = judgeChapter(s, closingDay);

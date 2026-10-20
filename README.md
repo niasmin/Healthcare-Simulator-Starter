@@ -55,7 +55,7 @@ The shop (the floating Shop button on the phone map, 🛒 in the desktop top bar
 | 💝 Staff welfare | ฿200,000 | 1 | +1 morale a day for every employee |
 | 🍲 Central kitchen | ฿250,000 | 1 | Food costs −25% |
 | 📱 Family app | ฿180,000 | 2 | +0.2 reputation a day while satisfaction is 60+ |
-| 🧺 Laundry & supply room | ฿300,000 | 2 | Daily supplies −20% |
+| 📦 Supply stock system | ฿300,000 | 2 | Daily supplies −20% |
 | 🔔 Smart call system | ฿350,000 | 3 | Routine care may start 30 minutes later before it counts as missed |
 
 The sandbox can buy everything from day 1. The scripted player never buys upgrades, so the campaign balance figures are unchanged.
@@ -65,7 +65,20 @@ The sandbox can buy everything from day 1. The scripted player never buys upgrad
 - **Rooms:** the ward, villa, therapy room, neuro clinic, stroke unit (the recovery room picture) and training room (the activity room picture) use the sheet's isometric rooms in the build list.
 - **Equipment:** the examination desk, waiting chairs, vital-signs monitor, training manikin and whiteboard get map sprites cut from the sheet's equipment row.
 - **Branches:** the Network tab uses the business-card art from the title key art.
-- **Not used yet:** the pharmacist, nutritionist, receptionist, cleaner and security characters, and rooms such as the pharmacy, dining area, laundry and storage. These roles and rooms don't exist in the game yet.
+- **Support staff:** the pharmacist, nutritionist and cleaner have portraits, map figures and room art (pharmacy, dining hall, laundry) from the sheet; the medicine shelf and dining table have map sprites.
+- **Not used yet:** the receptionist and security characters, and the storage room. The washer has no sprite yet and is drawn as a simple shape.
+
+### Support rooms and staff (optional)
+
+From chapter 2 three support rooms can be built. Each unlocks one support role on the job board, and an applicant of that role only appears once its room exists. They are optional: the campaign can be won without them, and the scripted player never builds them.
+
+| Room | Equipment | Staff | Effect (while the room is open and someone of that role has a shift) |
+|---|---|---|---|
+| Pharmacy (2×2) | Medicine shelf | Pharmacist (med rounds) | Daily supplies cost 90% |
+| Dining room (3×3) | Dining table | Nutritionist (meals) | Residents who eat on their own get +10 nutrition and +2 happiness at meal times (the room alone is enough); with a nutritionist, family satisfaction +0.5 a day |
+| Laundry room (2×2) | Washer | Cleaner (cleaning) | Daily upkeep cost 80%; residents' happiness +1 a day |
+
+Support staff only do their own skill, and they never count as the "narrowest" colleague when nurses and caregivers decide whether to hold back for a task only they can do. Values are fictional game balancing.
 
 ### Game modes: campaign, challenge and sandbox
 
@@ -493,6 +506,7 @@ src/
 | `decor.test.ts` | Decor placed on an empty tile and charged once; can't overlap rooms, corridor, entrance or decor, and blocks building over it; demolish refunds half; appeal is capped and makes residents happier; schema-3 saves migrate to schema 4 |
 | `chapter.test.ts` | **30-day playthrough** by a scripted sensible player using only public commands and the real applicant and waiting-list pools: wins chapter 1 with cash positive every day; every invariant holds (ledger, unique beds, no overlapping shifts, no care without the skill); roster ready and >95% of tasks done; the three scripted events fire on their days; the same seed plays byte-identically; the verdict pauses the game and survives a save. **Balance:** a full home wins on more seeds, a 40% empty home and an overstaffed home fail on targets. **Verdict rules:** bankrupt at the first negative midnight, decided once and never changed; nothing decided before day 30; a migrated save past day 30 is judged at the next midnight. **Tutorial:** step order, derived from state, a goal and a how-to hint in Thai and English for every step. **Staffing advice:** rush-hour windows, RN covering PN work, one OT for ten sessions |
 | `chapter2.test.ts` | **90-day campaign** by the scripted player: wins Chapter 1, starts Chapter 2 on day 31 and wins it on day 90 with every target; dementia residents only in secured wards; airway care only by RNs and tube feeding only by RNs/PNs; an RN on the night roster; >93% of tasks done; byte-identical rerun; a reckless builder's lowest cash falls far below the careful one, with at least one bankruptcy; a second full team fails the chapter. **Rules:** the next chapter only after a win, with one candidate per programme; secured-ward admission; RN-only airway care missed with only a PN on nights; programme fees; schema-5 migration; Thai and English text for every Chapter 2 step |
+| `support.test.ts` | Support applicants appear only once their room exists; pharmacy supply cut; dining meal bonuses; nutritionist and cleaner daily lift; laundry upkeep cut; pharmacists take med rounds and nutritionists meals, with no missed meals; support rooms are optional |
 | `shop.test.ts` | Upgrades are bought once, for their price, from their chapter (all at once in the sandbox); the central kitchen and laundry cut food and supplies by their percentages; staff welfare adds morale; online marketing adds an enquiry; the family app lifts reputation while residents are content; the smart call system keeps late routine care pending 30 minutes longer |
 | `modes.test.ts` | Campaign games are unchanged; sandbox books ฿50M as capital, unlocks every room, has no tutorial steps and is never judged after 70 days; each challenge opens with its own cash, reputation or chapter; each challenge is won by the scripted player and ends without a next chapter |
 | `chapter7.test.ts` | **Full 390-day campaign:** all 7 chapters won on schedule and solvent, ledger reconciles; one branch of each kind, each manager of the right role and off the roster; branch invoices exact; network occupancy ≥ 70%. **Opening:** locked before chapter 7; manager role checked; full opening cost charged; managers can’t take shifts or a second branch; cap of 5. **Running:** good branches fill and bill daily, poor ones empty, a poor name at headquarters stops growth; certificates raise the quality target; a lost manager leaves the branch leaderless until one is appointed; support visits lift quality, cost money and have a cooldown; closing refunds 30% and frees the manager; busy clinic branches refer to the stroke unit. Guide order; v9→v10 migration |

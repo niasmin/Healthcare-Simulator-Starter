@@ -24,7 +24,7 @@ export interface Rect {
   h: number;
 }
 
-export type RoomType = 'ward' | 'nursing_station' | 'therapy' | 'staff_room' | 'villa' | 'homecare_office' | 'training_room' | 'neuro_clinic' | 'stroke_unit';
+export type RoomType = 'ward' | 'nursing_station' | 'therapy' | 'staff_room' | 'villa' | 'homecare_office' | 'training_room' | 'neuro_clinic' | 'stroke_unit' | 'pharmacy' | 'dining_room' | 'laundry_room';
 
 export type EquipmentId =
   | 'care_bed'
@@ -43,7 +43,10 @@ export type EquipmentId =
   | 'whiteboard'
   | 'exam_desk'
   | 'waiting_chairs'
-  | 'vital_monitor';
+  | 'vital_monitor'
+  | 'medicine_shelf'
+  | 'dining_table'
+  | 'washer';
 
 export interface Room {
   id: string;
@@ -177,13 +180,13 @@ export interface PersonName {
   gender?: 'f' | 'm';
 }
 
-export type StaffRole = 'rn' | 'pn' | 'caregiver' | 'pt' | 'ot' | 'doctor';
+export type StaffRole = 'rn' | 'pn' | 'caregiver' | 'pt' | 'ot' | 'doctor' | 'pharmacist' | 'nutritionist' | 'cleaner';
 
 /**
  * Abstract qualifications. Clinical work is modelled only as "who is allowed
  * to do which kind of task" — never as treatment advice.
  */
-export type Skill = 'assessment' | 'vital_signs' | 'med_round' | 'personal_care' | 'feeding' | 'mobility' | 'activity' | 'tube_feeding' | 'airway_care' | 'consult';
+export type Skill = 'assessment' | 'vital_signs' | 'med_round' | 'personal_care' | 'feeding' | 'mobility' | 'activity' | 'tube_feeding' | 'airway_care' | 'consult' | 'cleaning';
 
 export type ShiftSlot = 'morning' | 'afternoon' | 'night';
 

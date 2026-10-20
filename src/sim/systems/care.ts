@@ -1,3 +1,4 @@
+import { SUPPORT_ROLES } from '../../data/staff';
 import { hasUpgrade, SMART_CALL_EXTRA_GRACE } from '../../data/shop';
 import { carePlanSchedule, TASK_KINDS } from '../../data/patients';
 import { parseBedId } from '../../domain/rules/beds';
@@ -132,7 +133,8 @@ export function careTick(state: GameState): GameState {
       // task is about to be missed. (Stops PNs doing 07:30 personal care while 08:00 vital signs wait.)
       // Only staff with a narrower colleague on shift for this task hold back.
       const urgent = now >= t.dueAt + TASK_KINDS[t.kind].grace - RESERVE_URGENT_MINUTES;
-      const qualified = [...employees.values()].filter((x) => x.skills.includes(t.skill) && isOnShift(state, x.id, now));
+      // Support staff (pharmacist, nutritionist) are extra hands, never the yardstick for who holds back.
+      const qualified = [...employees.values()].filter((x) => x.skills.includes(t.skill) && isOnShift(state, x.id, now) && !SUPPORT_ROLES.includes(x.role));
       const narrowest = qualified.reduce<Employee | null>((a, x) => (!a || x.skills.length < a.skills.length ? x : a), null);
       const narrowSkills = new Set<string>(narrowest?.skills ?? []);
       const e = urgent ? candidates[0] : candidates.find((c) => c.skills.length === narrowest?.skills.length || !reservedFor(c, t, tasks, now, narrowSkills));
