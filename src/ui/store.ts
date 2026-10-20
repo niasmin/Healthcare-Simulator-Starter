@@ -4,7 +4,10 @@ import { createInitialState } from '../sim/state';
 import type { Cell, ChallengeId, CommandResult, DecorType, GameMode, GameState, RoomType } from '../domain/types';
 import type { Lang } from './i18n';
 import type { GameTemplate } from '../sim/templates';
+import type { AwayReport } from './away';
 import { newGameState } from '../sim/modes';
+import { autopilotOn, runAway, ticksFor } from './away';
+import { MS_PER_TICK_1X } from './constants';
 
 export type Tool = { kind: 'select' } | { kind: 'corridor' } | { kind: 'bulldoze' } | { kind: 'room'; roomType: RoomType } | { kind: 'decor'; decor: DecorType } | { kind: 'prefab'; prefab: string; rotated: boolean };
 
@@ -47,7 +50,7 @@ interface UIStore {
   togglePause: () => void;
   newGame: (template?: GameTemplate, mode?: GameMode, challenge?: ChallengeId) => void;
   /** Replace the running game with a loaded save (paused, UI reset). */
-  loadGame: (game: GameState) => void;
+  loadGame: (game: GameState, savedAt?: number) => void;
   /** True once the player pressed Start or Continue; autosave waits for it. */
   started: boolean;
   setStarted: (v: boolean) => void;
@@ -66,6 +69,13 @@ interface UIStore {
   setExterior: (v: boolean) => void;
   autoOpen: boolean;
   setAutoOpen: (v: boolean) => void;
+  /** Keep an autopilot game running while the player is away (remembered per browser). */
+  awayPlay: boolean;
+  setAwayPlay: (v: boolean) => void;
+  /** Catch-up in progress, in ticks. */
+  away: { done: number; total: number } | null;
+  awayReport: AwayReport | null;
+  setAwayReport: (r: AwayReport | null) => void;
   /** The tutorial card is folded into a small chip (remembered per browser). */
   tutorialHidden: boolean;
   setTutorialHidden: (v: boolean) => void;
@@ -83,6 +93,14 @@ function initialLang(): Lang {
     /* storage unavailable */
   }
   return 'th';
+}
+
+function initialAwayPlay(): boolean {
+  try {
+    return localStorage.getItem('he.away') !== '0';
+  } catch {
+    return true;
+  }
 }
 
 function initialTutorialHidden(): boolean {
@@ -116,6 +134,18 @@ export const useGame = create<UIStore>((set, get) => ({
   setExterior: (exterior) => set({ exterior }),
   autoOpen: false,
   setAutoOpen: (autoOpen) => set({ autoOpen }),
+  awayPlay: initialAwayPlay(),
+  setAwayPlay: (awayPlay) => {
+    try {
+      localStorage.setItem('he.away', awayPlay ? '1' : '0');
+    } catch {
+      /* storage unavailable */
+    }
+    set({ awayPlay });
+  },
+  away: null,
+  awayReport: null,
+  setAwayReport: (awayReport) => set({ awayReport }),
 
   dispatch: (cmd) => {
     const { state, result } = applyCommand(get().game, cmd);
@@ -155,8 +185,12 @@ export const useGame = create<UIStore>((set, get) => ({
   newGame: (template = 'starter', mode = 'campaign', challenge) =>
     set({ game: newGameState(template, mode, challenge), selectedRoomId: null, drag: null, tool: { kind: 'select' }, toast: null, view: 'map', leftTab: 'build', sheet: null, chapterSeen: false }),
   dismissToast: () => set({ toast: null }),
-  loadGame: (game) =>
-    set({ game: { ...game, speed: 0 }, selectedRoomId: null, drag: null, tool: { kind: 'select' }, view: 'map', sheet: null, started: true, saveOpen: false, chapterSeen: !!game.chapter.result }),
+  loadGame: (game, savedAt) => {
+    // An autopilot game saved while running carries on from where it was, catching up the time away.
+    const resume = savedAt !== undefined && get().awayPlay && game.speed > 0 && autopilotOn(game);
+    set({ game: resume ? game : { ...game, speed: 0 }, selectedRoomId: null, drag: null, tool: { kind: 'select' }, view: 'map', sheet: null, started: true, saveOpen: false, chapterSeen: !!game.chapter.result });
+    if (resume) runAway(ticksFor(Date.now() - savedAt, game.speed, MS_PER_TICK_1X));
+  },
   started: false,
   setStarted: (started) => set({ started }),
   notify: (key, level = 'ok', params) => set({ toast: { id: ++toastSeq, key, level, ...(params ? { params } : {}) } }),

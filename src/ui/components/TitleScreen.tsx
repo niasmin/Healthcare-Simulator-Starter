@@ -256,7 +256,7 @@ export function TitleScreen() {
     if (!latest) return;
     const r = await saves.load(latest.slot);
     if (!r.ok) return notify(`save.err.${r.error}`, "error");
-    loadGame(r.state);
+    loadGame(r.state, latest.meta?.savedAt);
   };
   const meta = latest?.meta;
   const money = (v: number) => formatTHB(v, localeOf(lang));

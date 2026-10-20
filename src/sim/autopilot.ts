@@ -25,8 +25,29 @@ import { choiceBlocker } from './systems/events';
  *   families, only where a corridor already reaches and only with a month's running costs to spare.
  */
 
-export const AUTO_KEYS = ['events', 'admit', 'carePlan', 'staff', 'build', 'chapters'] as const;
-export const AUTO_OFF: Required<AutoSettings> = { events: false, admit: false, carePlan: false, staff: false, build: false, chapters: false };
+export const AUTO_KEYS = ['events', 'admit', 'carePlan', 'staff', 'build', 'estate', 'homecare', 'training', 'placements', 'branches', 'shop', 'chapters'] as const;
+export type AutoKey = (typeof AUTO_KEYS)[number];
+export const AUTO_OFF: Required<AutoSettings> = {
+  events: false,
+  admit: false,
+  carePlan: false,
+  staff: false,
+  build: false,
+  estate: false,
+  homecare: false,
+  training: false,
+  placements: false,
+  branches: false,
+  shop: false,
+  chapters: false,
+};
+/** How the switches are grouped in the Autopilot window. */
+export const AUTO_GROUPS: Array<{ id: string; keys: AutoKey[] }> = [
+  { id: 'daily', keys: ['events', 'admit', 'carePlan', 'staff'] },
+  { id: 'growth', keys: ['build', 'estate', 'shop'] },
+  { id: 'business', keys: ['homecare', 'training', 'placements', 'branches'] },
+  { id: 'campaign', keys: ['chapters'] },
+];
 /** Building keeps this much in the bank on top of 30 days of running costs. */
 export const BUILD_RESERVE = thb(200_000);
 /** Building happens once a day, at 08:00. */
@@ -145,7 +166,9 @@ export function autopilot(state: GameState, apply: Apply, speed: GameState['spee
   if (a.chapters && s.chapter.result) s = advanceChapter(s, apply, speed);
   if (s.minute % 60 !== 0) return s;
   if (a.build && s.minute % (24 * 60) === BUILD_MINUTE) s = buildNext(s, apply);
-  if (a.chapters && (s.minute % (24 * 60) === 7 * 60 || s.minute % (24 * 60) === 15 * 60)) s = campaignTurn(s, apply);
+  const all = autoSettings(s);
+  const business = all.chapters || all.build || all.estate || all.homecare || all.training || all.placements || all.branches || all.shop;
+  if (business && (s.minute % (24 * 60) === 7 * 60 || s.minute % (24 * 60) === 15 * 60)) s = campaignTurn(s, apply, all);
   if (a.staff) s = staffAll(s, apply);
   if (a.admit) s = admitAll(s, apply);
   if (a.carePlan) s = planAll(s, apply);

@@ -7,7 +7,8 @@ import { EQUIPMENT } from '../data/rooms';
 import { COURSES } from '../data/workforce';
 import { thb } from '../domain/money';
 import { cellIndex } from '../domain/grid';
-import type { BranchKind, CourseId, DecorType, GameState, StaffRole } from '../domain/types';
+import type { AutoSettings, BranchKind, CourseId, DecorType, GameState, StaffRole } from '../domain/types';
+import { UPGRADES, UPGRADE_ORDER, hasUpgrade } from '../data/shop';
 import { buildSomewhere, tryCmd, type Apply } from './autoBuild';
 import { log } from './helpers';
 import { dailyRunningCost, nextBillingDay, summarize } from './selectors';
@@ -166,33 +167,64 @@ function homeCare(s: GameState, apply: Apply): GameState {
   return s;
 }
 
-/** Chapter 5: a training room, a certified pool of extra staff, and placements with partners. */
-function workforce(s: GameState, apply: Apply): GameState {
-  const def = chapterDef(s.chapter.id);
+/** Chapter 5 helpers: staff free for training or a placement, and the size of that pool. */
+const freeStaff = (s: GameState) => s.employees.filter((e) => !e.placement && !e.branch && !s.shifts.some((x) => x.employeeId === e.id) && !s.workforce.training.some((t) => t.employeeId === e.id));
+const poolSize = (s: GameState) => s.employees.filter((e) => !s.shifts.some((x) => x.employeeId === e.id)).length;
+
+/** Send one person of `role` to `course`: someone free first, else a new hire while the pool has room. */
+function train(s: GameState, apply: Apply, role: StaffRole, course: CourseId): GameState {
+  if (!affords(s, COURSES[course].costSatang) || s.workforce.training.length >= trainingSeats(s)) return s;
+  let trainee = freeStaff(s).find((e) => e.role === role && trainingBlocker(s, e.id, course) === null)?.id ?? null;
+  if (!trainee && poolSize(s) < MAX_POOL) [s, trainee] = hireRole(s, apply, role);
+  if (trainee) [s] = tryCmd(s, apply, { type: 'startTraining', employeeId: trainee, course });
+  return s;
+}
+
+/** Chapter 5, training: a training room, then certificates up to the chapter's target and for waiting offers. */
+function training(s: GameState, apply: Apply): GameState {
   if (!s.site.rooms.some((r) => r.type === 'training_room')) s = build(s, apply, 'training');
   if (!s.site.rooms.some((r) => r.type === 'training_room')) return s;
-  const free = () => s.employees.filter((e) => !e.placement && !e.branch && !s.shifts.some((x) => x.employeeId === e.id) && !s.workforce.training.some((t) => t.employeeId === e.id));
-  const pool = () => s.employees.filter((e) => !s.shifts.some((x) => x.employeeId === e.id)).length;
-  const train = (role: StaffRole, course: CourseId): void => {
-    if (!affords(s, COURSES[course].costSatang)) return;
-    let trainee = free().find((e) => e.role === role && trainingBlocker(s, e.id, course) === null)?.id ?? null;
-    if (!trainee && pool() < MAX_POOL && s.workforce.training.length < trainingSeats(s)) [s, trainee] = hireRole(s, apply, role);
-    if (trainee) [s] = tryCmd(s, apply, { type: 'startTraining', employeeId: trainee, course });
-  };
-  for (const o of [...s.workforce.offers].sort((a, b) => a.expiresDay - b.expiresDay)) {
-    if (s.workforce.contracts.length >= MAX_CONTRACTS) break;
-    let who = free().find((e) => placementBlocker(s, o.id, e.id) === null)?.id ?? null;
-    if (!who && !o.cert && pool() < MAX_POOL) [s, who] = hireRole(s, apply, o.role);
-    if (who) [s] = tryCmd(s, apply, { type: 'acceptOffer', offerId: o.id, employeeId: who });
-    else if (o.cert) train(o.role, o.cert);
-  }
-  if (certifiedCount(s) + s.workforce.training.length < (def.targetCertified ?? 0) && s.workforce.training.length < trainingSeats(s)) {
+  // Offers that need a certificate nobody free holds yet: train someone for the next one.
+  for (const o of s.workforce.offers) if (o.cert && !freeStaff(s).some((e) => placementBlocker(s, o.id, e.id) === null)) s = train(s, apply, o.role, o.cert);
+  const target = chapterDef(s.chapter.id).targetCertified ?? 0;
+  if (certifiedCount(s) + s.workforce.training.length < target) {
     const caregivers = s.employees.filter((e) => e.role === 'caregiver' && isCertified(e)).length;
     const before = s.workforce.training.length;
-    if (caregivers >= 4) train('pn', 'airway_cert');
-    if (s.workforce.training.length === before) train('caregiver', 'care_cert');
+    if (caregivers >= 4) s = train(s, apply, 'pn', 'airway_cert');
+    if (s.workforce.training.length === before) s = train(s, apply, 'caregiver', 'care_cert');
   }
   return s;
+}
+
+/** Chapter 5, placements: accept partner offers (factories, clinics, schools) with someone suitable, soonest expiry first. */
+function placements(s: GameState, apply: Apply): GameState {
+  // Partners only send requests to a home with a training room.
+  if (!s.site.rooms.some((r) => r.type === 'training_room')) s = build(s, apply, 'training');
+  for (const o of [...s.workforce.offers].sort((a, b) => a.expiresDay - b.expiresDay)) {
+    if (s.workforce.contracts.length >= MAX_CONTRACTS) break;
+    let who = freeStaff(s).find((e) => placementBlocker(s, o.id, e.id) === null)?.id ?? null;
+    if (!who && !o.cert && poolSize(s) < MAX_POOL) [s, who] = hireRole(s, apply, o.role);
+    if (who) [s] = tryCmd(s, apply, { type: 'acceptOffer', offerId: o.id, employeeId: who });
+  }
+  return s;
+}
+
+/**
+ * Shop: buy the cheapest unlocked upgrade not owned yet, but only once the home has 30 beds (the
+ * chapter 2 size), and while a month of running costs plus a large reserve stay in the bank
+ * (growth comes first: upgrades bought early starve the chapter 2 expansion).
+ */
+export const SHOP_RESERVE = thb(500_000);
+export const SHOP_MIN_BEDS = 30;
+function shop(s: GameState, apply: Apply): GameState {
+  const next = UPGRADE_ORDER.map((id) => UPGRADES[id])
+    .filter((u) => !hasUpgrade(s, u.id) && (s.mode === 'sandbox' || s.chapter.id >= u.unlockChapter))
+    .sort((a, b) => a.costSatang - b.costSatang)[0];
+  // A 30-bed home (the chapter 2 expansion) comes first; later bed targets don't hold upgrades back.
+  if (!next || summarize(s).bedsOperational < SHOP_MIN_BEDS) return s;
+  if (s.organization.cashSatang < next.costSatang + 30 * dailyRunningCost(s) + SHOP_RESERVE) return s;
+  const [out, ok] = tryCmd(s, apply, { type: 'buyUpgrade', upgrade: next.id });
+  return ok ? log(out, 'good', 'auto.log.shop', { upgrade: next.id }) : s;
 }
 
 /** Chapter 6: the neuro clinic, then the stroke unit (the admit switch fills its beds). */
@@ -228,17 +260,23 @@ function network(s: GameState, apply: Apply): GameState {
   return s;
 }
 
-/** Twice a day: work on the current chapter's goals (and keep the earlier chapters' going). */
-export function campaignTurn(state: GameState, apply: Apply): GameState {
-  if (state.mode === 'sandbox' || state.chapter.result) return state;
+/** The business switches this turn serves: each one, or all of them under "play every chapter". */
+export type BusinessSwitches = Pick<Required<AutoSettings>, 'chapters' | 'build' | 'estate' | 'homecare' | 'training' | 'placements' | 'branches' | 'shop'>;
+
+/** Twice a day: the business work each switched-on helper covers, from the chapter it unlocks in. */
+export function campaignTurn(state: GameState, apply: Apply, on: BusinessSwitches = { chapters: true, build: false, estate: false, homecare: false, training: false, placements: false, branches: false, shop: false }): GameState {
+  if (state.chapter.result) return state;
   let s = state;
   const c = s.chapter.id;
-  if (c >= 2) s = nursingCentre(s, apply);
-  if (c >= 3) s = tranquila(s, apply);
-  if (c >= 4) s = homeCare(s, apply);
-  if (c >= 5) s = workforce(s, apply);
-  if (c >= 6) s = hospital(s, apply);
-  if (c >= 7) s = network(s, apply);
+  const all = on.chapters;
+  if (c >= 2 && (all || on.build) && s.mode !== 'sandbox') s = nursingCentre(s, apply);
+  if (c >= 3 && (all || on.estate)) s = tranquila(s, apply);
+  if (c >= 4 && (all || on.homecare)) s = homeCare(s, apply);
+  if (c >= 5 && (all || on.training)) s = training(s, apply);
+  if (c >= 5 && (all || on.placements)) s = placements(s, apply);
+  if (c >= 6 && (all || on.build)) s = hospital(s, apply);
+  if (c >= 7 && (all || on.branches)) s = network(s, apply);
+  if (on.shop) s = shop(s, apply);
   return s;
 }
 
