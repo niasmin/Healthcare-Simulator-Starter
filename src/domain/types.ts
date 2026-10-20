@@ -591,6 +591,8 @@ export interface AutoSettings {
   admit: boolean;
   carePlan: boolean;
   staff: boolean;
+  /** Added later: missing in earlier saves = off. */
+  build?: boolean;
 }
 
 export interface GameState {

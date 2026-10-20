@@ -66,7 +66,10 @@ The sandbox can buy everything from day 1. The scripted player never buys upgrad
 - **Equipment:** the examination desk, waiting chairs, vital-signs monitor, training manikin and whiteboard get map sprites cut from the sheet's equipment row.
 - **Branches:** the Network tab uses the business-card art from the title key art.
 - **Support staff:** the pharmacist, nutritionist, cleaner, receptionist and security guard have portraits, map figures and build-list art (pharmacy, dining hall, laundry, storage, bath & hygiene, reception desk) from the sheet; the medicine shelf, dining table and reception desk have map sprites.
-- **Not used yet:** the outdoor activity area and some furniture. The washer, storage rack and bath set have no sprite yet and are drawn as simple shapes.
+- **Map sprites drawn for this game:**
+  - The storage rack is cut from the sheet's storage room.
+  - The washer and bath set are drawn to match, since the sheet has no clean single copy of either.
+- **Not used yet:** the outdoor activity area and some furniture.
 
 ### Support rooms and staff (optional)
 
@@ -86,7 +89,7 @@ Support staff only do their own skill, and they never count as the "narrowest" c
 
 ### Autopilot: let the home run itself
 
-The 🤖 Autopilot button (top bar; a floating button on the phone map) opens four switches. Everything they do goes through the same public commands a player uses, so every rule and invariant still holds. All are off by default, and the scripted player never uses them.
+The 🤖 Autopilot button (top bar; a floating button on the phone map) opens five switches. Everything they do goes through the same public commands a player uses, so every rule and invariant still holds. All are off by default, and the scripted player never uses them.
 
 | Switch | What it does |
 |---|---|
@@ -94,8 +97,13 @@ The 🤖 Autopilot button (top bar; a floating button on the phone map) opens fo
 | Admit residents | Every game hour, fills each fitting free bed from the waiting list (urgent referrals first), plus stroke-unit referrals |
 | Write care plans | Every resident without a care plan gets one (needs an RN on the staff) |
 | Hire and roster to the advice | Fills each gap in the roster advice with someone who has no shift yet, or hires an applicant. It never hires into debt and never dismisses anyone |
+| Build ready-made rooms | At most one room a day, at 08:00. It builds whichever of these comes first: a basic room that is missing (ward, nursing station, staff room, therapy); another 10-bed ward when every bed is taken and 3+ families wait; a villa for waiting premium families (chapter 3+). The room goes next to an existing corridor, as near the entrance as it fits and opens. It only builds while 30 days of running costs plus ฿200,000 stay in the bank |
 
-The autopilot never builds or buys. With all four on, a built 10-bed home fills up, keeps over 98% of care done and stays profitable for 60 days on every seed tested.
+The autopilot never buys land, lays corridors, buys upgrades or dismisses anyone.
+
+Results:
+- **Built 10-bed home, first four switches on:** it fills up, keeps about 98% or more of care done and stays profitable for 60 days on every seed tested.
+- **Starter campus, all five switches on:** it builds three wards and the therapy room, reaches 30 residents and wins chapter 1 on its own. Over 90 days on seeds 1, 3 and 8, cash never fell below ฿440,000.
 
 ### More land
 
@@ -521,7 +529,7 @@ src/
   - Food, supplies, upkeep and payroll are each charged once per day.
   - An event's cost is charged once, and a resolved event can't be resolved again.
 
-## Tests (204 passing)
+## Tests (206 passing)
 
 | File | Covers |
 |---|---|
@@ -538,7 +546,7 @@ src/
 | `chapter.test.ts` | **30-day playthrough** by a scripted sensible player using only public commands and the real applicant and waiting-list pools: wins chapter 1 with cash positive every day; every invariant holds (ledger, unique beds, no overlapping shifts, no care without the skill); roster ready and >95% of tasks done; the three scripted events fire on their days; the same seed plays byte-identically; the verdict pauses the game and survives a save. **Balance:** a full home wins on more seeds, a 40% empty home and an overstaffed home fail on targets. **Verdict rules:** bankrupt at the first negative midnight, decided once and never changed; nothing decided before day 30; a migrated save past day 30 is judged at the next midnight. **Tutorial:** step order, derived from state, a goal and a how-to hint in Thai and English for every step. **Staffing advice:** rush-hour windows, RN covering PN work, one OT for ten sessions |
 | `chapter2.test.ts` | **90-day campaign** by the scripted player: wins Chapter 1, starts Chapter 2 on day 31 and wins it on day 90 with every target; dementia residents only in secured wards; airway care only by RNs and tube feeding only by RNs/PNs; an RN on the night roster; >93% of tasks done; byte-identical rerun; a reckless builder's lowest cash falls far below the careful one, with at least one bankruptcy; a second full team fails the chapter. **Rules:** the next chapter only after a win, with one candidate per programme; secured-ward admission; RN-only airway care missed with only a PN on nights; programme fees; schema-5 migration; Thai and English text for every Chapter 2 step |
 | `support.test.ts` | Support applicants appear only once their room exists; pharmacy supply cut; dining meal bonuses; nutritionist and cleaner daily lift; laundry upkeep cut; a receptionist adds an enquiry and a security guard lifts satisfaction; the storage room cuts supplies on top of the pharmacy; the bath & hygiene room shortens personal care; pharmacists take med rounds and nutritionists meals, with no missed meals; support rooms are optional |
-| `autopilot.test.ts` | Off by default and switched by command; with all switches on, a built home runs 30 days on its own (8+ residents, every one with a plan, an RN hired, >90% of care done, cash positive, ledger and unique beds intact); events answered at once without pausing, accepting the staff request; nothing happens with it off |
+| `autopilot.test.ts` | Off by default and switched by command; with all switches on, a built home runs 30 days on its own (8+ residents, every one with a plan, an RN hired, >90% of care done, cash positive, ledger and unique beds intact); from the starter campus it builds every basic room, staffs and fills the home and wins chapter 1 solvent; it builds only what is missing or needed and never without money to spare; events answered at once without pausing, accepting the staff request; nothing happens with it off |
 | `land.test.ts` | Three plots sold in order for their prices, each from its chapter, keeping every room and corridor tile; then already done; locked by chapter and by cash; a room can be built on the newest plot |
 | `shop.test.ts` | Upgrades are bought once, for their price, from their chapter (all at once in the sandbox); the central kitchen and laundry cut food and supplies by their percentages; staff welfare adds morale; online marketing adds an enquiry; the family app lifts reputation while residents are content; the smart call system keeps late routine care pending 30 minutes longer |
 | `modes.test.ts` | Campaign games are unchanged; sandbox books ฿50M as capital, unlocks every room, has no tutorial steps and is never judged after 70 days; each challenge opens with its own cash, reputation or chapter; each challenge is won by the scripted player and ends without a next chapter |

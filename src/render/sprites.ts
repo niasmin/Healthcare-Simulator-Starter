@@ -31,6 +31,9 @@ export const EQUIP_SPRITE: Partial<Record<EquipmentId, { name: string; width: nu
   medicine_shelf: { name: 'eq_medshelf', width: 30 },
   dining_table: { name: 'eq_dining', width: 50 },
   reception_desk: { name: 'eq_reception', width: 56 },
+  washer: { name: 'eq_washer', width: 24 },
+  storage_rack: { name: 'eq_rack', width: 34 },
+  bath_set: { name: 'eq_bath', width: 46 },
 };
 
 /** Map-label pill per room type: glyph texture name and pill colour. */
