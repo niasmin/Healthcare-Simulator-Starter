@@ -111,12 +111,13 @@ export interface RankEntry {
   reputation: number;
   satisfaction: number;
   staff: number;
+  stars: number;
   day: number;
   chapter: number;
   site: Site;
 }
 export type RankRecord = Omit<RankEntry, 'site'> & { user_id: string; updated_at: string };
-const RANK_COLUMNS = 'user_id,display_name,home_name,score,residents,beds,reputation,satisfaction,staff,day,chapter,updated_at';
+const RANK_COLUMNS = 'user_id,display_name,home_name,score,residents,beds,reputation,satisfaction,staff,stars,day,chapter,updated_at';
 
 export const EVENTS_TABLE = 'game_events';
 export interface GameEventRow {

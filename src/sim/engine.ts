@@ -30,6 +30,7 @@ import { FAMILY_APP_REPUTATION, FAMILY_APP_SATISFACTION_LINE, UPGRADES, hasUpgra
 import { admitInpatient, hospitalDayEnd, hospitalTick } from './systems/hospital';
 import { supportDayEnd } from './systems/support';
 import { cityBlocker, cityCost, visitPlace } from './systems/city';
+import { goalsDayEnd, goalsTick } from './systems/goals';
 import { assignManager, closeBranch, networkDayEnd, openBranch, supportBranch } from './systems/network';
 import { acceptOffer, endContract, startTraining, workforceDayEnd, workforceTick } from './systems/workforce';
 
@@ -529,6 +530,7 @@ export function step(state: GameState): GameState {
         s = hospitalDayEnd(s, closingDay, ev.at);
         s = networkDayEnd(s, closingDay);
         s = supportDayEnd(s);
+        s = goalsDayEnd(s, closingDay);
         s = closeDay(s);
         s = residentDepartures(s);
         s = judgeChapter(s, closingDay);
@@ -552,6 +554,7 @@ export function step(state: GameState): GameState {
   s = eventExpiryTick(s);
   // Autopilot (if switched on) answers events and does the routine admin through public commands.
   s = autopilot(s, applyCommand, state.speed);
+  if (s.minute % 60 === 0) s = goalsTick(s);
   // Home visits are booked appointments, so they claim staff before in-house tasks.
   s = homecareTick(s);
   s = hospitalTick(s);

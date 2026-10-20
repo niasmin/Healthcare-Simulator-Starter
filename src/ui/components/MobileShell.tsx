@@ -1,3 +1,4 @@
+import { useOpenMissions } from './GoalsModal';
 import { AccountRow, PrefsList } from './Prefs';
 import { useAutoOn } from './AutoModal';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
@@ -328,6 +329,7 @@ export function MobileShell() {
   const autoOn = useAutoOn();
   const nextChapter = useGame((s) => nextChapterAvailable(s.game));
   const missionBadge = useGame((s) => !!s.game.chapter.result) && !nextChapter;
+  const openMissions = useOpenMissions();
 
   const summary = useMemo(() => summarize(game), [game]);
   const alertCount = useMemo(() => {
@@ -406,6 +408,7 @@ export function MobileShell() {
                     className={autoOn ? '!from-[#f2b631] !to-[#d9901a]' : ''}
                   />
                   <FloatButton emoji="🏙️" label={t('hud.city')} onClick={() => useGame.getState().setCityOpen('city')} />
+                  <FloatButton emoji="🎯" label={t('hud.daily')} onClick={() => useGame.getState().setGoalsOpen(true)} badge={openMissions > 0} />
                 </div>
                 <div className="absolute right-2 top-[11.2rem] z-10 flex flex-col gap-2 pointer-events-none">
                   <FloatButton icon={eventsIcon} label={t('hud.events')} onClick={() => setSheet('events')} />

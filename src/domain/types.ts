@@ -113,6 +113,35 @@ export type LedgerCategory =
   /** Treats and outings bought in town (city map). */
   | 'outing';
 
+export type MissionId = 'no_missed' | 'tasks40' | 'admit_one' | 'hire_one' | 'outing' | 'satisfied75' | 'happy70' | 'cash_up' | 'full_beds';
+export type AchievementId =
+  | 'first_resident'
+  | 'full_ward'
+  | 'beds30'
+  | 'beds60'
+  | 'villas3'
+  | 'team20'
+  | 'all_roles'
+  | 'perfect_day'
+  | 'happy_week'
+  | 'shopper'
+  | 'town_tour'
+  | 'top_town'
+  | 'missions10'
+  | 'missions50';
+/** Daily missions done today, achievements earned (day), and running totals. */
+export interface GoalsState {
+  day: number;
+  done: MissionId[];
+  /** Missions completed over the whole game. */
+  total: number;
+  /** Days in a row with every mission done. */
+  streak: number;
+  /** Stars earned from missions and achievements (they count towards the ranking score). */
+  stars: number;
+  achievements: Partial<Record<AchievementId, number>>;
+}
+
 /** Places in town the player can visit from the city map. */
 export type CityPlace = 'coffee' | 'cake' | 'restaurant' | 'park' | 'mall';
 /** Town visits: the day each place was last used, and the mall deal's last day. */
@@ -670,6 +699,8 @@ export interface GameState {
   perfDays?: RolePerf[];
   /** Town visits from the city map (older saves: absent). */
   city?: CityState;
+  /** Daily missions and achievements (older saves: absent). */
+  goals?: GoalsState;
   // Phase 3
   priceLevel: PriceLevel;
   invoices: Invoice[];
