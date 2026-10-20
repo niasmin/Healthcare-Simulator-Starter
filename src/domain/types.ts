@@ -58,6 +58,8 @@ export interface Room {
   /** Installed equipment counts. Missing key = 0. */
   equipment: Partial<Record<EquipmentId, number>>;
   builtAt: SimMinute;
+  /** The player's name for the building (missing = the default "Ward 1", "Villa 2", ...). */
+  name?: string;
 }
 
 export type DecorType = 'tree' | 'sakura' | 'tree2' | 'flowers' | 'hedge' | 'planter' | 'lamp' | 'umbrella' | 'fountain' | 'gazebo';

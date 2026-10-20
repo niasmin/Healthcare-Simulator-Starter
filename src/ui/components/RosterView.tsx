@@ -146,8 +146,18 @@ function StaffRow({ e }: { e: Employee }) {
   );
 }
 
+/** Staff by profession, the costliest profession first, and within each the highest wage first. */
+export function staffGroups(employees: Employee[]): Array<{ role: StaffRole; staff: Employee[]; payroll: number }> {
+  const byRole = new Map<StaffRole, Employee[]>();
+  for (const e of employees) byRole.set(e.role, [...(byRole.get(e.role) ?? []), e]);
+  return [...byRole.entries()]
+    .map(([role, staff]) => ({ role, staff: [...staff].sort((a, b) => b.wageMonthlySatang - a.wageMonthlySatang), payroll: staff.reduce((a, e) => a + e.wageMonthlySatang, 0) }))
+    .sort((a, b) => b.payroll - a.payroll || ROLE_ORDER.indexOf(a.role) - ROLE_ORDER.indexOf(b.role));
+}
+
 export function RosterView() {
   const t = useT();
+  const money = useMoney();
   const name = useName();
   const game = useGame((s) => s.game);
   const dispatch = useGame((s) => s.dispatch);
@@ -297,11 +307,24 @@ export function RosterView() {
                 <th />
               </tr>
             </thead>
-            <tbody>
-              {game.employees.map((e) => (
-                <StaffRow key={e.id} e={e} />
-              ))}
-            </tbody>
+            {staffGroups(game.employees).map((g) => (
+              <tbody key={g.role}>
+                <tr className="bg-sand/60">
+                  <th colSpan={7} className="py-1.5 px-2 text-left">
+                    <div className="flex items-center gap-2 text-xs">
+                      <RoleChip role={g.role} label={t(`role.${g.role}`)} />
+                      <span className="text-ink-soft">{t('roster.group_count', { n: g.staff.length })}</span>
+                      <span className="ml-auto tabular font-semibold">
+                        {t('roster.group_payroll', { amount: money(g.payroll) })}
+                      </span>
+                    </div>
+                  </th>
+                </tr>
+                {g.staff.map((e) => (
+                  <StaffRow key={e.id} e={e} />
+                ))}
+              </tbody>
+            ))}
           </table>
         )}
       </section>

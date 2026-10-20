@@ -178,6 +178,14 @@ Results:
     - Chapter 2's specialised fittings go into another ward while a programme still has nobody and no fitted bed is free.
     - The land purchase counts as the day's spend, so a room waits until the money is back. Before that fix, seed 8 went bankrupt on day 151.
 
+### Running the home: names, zones and lists
+
+- **Building names:** every ward and villa gets a default name ("Ward 1", "Villa 2"). One-of-a-kind rooms keep their plain name unless there are several. Rename any building from its details (✏️); the name shows on the map labels, in the alerts and on the residents page.
+- **Residents by building:** the residents page has one section per ward or villa, with its name and how full it is. When there are villas, there are tabs for all, wards and villas, so it is easy to see who lives where and to discharge from a particular building.
+- **Staff by profession:** the staff list is grouped by profession, the costliest group first, with each group's headcount and monthly payroll; within a group the highest wage comes first.
+- **Price level:** the finance page adds an 🤖 Automatic choice next to value, standard and premium. It switches on automatic pricing and shows the level chosen today. Picking a level by hand switches it off.
+- **Hire button:** on the phone, the bottom bar has Build, Hire (with the number of applicants), Residents and Report.
+
 ### More land
 
 The plots down the street are sold one after another. Each grows the lot east, and everything already built stays where it is.
@@ -187,6 +195,9 @@ The plots down the street are sold one after another. Each grows the lot east, a
 | 1 | 32×20 | ฿300,000 | 3 |
 | 2 | 44×20 | ฿500,000 | 4 |
 | 3 | 56×20 | ฿800,000 | 5 |
+| 4 and on | +12 columns each | 30% more each time (฿1,040,000, ฿1,350,000, …) | 5 |
+
+The street ends at 152 columns.
 
 ### Exterior view
 
@@ -602,7 +613,7 @@ src/
   - Food, supplies, upkeep and payroll are each charged once per day.
   - An event's cost is charged once, and a resolved event can't be resolved again.
 
-## Tests (221 passing)
+## Tests (225 passing)
 
 | File | Covers |
 |---|---|
@@ -622,6 +633,7 @@ src/
 | `autopilot.test.ts` | Off by default and switched by command; with all switches on, a built home runs 30 days on its own (8+ residents, every one with a plan, an RN hired, >90% of care done, cash positive, ledger and unique beds intact); from the starter campus it builds every basic room, staffs and fills the home and wins chapter 1 solvent; it builds only what is missing or needed and never without money to spare; "play every chapter" wins chapters 1–3 back to back unattended and carries straight on into chapter 4; after a verdict it starts the next chapter on a win or replays on a loss, at the speed before; Home Care, training, placements and the shop each work on their own (from their chapter, touching nothing else, and the shop never buys when short); time away is played out at the game's speed, capped at 30 days; pricing picks value, premium or standard by demand; staff care gives a tired person their second shift off and builds a staff room; the garden switch plants up to full appeal away from corridors; alerts fire for low cash and for a paused game; events answered at once without pausing, accepting the staff request; nothing happens with it off |
 | `land.test.ts` | Three plots sold in order for their prices, each from its chapter, keeping every room and corridor tile; then already done; locked by chapter and by cash; a room can be built on the newest plot; the autopilot's land purchase runs a corridor into the new plot so a villa can open there |
 | `supabase.test.ts` | A save round-trips through `game_saves` rows: one row per part, each under the size check, keyed by the player's id; another player sees none of it; removal deletes every part; off without the build settings; Supabase auth messages map to the reasons the sign-in window explains |
+| `buildings.test.ts` | Wards and villas are numbered by age, one-of-a-kind rooms are not; renaming trims, caps at 30 characters, and an empty name brings the default back; the staff list groups by profession, costliest first, highest wage first |
 | `shop.test.ts` | Upgrades are bought once, for their price, from their chapter (all at once in the sandbox); the central kitchen and laundry cut food and supplies by their percentages; staff welfare adds morale; online marketing adds an enquiry; the family app lifts reputation while residents are content; the smart call system keeps late routine care pending 30 minutes longer |
 | `modes.test.ts` | Campaign games are unchanged; sandbox books ฿50M as capital, unlocks every room, has no tutorial steps and is never judged after 70 days; each challenge opens with its own cash, reputation or chapter; each challenge is won by the scripted player and ends without a next chapter |
 | `chapter7.test.ts` | **Full 390-day campaign:** all 7 chapters won on schedule and solvent, ledger reconciles; one branch of each kind, each manager of the right role and off the roster; branch invoices exact; network occupancy ≥ 70%. **Opening:** locked before chapter 7; manager role checked; full opening cost charged; managers can’t take shifts or a second branch; cap of 5. **Running:** good branches fill and bill daily, poor ones empty, a poor name at headquarters stops growth; certificates raise the quality target; a lost manager leaves the branch leaderless until one is appointed; support visits lift quality, cost money and have a cooldown; closing refunds 30% and frees the manager; busy clinic branches refer to the stroke unit. Guide order; v9→v10 migration |

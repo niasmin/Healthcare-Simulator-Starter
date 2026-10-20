@@ -77,9 +77,22 @@ export const LAND_PLOTS: LandPlot[] = [
   { width: 56, priceSatang: thb(800_000), chapter: 5 },
 ];
 
+/** After the three plots above, the street goes on: 12 more columns a plot, each 30% dearer. */
+export const EXTRA_PLOT_WIDTH = 12;
+export const EXTRA_PLOT_GROWTH = 1.3;
+/** The lot stops growing here (the far end of the street). */
+export const MAX_LOT_WIDTH = 152;
+
 /** The next plot to buy, or null when the whole street is ours. */
 export function nextPlot(width: number): LandPlot | null {
-  return LAND_PLOTS.find((p) => p.width > width) ?? null;
+  const listed = LAND_PLOTS.find((p) => p.width > width);
+  if (listed) return listed;
+  const last = LAND_PLOTS[LAND_PLOTS.length - 1];
+  if (width < last.width || width + EXTRA_PLOT_WIDTH > MAX_LOT_WIDTH) return null;
+  const k = Math.round((width - last.width) / EXTRA_PLOT_WIDTH) + 1;
+  // Whole thousands of baht, like the listed plots.
+  const price = Math.round((last.priceSatang * Math.pow(EXTRA_PLOT_GROWTH, k)) / 100_000) * 100_000;
+  return { width: width + EXTRA_PLOT_WIDTH, priceSatang: price, chapter: last.chapter };
 }
 
 /** Chapters shown on the road map (the rest unlock in later versions). */
