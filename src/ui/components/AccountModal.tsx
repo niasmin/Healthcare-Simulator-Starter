@@ -31,7 +31,7 @@ export function AccountModal({ onClose }: { onClose: () => void }) {
     if (recovering) setMode('newpass');
   }, [recovering]);
   // Only the providers the project has switched on get a button.
-  const [providers, setProviders] = useState<Record<OAuthProvider, boolean>>({ google: false, apple: false });
+  const [providers, setProviders] = useState<Record<OAuthProvider, boolean>>({ google: false });
   useEffect(() => {
     let alive = true;
     void supabase?.providers().then((p) => alive && setProviders(p));
@@ -43,7 +43,7 @@ export function AccountModal({ onClose }: { onClose: () => void }) {
     if (!supabase) return;
     setBusy(true);
     setError(null);
-    // The page leaves for Google or Apple and comes back signed in: keep the game first.
+    // The page leaves for Google and comes back signed in: keep the game first.
     if (useGame.getState().started) await saveTo('auto').catch(() => undefined);
     const r = await supabase.signInWith(provider);
     if (!r.ok) {
@@ -155,7 +155,7 @@ export function AccountModal({ onClose }: { onClose: () => void }) {
                 ))}
               </div>
             )}
-            {(mode === 'signin' || mode === 'signup') && (providers.google || providers.apple) && (
+            {(mode === 'signin' || mode === 'signup') && providers.google && (
               <div className="flex flex-col gap-2">
                 {providers.google && (
                   <button type="button" disabled={busy} onClick={() => void social('google')} className="rounded-xl border border-line bg-white px-3 py-2 text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-60">
@@ -166,14 +166,6 @@ export function AccountModal({ onClose }: { onClose: () => void }) {
                       <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z" />
                     </svg>
                     {t('auth.with_google')}
-                  </button>
-                )}
-                {providers.apple && (
-                  <button type="button" disabled={busy} onClick={() => void social('apple')} className="rounded-xl bg-black text-white px-3 py-2 text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-60">
-                    <svg viewBox="0 0 24 24" className="size-5" fill="currentColor" aria-hidden>
-                      <path d="M16.4 12.6c0-2.3 1.9-3.4 2-3.5-1.1-1.6-2.8-1.8-3.4-1.8-1.4-.1-2.8.9-3.5.9-.7 0-1.8-.9-3-.8-1.5 0-3 .9-3.8 2.3-1.6 2.8-.4 7 1.2 9.3.8 1.1 1.7 2.4 2.9 2.3 1.2 0 1.6-.7 3-.7s1.8.7 3 .7c1.2 0 2-1.1 2.8-2.3.9-1.3 1.2-2.5 1.2-2.6 0 0-2.4-.9-2.4-3.8zM14.1 5.8c.6-.8 1.1-1.8 1-2.8-.9 0-2 .6-2.6 1.4-.6.7-1.1 1.7-1 2.7 1 .1 2-.5 2.6-1.3z" />
-                    </svg>
-                    {t('auth.with_apple')}
                   </button>
                 )}
                 <div className="flex items-center gap-2 text-[11px] text-ink-soft">
