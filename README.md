@@ -59,7 +59,11 @@ Chapters 5–7 (PHC workforce, Neuro Hospital, multi-site empire) come in Phase 
 - **Side menus:** Missions opens the chapter road map, Guide opens a 6-step how-to-play, and News lists what is in this version. Shop and Ranking are shown locked (“coming soon”).
 - **Mode tabs:** Campaign is playable. Challenge and Sandbox are locked.
 - **Business cards** (Nursing Home, Tranquila, Home Care, Neuroclinic, Rehabilitation, Staff, Inventory, Management, Achievement) show the chapter that unlocks each one, or a lock when it isn't built yet. Tapping a card opens the road map.
-- Works at phone width: the side menus become one row, the buttons stack, and the cards scroll sideways. Dialogs close with Esc or ✕.
+- **Phone portrait layout (≤ 640 px wide)** follows the portrait concept art. The key art, with the baked-in buttons painted out, sits behind real controls:
+  - a manager card, cash/residents/reputation pills and settings (language, My saves) at the top;
+  - Missions, Events 🔒, Rewards and Shop 🔒 on the left, and News and Guide on the right;
+  - big New Game and Continue buttons, the mode tabs and scrolling business cards at the bottom.
+- Dialogs close with Esc or ✕.
 
 ### Play-screen upgrade: a living town, ready-made rooms and a starter campus
 
