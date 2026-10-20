@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import type { AuthResult } from '../../storage/supabaseStore';
+import type { AuthResult, OAuthProvider } from '../../storage/supabaseStore';
 import { useT } from '../hooks';
-import { supabase, useSaveStatus } from '../saveService';
+import { saveTo, supabase, useSaveStatus } from '../saveService';
 import { useGame } from '../store';
 
 type Mode = 'signin' | 'signup' | 'forgot' | 'newpass';
@@ -30,6 +30,27 @@ export function AccountModal({ onClose }: { onClose: () => void }) {
   useEffect(() => {
     if (recovering) setMode('newpass');
   }, [recovering]);
+  // Only the providers the project has switched on get a button.
+  const [providers, setProviders] = useState<Record<OAuthProvider, boolean>>({ google: false, apple: false });
+  useEffect(() => {
+    let alive = true;
+    void supabase?.providers().then((p) => alive && setProviders(p));
+    return () => {
+      alive = false;
+    };
+  }, []);
+  const social = async (provider: OAuthProvider) => {
+    if (!supabase) return;
+    setBusy(true);
+    setError(null);
+    // The page leaves for Google or Apple and comes back signed in: keep the game first.
+    if (useGame.getState().started) await saveTo('auto').catch(() => undefined);
+    const r = await supabase.signInWith(provider);
+    if (!r.ok) {
+      setBusy(false);
+      setError(t(`auth.err.${r.reason}`));
+    }
+  };
 
   const signedIn = !!account && !account.anonymous && !!account.email;
   const run = async (fn: () => Promise<AuthResult>, onOk: (r: Extract<AuthResult, { ok: true }>) => void) => {
@@ -132,6 +153,34 @@ export function AccountModal({ onClose }: { onClose: () => void }) {
                     {t(`auth.mode.${m}`)}
                   </button>
                 ))}
+              </div>
+            )}
+            {(mode === 'signin' || mode === 'signup') && (providers.google || providers.apple) && (
+              <div className="flex flex-col gap-2">
+                {providers.google && (
+                  <button type="button" disabled={busy} onClick={() => void social('google')} className="rounded-xl border border-line bg-white px-3 py-2 text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-60">
+                    <svg viewBox="0 0 48 48" className="size-5" aria-hidden>
+                      <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 13 4 4 13 4 24s9 20 20 20 20-9 20-20c0-1.3-.1-2.4-.4-3.5z" />
+                      <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z" />
+                      <path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z" />
+                      <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z" />
+                    </svg>
+                    {t('auth.with_google')}
+                  </button>
+                )}
+                {providers.apple && (
+                  <button type="button" disabled={busy} onClick={() => void social('apple')} className="rounded-xl bg-black text-white px-3 py-2 text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-60">
+                    <svg viewBox="0 0 24 24" className="size-5" fill="currentColor" aria-hidden>
+                      <path d="M16.4 12.6c0-2.3 1.9-3.4 2-3.5-1.1-1.6-2.8-1.8-3.4-1.8-1.4-.1-2.8.9-3.5.9-.7 0-1.8-.9-3-.8-1.5 0-3 .9-3.8 2.3-1.6 2.8-.4 7 1.2 9.3.8 1.1 1.7 2.4 2.9 2.3 1.2 0 1.6-.7 3-.7s1.8.7 3 .7c1.2 0 2-1.1 2.8-2.3.9-1.3 1.2-2.5 1.2-2.6 0 0-2.4-.9-2.4-3.8zM14.1 5.8c.6-.8 1.1-1.8 1-2.8-.9 0-2 .6-2.6 1.4-.6.7-1.1 1.7-1 2.7 1 .1 2-.5 2.6-1.3z" />
+                    </svg>
+                    {t('auth.with_apple')}
+                  </button>
+                )}
+                <div className="flex items-center gap-2 text-[11px] text-ink-soft">
+                  <span className="h-px flex-1 bg-line" />
+                  {t('auth.or_email')}
+                  <span className="h-px flex-1 bg-line" />
+                </div>
               </div>
             )}
             {mode === 'signup' && <input className={field} required maxLength={40} value={name} onChange={(e) => setName(e.target.value)} placeholder={t('auth.name')} autoComplete="nickname" />}

@@ -74,6 +74,7 @@ describe('Supabase cloud saves', () => {
     expect(authReason('Unable to validate email address: invalid format')).toBe('invalid_email');
     expect(authReason('For security purposes, you can only request this after 30 seconds. Too many requests')).toBe('rate_limited');
     expect(authReason('Failed to fetch')).toBe('network');
+    expect(authReason('Unsupported provider: provider is not enabled')).toBe('provider_off');
     expect(authReason('something else')).toBe('unknown');
   });
 });
