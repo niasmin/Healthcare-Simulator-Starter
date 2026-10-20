@@ -1,3 +1,4 @@
+import { useAutoOn } from './AutoModal';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { GameSpeed } from '../../domain/types';
 import { headline, rosterView, summarize } from '../../sim/selectors';
@@ -177,14 +178,14 @@ function MobileTopBar({ alertCount, overlay }: { alertCount: number; overlay: bo
 }
 
 /** Square floating map button with a concept-art icon and a caption. */
-function FloatButton({ icon, label, onClick, badge, className = '' }: { icon: string; label: string; onClick: () => void; badge?: boolean; className?: string }) {
+function FloatButton({ icon, emoji, label, onClick, badge, className = '' }: { icon?: string; emoji?: string; label: string; onClick: () => void; badge?: boolean; className?: string }) {
   return (
     <button
       type="button"
       onClick={onClick}
       className={`pointer-events-auto relative w-[3.9rem] rounded-2xl bg-gradient-to-b from-[#2a5d93] to-[#173f6b] border-2 border-white/80 shadow-lg pt-1 pb-1 flex flex-col items-center ${className}`}
     >
-      <img src={icon} alt="" className="h-8 object-contain" />
+      {icon ? <img src={icon} alt="" className="h-8 object-contain" /> : <span className="h-8 text-2xl leading-8" aria-hidden>{emoji}</span>}
       <span className="text-[10px] font-bold text-white leading-tight">{label}</span>
       {badge && <span className="absolute -top-1.5 -right-1.5 size-5 rounded-full bg-coral border-2 border-white text-white text-[11px] font-black grid place-items-center">!</span>}
     </button>
@@ -310,6 +311,9 @@ export function MobileShell() {
   const setTool = useGame((s) => s.setTool);
   const showLabels = useGame((s) => s.showLabels);
   const setShowLabels = useGame((s) => s.setShowLabels);
+  const exterior = useGame((s) => s.exterior);
+  const setExterior = useGame((s) => s.setExterior);
+  const autoOn = useAutoOn();
   const nextChapter = useGame((s) => nextChapterAvailable(s.game));
   const missionBadge = useGame((s) => !!s.game.chapter.result) && !nextChapter;
 
@@ -383,6 +387,12 @@ export function MobileShell() {
               <>
                 <div className="absolute left-2 top-[11.2rem] z-10 flex flex-col gap-2 pointer-events-none">
                   <FloatButton icon={clipIcon} label={t('hud.missions')} onClick={() => setSheet('missions')} badge={missionBadge} />
+                  <FloatButton
+                    emoji="🤖"
+                    label={t(autoOn ? 'auto.on' : 'hud.auto')}
+                    onClick={() => useGame.getState().setAutoOpen(true)}
+                    className={autoOn ? '!from-[#f2b631] !to-[#d9901a]' : ''}
+                  />
                 </div>
                 <div className="absolute right-2 top-[11.2rem] z-10 flex flex-col gap-2 pointer-events-none">
                   <FloatButton icon={eventsIcon} label={t('hud.events')} onClick={() => setSheet('events')} />
@@ -405,7 +415,17 @@ export function MobileShell() {
                 <span className="text-[10px] font-bold text-white leading-tight">{t('hud.overview')}</span>
               </button>
             </div>
-            <div className="absolute right-2 bottom-2 z-10 pointer-events-none">
+            <div className="absolute right-2 bottom-2 z-10 pointer-events-none flex gap-2">
+              <button
+                type="button"
+                onClick={() => setExterior(!exterior)}
+                aria-pressed={exterior}
+                title={t(exterior ? 'canvas.interior' : 'canvas.exterior')}
+                aria-label={t(exterior ? 'canvas.interior' : 'canvas.exterior')}
+                className={`pointer-events-auto size-12 rounded-2xl border-2 shadow-lg grid place-items-center text-2xl ${exterior ? 'bg-white border-white' : 'bg-[#14365f]/85 border-white/60'}`}
+              >
+                🏠
+              </button>
               <button
                 type="button"
                 onClick={() => setShowLabels(!showLabels)}

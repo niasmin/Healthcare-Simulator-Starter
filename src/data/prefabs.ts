@@ -31,6 +31,7 @@ export const PREFABS: PrefabDef[] = [
   { id: 'laundry', roomType: 'laundry_room', w: 2, h: 2, equipment: { washer: 2 } },
   { id: 'reception', roomType: 'reception', w: 3, h: 2, equipment: { reception_desk: 1, waiting_chairs: 1 } },
   { id: 'storage', roomType: 'storage_room', w: 2, h: 2, equipment: { storage_rack: 2 } },
+  { id: 'bathroom', roomType: 'bathroom', w: 2, h: 2, equipment: { bath_set: 2 } },
 ];
 
 export function prefabDef(id: string): PrefabDef | undefined {

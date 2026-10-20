@@ -61,6 +61,11 @@ interface UIStore {
   /** Room name pills on the map (toggled by the layers button). */
   showLabels: boolean;
   setShowLabels: (v: boolean) => void;
+  /** Exterior view: rooms drawn as finished buildings with roofs, seen from above. */
+  exterior: boolean;
+  setExterior: (v: boolean) => void;
+  autoOpen: boolean;
+  setAutoOpen: (v: boolean) => void;
   /** The tutorial card is folded into a small chip (remembered per browser). */
   tutorialHidden: boolean;
   setTutorialHidden: (v: boolean) => void;
@@ -107,6 +112,10 @@ export const useGame = create<UIStore>((set, get) => ({
   setSheet: (sheet) => set({ sheet }),
   showLabels: true,
   setShowLabels: (showLabels) => set({ showLabels }),
+  exterior: false,
+  setExterior: (exterior) => set({ exterior }),
+  autoOpen: false,
+  setAutoOpen: (autoOpen) => set({ autoOpen }),
 
   dispatch: (cmd) => {
     const { state, result } = applyCommand(get().game, cmd);

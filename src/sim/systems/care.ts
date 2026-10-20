@@ -10,6 +10,7 @@ import { allocId } from '../helpers';
 import { applyNeedDelta } from './needs';
 import { recordService } from './billing';
 import { EXHAUSTED_ENERGY } from './staffing';
+import { BATHROOM_CARE_PERCENT } from './support';
 
 /**
  * Care Plan Engine.
@@ -81,6 +82,9 @@ export function careTick(state: GameState): GameState {
   let changed = false;
 
   const statuses = allRoomStatuses(state.site);
+
+  // A bath & hygiene room (grab rails, shower chairs) makes personal care quicker.
+  const bathroom = state.site.rooms.some((x) => x.type === 'bathroom' && statuses.get(x.id)?.operational);
   const therapyOpen = state.site.rooms.some((r) => r.type === 'therapy' && statuses.get(r.id)?.operational);
 
   const tasks = state.tasks.map((t) => ({ ...t }));
@@ -139,7 +143,8 @@ export function careTick(state: GameState): GameState {
       const narrowSkills = new Set<string>(narrowest?.skills ?? []);
       const e = urgent ? candidates[0] : candidates.find((c) => c.skills.length === narrowest?.skills.length || !reservedFor(c, t, tasks, now, narrowSkills));
       if (!e) continue;
-      const duration = e.energy < 30 ? Math.round(t.duration * 1.5) : t.duration;
+      const base = bathroom && t.kind === 'personal_care' ? Math.round((t.duration * BATHROOM_CARE_PERCENT) / 100) : t.duration;
+      const duration = e.energy < 30 ? Math.round(base * 1.5) : base;
       t.status = 'in_progress';
       t.assigneeId = e.id;
       t.finishAt = now + duration;

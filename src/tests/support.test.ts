@@ -7,6 +7,7 @@ import { dailyResidentCosts } from '../sim/systems/billing';
 import { dailyUpkeep } from '../sim/systems/finance';
 import { refreshCandidates } from '../sim/systems/staffing';
 import {
+  BATHROOM_CARE_PERCENT,
   DINING_MEAL_HAPPINESS,
   DINING_MEAL_NUTRITION,
   LAUNDRY_UPKEEP_PERCENT,
@@ -22,19 +23,19 @@ import { needsTick } from '../sim/systems/needs';
 import type { GameState } from '../domain/types';
 import { admit, buildHome, hire, ok, quietEvents } from './helpers';
 
-const SPOT = { pharmacy: { x: 14, y: 11 }, laundry: { x: 16, y: 11 }, dining: { x: 10, y: 13 }, reception: { x: 0, y: 0 }, storage: { x: 0, y: 0 } };
+const SPOT = { pharmacy: { x: 14, y: 11 }, laundry: { x: 16, y: 11 }, dining: { x: 10, y: 13 }, reception: { x: 0, y: 0 }, storage: { x: 0, y: 0 }, bathroom: { x: 0, y: 0 } };
 const home = (): GameState => {
   const s = quietEvents(buildHome(createInitialState(8)));
   return { ...s, chapter: { id: 2, startDay: 1, result: null, past: [] } };
 };
 type Support = keyof typeof SPOT;
 const withRoom = (s: GameState, prefab: Support): GameState => {
-  if (prefab === 'reception' || prefab === 'storage') {
+  if (prefab === 'reception' || prefab === 'storage' || prefab === 'bathroom') {
     // Any free spot next to the corridor will do.
     for (let y = 0; y < 20; y++)
       for (let x = 0; x < 20; x++) {
         const out = applyCommand(s, { type: 'placePrefab', prefab, origin: { x, y } });
-        if (out.result.ok && out.state.site.rooms.some((r) => r.type === (prefab === 'reception' ? 'reception' : 'storage_room') && roomOpen(out.state, r.type))) return out.state;
+        if (out.result.ok && out.state.site.rooms.some((r) => r.type === ({ reception: 'reception', storage: 'storage_room', bathroom: 'bathroom' } as const)[prefab] && roomOpen(out.state, r.type))) return out.state;
       }
     throw new Error(`no spot for ${prefab}`);
   }
@@ -140,6 +141,25 @@ describe('support rooms and staff', () => {
     s = withRoom(s, 'pharmacy');
     [s] = hire(s, 'pharmacist', ['morning']);
     expect(dailyResidentCosts(s).supplies).toBe(pctOf(pctOf(base, PHARMACY_SUPPLIES_PERCENT), STORAGE_SUPPLIES_PERCENT));
+  });
+
+  it('a bath & hygiene room makes personal care quicker', () => {
+    const run = (withBath: boolean) => {
+      let s = home();
+      if (withBath) s = withRoom(s, 'bathroom');
+      [s] = admit(s, { group: 'bedridden', careLevel: 4 });
+      [s] = hire(s, 'rn', ['morning']);
+      [s] = hire(s, 'caregiver', ['morning']);
+      s = ok(s, { type: 'createCarePlan', residentId: s.residents[0].id });
+      for (let i = 0; i < 12; i++) {
+        s = step(s);
+        const t = s.tasks.find((x) => x.kind === 'personal_care' && x.status === 'in_progress');
+        if (t) return t.finishAt! - s.minute;
+      }
+      throw new Error('no personal care started');
+    };
+    expect(run(true)).toBe(Math.round((30 * BATHROOM_CARE_PERCENT) / 100));
+    expect(run(false)).toBe(30);
   });
 
   it('support rooms are optional: nothing in a campaign chapter requires them', () => {

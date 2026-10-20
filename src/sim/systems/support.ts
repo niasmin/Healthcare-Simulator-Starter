@@ -13,6 +13,7 @@ import { makeApplicant } from './staffing';
  * - Reception + receptionist: a staffed front desk turns more calls into enquiries (+1 family a day).
  * - Reception + security guard: families feel their relatives are safe (satisfaction up a little each day).
  * - Storage room (no staff): stock bought in bulk cuts daily supplies a little.
+ * - Bath & hygiene room (no staff): personal care (washing, dressing) takes a third less time.
  */
 
 export const PHARMACY_SUPPLIES_PERCENT = 90;
@@ -24,6 +25,7 @@ export const CLEANER_HAPPINESS_PER_DAY = 1;
 export const RECEPTION_EXTRA_ENQUIRIES = 1;
 export const SECURITY_SATISFACTION_PER_DAY = 0.3;
 export const STORAGE_SUPPLIES_PERCENT = 95;
+export const BATHROOM_CARE_PERCENT = 67;
 
 export const SUPPORT_ROOM: Partial<Record<StaffRole, RoomType>> = { pharmacist: 'pharmacy', nutritionist: 'dining_room', cleaner: 'laundry_room', receptionist: 'reception', security: 'reception' };
 

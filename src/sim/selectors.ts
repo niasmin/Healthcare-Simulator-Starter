@@ -36,7 +36,7 @@ export function summarize(state: GameState): SiteSummary {
   let roomsOperational = 0;
   let bedsInstalled = 0;
   let bedsOperational = 0;
-  const operationalByType: Record<RoomType, number> = { ward: 0, nursing_station: 0, therapy: 0, staff_room: 0, villa: 0, homecare_office: 0, training_room: 0, neuro_clinic: 0, stroke_unit: 0, pharmacy: 0, dining_room: 0, laundry_room: 0, reception: 0, storage_room: 0 };
+  const operationalByType: Record<RoomType, number> = { ward: 0, nursing_station: 0, therapy: 0, staff_room: 0, villa: 0, homecare_office: 0, training_room: 0, neuro_clinic: 0, stroke_unit: 0, pharmacy: 0, dining_room: 0, laundry_room: 0, reception: 0, storage_room: 0, bathroom: 0 };
   for (const room of state.site.rooms) {
     const st = statuses.get(room.id)!;
     bedsInstalled += st.installedBeds;
