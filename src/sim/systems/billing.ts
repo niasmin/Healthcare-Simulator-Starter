@@ -38,10 +38,10 @@ export function hasInvoice(state: GameState, clientId: string, month: number, ki
   return state.invoices.some((i) => i.clientId === clientId && i.month === month && i.kind === kind);
 }
 
-function issue(state: GameState, resident: Resident, kind: Invoice['kind'], month: number, lines: InvoiceLine[]): GameState {
+export function issue(state: GameState, resident: Pick<Resident, 'id' | 'name'>, kind: Invoice['kind'], month: number, lines: InvoiceLine[]): GameState {
   if (!lines.length) return state;
   // Invariant: at most one admission/monthly invoice per resident per month.
-  if (kind !== 'final' && (hasInvoice(state, resident.id, month, 'admission') || hasInvoice(state, resident.id, month, 'monthly'))) return state;
+  if ((kind === 'admission' || kind === 'monthly') && (hasInvoice(state, resident.id, month, 'admission') || hasInvoice(state, resident.id, month, 'monthly'))) return state;
   let s = state;
   let id: string, delay: number;
   [s, id] = allocId(s, 'inv');
@@ -66,7 +66,7 @@ function issue(state: GameState, resident: Resident, kind: Invoice['kind'], mont
 export function billAdmission(state: GameState, resident: Resident): GameState {
   const day = dayOf(state.minute);
   const days = DAYS_PER_MONTH - dayInMonth(day) + 1;
-  const fee = monthlyFee(resident.careLevel, state.priceLevel, resident.group);
+  const fee = monthlyFee(resident.careLevel, state.priceLevel, resident.group, resident.premium);
   const amount = Math.floor((fee * days) / DAYS_PER_MONTH / 100) * 100;
   const line: InvoiceLine = { stream: 'room_care', memo: 'invoice.line.room_care_days', memoParams: { days, level: resident.careLevel }, qty: days, unitSatang: Math.floor(fee / DAYS_PER_MONTH), amountSatang: amount };
   return issue(state, resident, 'admission', monthOfDay(day), [line]);
@@ -76,7 +76,7 @@ export function billAdmission(state: GameState, resident: Resident): GameState {
 export function billMonth(state: GameState, month: number): GameState {
   let s = state;
   for (const r of state.residents) {
-    const fee = monthlyFee(r.careLevel, s.priceLevel, r.group);
+    const fee = monthlyFee(r.careLevel, s.priceLevel, r.group, r.premium);
     const lines: InvoiceLine[] = [
       { stream: 'room_care', memo: 'invoice.line.room_care', memoParams: { level: r.careLevel }, qty: 1, unitSatang: fee, amountSatang: fee },
       ...serviceLines(s.unbilled[r.id] ?? EMPTY),
@@ -98,7 +98,7 @@ export function billFinal(state: GameState, resident: Resident): GameState {
   return s;
 }
 
-export function recordService(state: GameState, residentId: string, stream: Exclude<RevenueStream, 'room_care'>, n = 1): GameState {
+export function recordService(state: GameState, residentId: string, stream: Exclude<RevenueStream, 'room_care' | 'homecare'>, n = 1): GameState {
   const cur = state.unbilled[residentId] ?? EMPTY;
   return { ...state, unbilled: { ...state.unbilled, [residentId]: { ...cur, [stream]: cur[stream] + n } } };
 }

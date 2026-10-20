@@ -19,13 +19,14 @@ describe('chapter 2: Professional Nursing Center (campaign playthrough)', () => 
   const s = run.state;
 
   it('wins chapter 1, starts chapter 2 the next day and wins it on day 90', () => {
-    expect(s.chapter.past).toHaveLength(1);
+    // The day-91 turn already starts chapter 3, so chapter 2's verdict is the latest one in `past`.
     expect(s.chapter.past[0]).toMatchObject({ chapter: 1, outcome: 'won', day: 30 });
-    expect(s.chapter).toMatchObject({ id: 2, startDay: 31 });
-    expect(s.chapter.result).toMatchObject({ chapter: 2, outcome: 'won', reason: 'complete', day: 90 });
-    expect(s.chapter.result!.checks.map((c) => c.id)).toEqual(['solvent', 'beds', 'residents', 'rn', 'programmes', 'cashflow', 'quality']);
+    const ch2 = s.chapter.past[1];
+    expect(ch2).toMatchObject({ chapter: 2, outcome: 'won', reason: 'complete', day: 90 });
+    expect(s.chapter).toMatchObject({ id: 3, startDay: 91 });
+    expect(ch2.checks.map((c) => c.id)).toEqual(['solvent', 'beds', 'residents', 'rn', 'programmes', 'cashflow', 'quality']);
     expect(run.minCash).toBeGreaterThan(0);
-    expect(buildObjectives(s).every((g) => g.done)).toBe(true);
+    expect(buildObjectives({ ...s, chapter: { id: 2, startDay: 31, result: ch2, past: [] } }).every((g) => g.done)).toBe(true);
   });
 
   it('keeps the programme rules: secured beds for dementia, airway care only by RNs, an RN at night', () => {
@@ -85,7 +86,7 @@ describe('chapter rules', () => {
     expect(next.chapter.past).toHaveLength(1);
     for (const g of PROGRAMMES) expect(next.waitlist.some((c) => c.group === g)).toBe(true);
     expect(applyCommand(next, { type: 'startChapter' }).result.ok).toBe(false);
-    expect(CHAPTERS).toHaveLength(2);
+    expect(CHAPTERS).toHaveLength(4);
   });
 
   it('dementia needs a secured ward; others fill ordinary wards first', () => {

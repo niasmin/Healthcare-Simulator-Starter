@@ -20,17 +20,18 @@ export function residentsInRoom(state: GameState, roomId: string) {
  * Free beds in OPERATIONAL wards, in deterministic order (room order, then index).
  * Invariant: a bed id is never held by two residents.
  */
-export function freeBeds(state: GameState, group?: CareGroup): string[] {
+/** Premium residents only take villa beds; everyone else takes ward beds. */
+export function freeBeds(state: GameState, group?: CareGroup, premium = false): string[] {
   const statuses = allRoomStatuses(state.site);
   const taken = new Set(state.residents.map((r) => r.bedId));
   const needs = group ? GROUP_WARD_EQUIPMENT[group] : undefined;
   const out: string[] = [];
   const secured: string[] = [];
   for (const room of state.site.rooms) {
-    if (room.type !== 'ward') continue;
+    if (room.type !== (premium ? 'villa' : 'ward')) continue;
     const st = statuses.get(room.id)!;
     if (!st.operational) continue;
-    if (needs && !needs.every((k) => (room.equipment[k] ?? 0) > 0)) continue;
+    if (needs && !premium && !needs.every((k) => (room.equipment[k] ?? 0) > 0)) continue;
     // Other residents fill ordinary wards first, keeping specialised beds for those who need them.
     const list = !needs && PROGRAMME_EQUIPMENT.some((k) => (room.equipment[k] ?? 0) > 0) ? secured : out;
     for (let i = 0; i < st.capacity; i++) {

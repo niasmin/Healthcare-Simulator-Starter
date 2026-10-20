@@ -26,6 +26,7 @@ export const EQUIPMENT: Record<EquipmentId, EquipmentDef> = {
   door_sensor: { id: 'door_sensor', costSatang: thb(35_000), color: 0x8a5a9e },
   feeding_pump: { id: 'feeding_pump', costSatang: thb(12_000), color: 0xe8eef2 },
   suction_unit: { id: 'suction_unit', costSatang: thb(20_000), color: 0xdfe8f0 },
+  care_van: { id: 'care_van', costSatang: thb(180_000), color: 0xf4f6f8 },
 };
 
 export interface EquipmentSlot {
@@ -49,6 +50,8 @@ export interface RoomDef {
   equipment: EquipmentSlot[];
   floorColor: number;
   wallColor: number;
+  /** First chapter in which the room can be built (default 1). */
+  unlockChapter?: number;
 }
 
 /** A care bed needs two tiles of floor space (bed + clearance). */
@@ -120,9 +123,48 @@ export const ROOMS: Record<RoomType, RoomDef> = {
     floorColor: 0xeedcc4,
     wallColor: 0xa77b4f,
   },
+  villa: {
+    type: 'villa',
+    minSide: 3,
+    minArea: 9,
+    maxArea: 16,
+    baseCostSatang: thb(80_000),
+    costPerTileSatang: thb(10_000),
+    upkeepPerTileSatang: thb(45),
+    // A private suite for one premium resident: bed, call bell and a living corner.
+    equipment: [
+      { id: 'care_bed', required: 1, max: () => 1 },
+      { id: 'call_system', required: 1, max: () => 1 },
+      { id: 'rest_sofa', required: 1, max: () => 1 },
+    ],
+    floorColor: 0xeadfca,
+    wallColor: 0xb08850,
+    unlockChapter: 3,
+  },
+  homecare_office: {
+    type: 'homecare_office',
+    minSide: 2,
+    minArea: 4,
+    maxArea: 12,
+    baseCostSatang: thb(60_000),
+    costPerTileSatang: thb(12_000),
+    upkeepPerTileSatang: thb(25),
+    // Each van carries one visit at a time.
+    equipment: [
+      { id: 'nurse_desk', required: 1, max: () => 1 },
+      { id: 'care_van', required: 1, max: (r) => Math.max(1, Math.floor(rectArea(r) / 3)) },
+    ],
+    floorColor: 0xcfe3ec,
+    wallColor: 0x3f7f9a,
+    unlockChapter: 4,
+  },
 };
 
-export const ROOM_TYPES: RoomType[] = ['ward', 'nursing_station', 'therapy', 'staff_room'];
+
+
+export const ROOM_TYPES: RoomType[] = ['ward', 'nursing_station', 'therapy', 'staff_room', 'villa', 'homecare_office'];
+/** Rooms whose care beds count as resident capacity. */
+export const BED_ROOMS: RoomType[] = ['ward', 'villa'];
 
 export const CORRIDOR_COST_PER_TILE: Satang = thb(3_000);
 export const CORRIDOR_UPKEEP_PER_TILE: Satang = thb(5);

@@ -7,7 +7,8 @@ import { dayOf } from '../sim/systems/time';
 import { SLOT_ORDER } from '../data/staff';
 import type { GameState, Rect, ShiftSlot, Skill, StaffRole } from '../domain/types';
 import { EQUIPMENT, TILES_PER_BED, roomConstructionCost } from '../data/rooms';
-import { chapterDef } from '../data/chapters';
+import { chapterDef, EXPANDED_WIDTH, LAND_PRICE } from '../data/chapters';
+import { DECOR, MAX_APPEAL, gardenAppeal } from '../data/decor';
 import { monthlyFee } from '../data/finance';
 import { thb } from '../domain/money';
 import { buildHome } from './helpers';
@@ -86,6 +87,76 @@ function expand(s: GameState, reserve: number, eager: boolean): GameState {
   return next;
 }
 
+/** Chapter 3–4 layout on the new land: the row-10 corridor runs east; villas, the Home Care centre and a garden. */
+export const NEW_LAND = {
+  corridor: { x: 18, y: 10, w: 14, h: 1 } as Rect,
+  villas: [20, 23, 26, 29].map((x) => ({ x, y: 7, w: 3, h: 3 }) as Rect).concat([20, 23].map((x) => ({ x, y: 11, w: 3, h: 3 }) as Rect)),
+  office: { x: 26, y: 11, w: 4, h: 3 } as Rect,
+  /** Garden cells, best spots first. */
+  garden: Array.from({ length: 5 * 12 }, (_, i) => ({ x: 20 + (i % 12), y: 14 + Math.floor(i / 12) })),
+};
+const VILLA_COST = roomConstructionCost('villa', NEW_LAND.villas[0]) + EQUIPMENT.care_bed.costSatang + EQUIPMENT.call_system.costSatang + EQUIPMENT.rest_sofa.costSatang;
+
+/** Cash a careful player keeps: running costs until the next billing day plus a cushion. */
+function runwayNeed(s: GameState, cushion: number): number {
+  return dailyRunningCost(s) * (nextBillingDay(s) - dayOf(s.minute)) + cushion;
+}
+
+/** Chapter 3: buy the land, lay the corridor, build villas one by one, then garden up. */
+function tranquila(s: GameState, reserve: number): GameState {
+  const def = chapterDef(s.chapter.id);
+  if (s.site.width < EXPANDED_WIDTH) {
+    if (s.organization.cashSatang < LAND_PRICE + runwayNeed(s, reserve)) return s;
+    s = tryCmd(s, { type: 'expandLot' });
+    s = tryCmd(s, { type: 'paintCorridor', rect: NEW_LAND.corridor });
+  }
+  // Garden first, a little at a time: premium families judge the grounds.
+  for (const type of ['gazebo', 'fountain', 'umbrella'] as const) {
+    while (gardenAppeal(s.site.decor) < MAX_APPEAL && s.organization.cashSatang > DECOR[type].costSatang + runwayNeed(s, reserve)) {
+      const cell = NEW_LAND.garden.find((c) => !s.site.decor.some((d) => d.cell.x === c.x && d.cell.y === c.y));
+      if (!cell) break;
+      const next = tryCmd(s, { type: 'placeDecor', decor: type, cell });
+      if (next === s) break;
+      s = next;
+    }
+  }
+  const built = s.site.rooms.filter((r) => r.type === 'villa').length;
+  const plan = NEW_LAND.villas[built];
+  if (plan && built < (def.targetPremium ?? 6) && s.organization.cashSatang >= VILLA_COST + runwayNeed(s, reserve)) {
+    const out = applyCommand(s, { type: 'placeRoom', roomType: 'villa', rect: plan });
+    if (out.result.ok && out.result.id) {
+      s = out.state;
+      for (const k of ['care_bed', 'call_system', 'rest_sofa'] as const) s = tryCmd(s, { type: 'installEquipment', roomId: out.result.id, equipment: k });
+    }
+  }
+  return s;
+}
+
+/** Chapter 4: open the Home Care centre, add vans as clients grow, accept enquiries the vans can serve. */
+function homeCare(s: GameState, reserve: number): GameState {
+  const def = chapterDef(s.chapter.id);
+  let office = s.site.rooms.find((r) => r.type === 'homecare_office');
+  if (!office) {
+    const cost = roomConstructionCost('homecare_office', NEW_LAND.office) + EQUIPMENT.nurse_desk.costSatang + EQUIPMENT.care_van.costSatang;
+    if (s.organization.cashSatang < cost + runwayNeed(s, reserve)) return s;
+    const out = applyCommand(s, { type: 'placeRoom', roomType: 'homecare_office', rect: NEW_LAND.office });
+    if (!out.result.ok || !out.result.id) return s;
+    s = tryCmd(tryCmd(out.state, { type: 'installEquipment', roomId: out.result.id, equipment: 'nurse_desk' }), { type: 'installEquipment', roomId: out.result.id, equipment: 'care_van' });
+    office = s.site.rooms.find((r) => r.type === 'homecare_office')!;
+  }
+  const vans = office.equipment.care_van ?? 0;
+  const target = (def.targetClients ?? 12) + 2;
+  if (s.homecare.clients.length >= vans * VISITS_PER_VAN - 1 && s.organization.cashSatang > EQUIPMENT.care_van.costSatang + runwayNeed(s, reserve)) s = tryCmd(s, { type: 'installEquipment', roomId: office.id, equipment: 'care_van' });
+  const capacity = (s.site.rooms.find((r) => r.id === office!.id)!.equipment.care_van ?? 0) * VISITS_PER_VAN;
+  for (const lead of [...s.homecare.leads]) {
+    if (s.homecare.clients.length >= Math.min(target, capacity)) break;
+    s = tryCmd(s, { type: 'admitClient', leadId: lead.id });
+  }
+  return s;
+}
+/** Visits one van can make in a morning (appointments 08:00–13:00, 100 minutes each). */
+const VISITS_PER_VAN = 4;
+
 function tryCmd(s: GameState, cmd: Command): GameState {
   const out = applyCommand(s, cmd);
   return out.result.ok ? out.state : s;
@@ -115,6 +186,8 @@ export function botTurn(state: GameState, opts: BotOptions = {}): GameState {
     const def = chapterDef(s.chapter.id);
     if (def.targetRn && s.employees.filter((e) => e.role === 'rn').length < def.targetRn) s = cover(s, 'rn', 'night');
   }
+  if (s.chapter.id >= 3) s = tranquila(s, opts.reserve ?? thb(50_000));
+  if (s.chapter.id >= 4) s = homeCare(s, opts.reserve ?? thb(50_000));
   if (s.events.active) {
     for (const id of EVENT_PREFS[s.events.active.defId]) {
       if (!EVENT_DEFS[s.events.active.defId].choices.some((c) => c.id === id) || choiceBlocker(s, id)) continue;
@@ -131,7 +204,8 @@ export function botTurn(state: GameState, opts: BotOptions = {}): GameState {
   if (s.employees.some((e) => e.role === 'rn')) {
     const queue = [...s.waitlist].sort((a, b) => (a.referralDeadline ?? 1e9) - (b.referralDeadline ?? 1e9));
     for (const c of queue) {
-      if (s.residents.length >= max || !freeBeds(s).length) break;
+      if (s.residents.length >= max) break;
+      if (!freeBeds(s, c.group, !!c.premium).length) continue;
       s = tryCmd(s, { type: 'admitResident', candidateId: c.id });
     }
   }

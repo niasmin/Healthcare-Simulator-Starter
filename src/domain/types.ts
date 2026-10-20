@@ -24,7 +24,7 @@ export interface Rect {
   h: number;
 }
 
-export type RoomType = 'ward' | 'nursing_station' | 'therapy' | 'staff_room';
+export type RoomType = 'ward' | 'nursing_station' | 'therapy' | 'staff_room' | 'villa' | 'homecare_office';
 
 export type EquipmentId =
   | 'care_bed'
@@ -37,7 +37,8 @@ export type EquipmentId =
   | 'rest_sofa'
   | 'door_sensor'
   | 'feeding_pump'
-  | 'suction_unit';
+  | 'suction_unit'
+  | 'care_van';
 
 export interface Room {
   id: string;
@@ -99,7 +100,7 @@ export type LedgerCategory =
 export type PriceLevel = 'value' | 'standard' | 'premium';
 
 /** Revenue streams, used for invoice lines and the revenue-mix chart. */
-export type RevenueStream = 'room_care' | 'therapy' | 'activity' | 'special';
+export type RevenueStream = 'room_care' | 'therapy' | 'activity' | 'special' | 'homecare';
 
 export interface InvoiceLine {
   stream: RevenueStream;
@@ -113,8 +114,8 @@ export interface InvoiceLine {
 
 export interface Invoice {
   id: string;
-  /** admission = pro-rated first month; monthly = start of month; final = services at discharge. */
-  kind: 'admission' | 'monthly' | 'final';
+  /** admission = pro-rated first month; monthly = start of month; final = services at discharge; homecare = a day of home visits. */
+  kind: 'admission' | 'monthly' | 'final' | 'homecare';
   /** Resident billed (the family pays). */
   clientId: string;
   clientName: PersonName;
@@ -233,6 +234,8 @@ export interface Resident {
   bedId: string;
   admittedAt: SimMinute;
   carePlan: CarePlan | null;
+  /** Premium (Tranquila) resident living in a private villa (Chapter 3). */
+  premium?: boolean;
 }
 
 export interface ResidentCandidate {
@@ -244,6 +247,8 @@ export interface ResidentCandidate {
   needs: Needs;
   /** Set for hospital referrals: must be admitted by this day or the partner is let down. */
   referralDeadline?: number;
+  /** Wants a private villa (Chapter 3 premium tier). */
+  premium?: boolean;
 }
 
 export type TaskKind =
@@ -326,7 +331,7 @@ export interface LogItem {
 // Chapter challenge (Phase 4): the 30-day story goal, judged once by the engine.
 // ---------------------------------------------------------------------------
 
-export type ChapterCheckId = 'solvent' | 'beds' | 'residents' | 'cashflow' | 'quality' | 'rn' | 'programmes';
+export type ChapterCheckId = 'solvent' | 'beds' | 'residents' | 'cashflow' | 'quality' | 'rn' | 'programmes' | 'premium' | 'premium_sat' | 'appeal' | 'clients' | 'visit_rate';
 
 export interface ChapterCheck {
   id: ChapterCheckId;
@@ -346,6 +351,55 @@ export interface ChapterResult {
   checks: ChapterCheck[];
 }
 
+// ---------------------------------------------------------------------------
+// Home care (Chapter 4). Clients live at home; staff visit them by van.
+// ---------------------------------------------------------------------------
+
+/** caregiver = personal care visit; nurse = health check visit (vital signs). */
+export type VisitPlan = 'caregiver' | 'nurse';
+
+export interface HomeClient {
+  id: string;
+  name: PersonName;
+  age: number;
+  plan: VisitPlan;
+  /** 0..100: drops when visits are missed; the family cancels below the churn line. */
+  satisfaction: number;
+  joinedAt: SimMinute;
+  /** Daily appointment time (minute of day). */
+  visitAt: number;
+}
+
+export interface HomeLead {
+  id: string;
+  name: PersonName;
+  age: number;
+  plan: VisitPlan;
+}
+
+export interface HomeVisit {
+  id: string;
+  clientId: string;
+  skill: Skill;
+  dueAt: SimMinute;
+  /** Minutes away from the home, travel included. */
+  duration: number;
+  status: TaskStatus;
+  assigneeId: string | null;
+  finishAt: SimMinute | null;
+}
+
+export interface HomeCareState {
+  clients: HomeClient[];
+  leads: HomeLead[];
+  visits: HomeVisit[];
+  /** Visits completed today, per client, billed at midnight. */
+  doneToday: Record<string, number>;
+  /** Closed days (last 14): visits done and missed. */
+  history: Array<{ day: number; done: number; missed: number }>;
+  today: { done: number; missed: number };
+}
+
 /** The running chapter. Each chapter is judged once, over days startDay .. startDay + days − 1. */
 export interface ChapterState {
   id: number;
@@ -356,7 +410,7 @@ export interface ChapterState {
 }
 
 export interface GameState {
-  schemaVersion: 6;
+  schemaVersion: 7;
   seed: number;
   /** Current PRNG state (mulberry32). Advancing the RNG updates this. */
   rngState: number;
@@ -391,6 +445,8 @@ export interface GameState {
   events: EventsState;
   // Phase 4
   chapter: ChapterState;
+  // Phase 5 part 2
+  homecare: HomeCareState;
 }
 
 export type ReasonCode =
@@ -418,7 +474,9 @@ export type ReasonCode =
   | 'invalid_choice'
   | 'needs_rn_on_shift'
   | 'needs_ward_equipment'
-  | 'chapter_locked';
+  | 'chapter_locked'
+  | 'already_done'
+  | 'no_homecare_office';
 
 export type CommandResult =
   | { ok: true; id?: string; costSatang?: Satang }

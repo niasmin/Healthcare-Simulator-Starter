@@ -13,6 +13,7 @@ const STREAM_COLOR: Record<RevenueStream, string> = {
   therapy: '#d9822b',
   activity: '#4f63c9',
   special: '#b24f8f',
+  homecare: '#2f6aa5',
 };
 const REVENUE = '#138a78';
 const EXPENSE = '#d9822b';

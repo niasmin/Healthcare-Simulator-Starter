@@ -1,6 +1,7 @@
 import { reconcile } from '../domain/rules/ledger';
 import type { ChapterResult, GameState } from '../domain/types';
 import { ROLES } from '../data/staff';
+import { emptyHomecare } from '../sim/systems/homecare';
 import { dayOf } from '../sim/systems/time';
 
 /**
@@ -10,7 +11,7 @@ import { dayOf } from '../sim/systems/time';
  * CompressionStream, so even long games stay far below storage limits.
  */
 export const SAVE_FORMAT = 1;
-export const CURRENT_SCHEMA = 6;
+export const CURRENT_SCHEMA = 7;
 
 export type SlotId = 'auto' | 'slot1' | 'slot2' | 'slot3';
 export const SLOTS: SlotId[] = ['auto', 'slot1', 'slot2', 'slot3'];
@@ -122,6 +123,10 @@ export function migrate(state: GameState): GameState {
       employees: s.employees.map((e) => ({ ...e, skills: [...new Set([...e.skills, ...ROLES[e.role].skills])] })),
     };
   }
+  if (s.schemaVersion === 6) {
+    // v7 adds home care (Chapter 4); villas and premium residents need no new fields.
+    s = { ...s, schemaVersion: 7, homecare: emptyHomecare() };
+  }
   return s as GameState;
 }
 
@@ -132,7 +137,7 @@ export function validate(input: GameState): { ok: true; state: GameState } | { o
   if (state.schemaVersion !== CURRENT_SCHEMA) return { ok: false, error: 'incompatible' };
   const arrays = [state.ledger, state.site?.rooms, state.site?.corridor, state.site?.decor, state.residents, state.employees, state.shifts, state.tasks, state.invoices, state.queue];
   if (arrays.some((a) => !Array.isArray(a))) return { ok: false, error: 'corrupt' };
-  if (!Number.isFinite(state.minute) || !state.organization || !state.events || !state.chapter) return { ok: false, error: 'corrupt' };
+  if (!Number.isFinite(state.minute) || !state.organization || !state.events || !state.chapter || !state.homecare) return { ok: false, error: 'corrupt' };
   if (!reconcile(state).ok) return { ok: false, error: 'corrupt' };
   return { ok: true, state };
 }

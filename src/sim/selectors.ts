@@ -1,8 +1,10 @@
-import { chapterDef, type ChapterDef } from '../data/chapters';
+import { chapterDef, EXPANDED_WIDTH, type ChapterDef } from '../data/chapters';
 import { allRoomStatuses, type RoomStatus } from '../domain/rules/rooms';
 import type { GameState, LedgerCategory, RoomType, Satang } from '../domain/types';
 import { dailyPayroll, dailyUpkeep } from './systems/finance';
 import { dailyResidentCosts } from './systems/billing';
+import { VISIT_DURATION, VISIT_GRACE, VISIT_SKILL, hasHomecareOffice, visitRate } from './systems/homecare';
+import { gardenAppeal } from '../data/decor';
 import { carePlanSchedule, TASK_KINDS } from '../data/patients';
 import { ROLE_ORDER, SHIFT_SLOTS, SLOT_ORDER } from '../data/staff';
 import { inWindow, isOnShift, shiftMinutes } from '../domain/rules/shifts';
@@ -30,7 +32,7 @@ export function summarize(state: GameState): SiteSummary {
   let roomsOperational = 0;
   let bedsInstalled = 0;
   let bedsOperational = 0;
-  const operationalByType: Record<RoomType, number> = { ward: 0, nursing_station: 0, therapy: 0, staff_room: 0 };
+  const operationalByType: Record<RoomType, number> = { ward: 0, nursing_station: 0, therapy: 0, staff_room: 0, villa: 0, homecare_office: 0 };
   for (const room of state.site.rooms) {
     const st = statuses.get(room.id)!;
     bedsInstalled += st.installedBeds;
@@ -61,7 +63,9 @@ export type GuideAction =
   | { kind: 'select'; roomType: RoomType }
   | { kind: 'tab'; tab: 'hire' | 'admit' }
   | { kind: 'view'; view: 'residents' | 'roster' | 'finance' }
-  | { kind: 'speed' };
+  | { kind: 'speed' }
+  | { kind: 'land' }
+  | { kind: 'decor' };
 
 export interface Objective {
   id: string;
@@ -114,6 +118,34 @@ export function buildObjectives(state: GameState, summary: SiteSummary = summari
       step('prog_airway', has('airway'), { kind: 'tab', tab: 'admit' }),
       step('roster2', rosterReady, { kind: 'view', view: 'roster' }, { key: 'goal.roster' }),
       step('fill2', state.residents.length >= def.targetResidents, { kind: 'tab', tab: 'admit' }, { key: 'goal.fill', params: { n: def.targetResidents }, progress: capped(state.residents.length, def.targetResidents) }),
+      chapterStep(state, def),
+    ];
+  }
+
+  if (def.id === 3) {
+    const premium = state.residents.filter((r) => r.premium);
+    const villas = state.site.rooms.filter((r) => r.type === 'villa' && summary.statuses.get(r.id)?.operational).length;
+    const appeal = gardenAppeal(state.site.decor);
+    const n = def.targetPremium ?? 0;
+    return [
+      step('land', state.site.width >= EXPANDED_WIDTH, { kind: 'land' }),
+      step('villas', villas >= n, { kind: 'tool', tool: 'villa' }, { params: { n }, progress: capped(villas, n) }),
+      step('garden', appeal >= (def.targetAppeal ?? 0), { kind: 'decor' }, { params: { n: def.targetAppeal ?? 0 }, progress: capped(appeal, def.targetAppeal ?? 0) }),
+      step('premium', premium.length >= n, { kind: 'tab', tab: 'admit' }, { params: { n }, progress: capped(premium.length, n) }),
+      step('fill3', state.residents.length >= def.targetResidents, { kind: 'tab', tab: 'admit' }, { key: 'goal.fill', params: { n: def.targetResidents }, progress: capped(state.residents.length, def.targetResidents) }),
+      chapterStep(state, def),
+    ];
+  }
+
+  if (def.id === 4) {
+    const n = def.targetClients ?? 0;
+    const rate = visitRate(state);
+    return [
+      step('hc_office', hasHomecareOffice(state), { kind: 'tool', tool: 'homecare_office' }),
+      step('hc_first', state.homecare.clients.length > 0, { kind: 'tab', tab: 'admit' }),
+      step('hc_roster', state.homecare.clients.length > 0 && rosterReady, { kind: 'view', view: 'roster' }, { key: 'goal.roster' }),
+      step('hc_clients', state.homecare.clients.length >= n, { kind: 'tab', tab: 'admit' }, { params: { n }, progress: capped(state.homecare.clients.length, n) }),
+      step('hc_rate', rate !== null && rate >= (def.targetVisitRate ?? 0) && state.homecare.history.length >= 7, { kind: 'view', view: 'roster' }, { params: { n: Math.round((def.targetVisitRate ?? 0) * 100) } }),
       chapterStep(state, def),
     ];
   }
@@ -184,6 +216,15 @@ export function slotDemand(state: GameState): Record<ShiftSlot, SlotDemand> {
       out[slot].bySkill[def.skill] = (out[slot].bySkill[def.skill] ?? 0) + def.duration;
       out[slot].tasks.push({ at: (mod - SHIFT_SLOTS[slot].start + MINUTES_PER_DAY) % MINUTES_PER_DAY, duration: def.duration, grace: def.grace, skill: def.skill });
     }
+  }
+  // Home visits (Chapter 4) need people too, during the morning shift.
+  for (const c of state.homecare.clients) {
+    const mod = c.visitAt;
+    const slot = SLOT_ORDER.find((sl) => inWindow(mod, SHIFT_SLOTS[sl].start, SHIFT_SLOTS[sl].end))!;
+    const skill = VISIT_SKILL[c.plan];
+    out[slot].minutes += VISIT_DURATION;
+    out[slot].bySkill[skill] = (out[slot].bySkill[skill] ?? 0) + VISIT_DURATION;
+    out[slot].tasks.push({ at: (mod - SHIFT_SLOTS[slot].start + MINUTES_PER_DAY) % MINUTES_PER_DAY, duration: VISIT_DURATION, grace: VISIT_GRACE, skill });
   }
   return out;
 }
@@ -314,12 +355,15 @@ export function careKpis(state: GameState, summary: SiteSummary = summarize(stat
 export type StaffActivity =
   | { kind: 'off' }
   | { kind: 'idle' }
-  | { kind: 'busy'; taskKind: import('../domain/types').TaskKind; residentId: string };
+  | { kind: 'busy'; taskKind: import('../domain/types').TaskKind; residentId: string }
+  | { kind: 'away'; clientId: string };
 
 export function staffActivity(state: GameState, e: Employee): StaffActivity {
   if (e.taskId) {
     const t = state.tasks.find((x) => x.id === e.taskId);
     if (t) return { kind: 'busy', taskKind: t.kind, residentId: t.residentId };
+    const v = state.homecare.visits.find((x) => x.id === e.taskId);
+    if (v) return { kind: 'away', clientId: v.clientId };
   }
   return isOnShift(state, e.id, state.minute) ? { kind: 'idle' } : { kind: 'off' };
 }
@@ -338,7 +382,8 @@ export function peopleMarkers(state: GameState): Array<{ key: string; kind: 'res
   let spot = 0;
   for (const e of state.employees) {
     const act = staffActivity(state, e);
-    if (act.kind === 'off') continue;
+    // Off duty, or out on a home visit: not in the building.
+    if (act.kind === 'off' || act.kind === 'away') continue;
     if (act.kind === 'busy') {
       const loc = bedOf.get(act.residentId);
       if (loc) {
@@ -421,8 +466,8 @@ export function financeView(state: GameState, period: 'month' | 'all'): FinanceV
     }
   }
 
-  const streams: RevenueStream[] = ['room_care', 'therapy', 'activity', 'special'];
-  const mixMap: Record<RevenueStream, Satang> = { room_care: 0, therapy: 0, activity: 0, special: 0 };
+  const streams: RevenueStream[] = ['room_care', 'therapy', 'activity', 'special', 'homecare'];
+  const mixMap: Record<RevenueStream, Satang> = { room_care: 0, therapy: 0, activity: 0, special: 0, homecare: 0 };
   for (const inv of state.invoices) {
     if (inv.status !== 'paid' || inv.paidAt === null) continue;
     const paidDay = dayOf(inv.paidAt % 1440 === 0 ? inv.paidAt - 1 : inv.paidAt);

@@ -39,6 +39,13 @@ export function runGuideAction(a: GuideAction) {
     case 'speed':
       st.dispatch({ type: 'setSpeed', speed: st.lastSpeed });
       break;
+    case 'land':
+    case 'decor':
+      // Both live in the Build tab (the land button on top, the garden section below).
+      st.setView('map');
+      st.setLeftTab('build');
+      if (mobile) st.setSheet('tools');
+      break;
   }
 }
 

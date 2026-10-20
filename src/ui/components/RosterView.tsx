@@ -73,6 +73,9 @@ function StaffRow({ e }: { e: Employee }) {
     const r = game.residents.find((x) => x.id === act.residentId);
     status = t('roster.busy', { task: act.taskKind, name: r ? name(r.name, true) : '' });
     tone = 'text-teal';
+  } else if (act.kind === 'away') {
+    status = `🚐 ${t('staff.away')}`;
+    tone = 'text-teal';
   }
   return (
     <tr className="border-t border-line">

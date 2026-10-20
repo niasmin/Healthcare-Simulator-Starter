@@ -1,5 +1,5 @@
 import { GROUP_LEVELS, RESIDENT_NAMES } from '../../data/patients';
-import { chapterDef } from '../../data/chapters';
+import { chapterDef, PREMIUM_SHARE } from '../../data/chapters';
 import { ROLES, STAFF_NAMES, wageFor } from '../../data/staff';
 import { WAITLIST_ARRIVALS } from '../../data/finance';
 import { allRoomStatuses } from '../../domain/rules/rooms';
@@ -52,7 +52,7 @@ export function randomRole(state: GameState): [GameState, StaffRole] {
   return [s, 'caregiver'];
 }
 
-export function makeResidentCandidate(state: GameState, forced?: { group: CareGroup; referralDeadline?: number }): GameState {
+export function makeResidentCandidate(state: GameState, forced?: { group: CareGroup; referralDeadline?: number; premium?: boolean }): GameState {
   let s = state;
   let name: PersonName;
   [s, name] = pickName(s, RESIDENT_NAMES, usedNames(s));
@@ -78,7 +78,23 @@ export function makeResidentCandidate(state: GameState, forced?: { group: CareGr
   }
   let id: string;
   [s, id] = allocId(s, 'cand');
-  const c: ResidentCandidate = { id, name, age, group, careLevel: level, needs, ...(forced?.referralDeadline !== undefined ? { referralDeadline: forced.referralDeadline } : {}) };
+  // From Chapter 3 some families ask for a private villa (only independent and rehab residents).
+  let premium = !!forced?.premium;
+  if (s.chapter.id >= 3 && !forced && (group === 'active_aging' || group === 'stroke_rehab')) {
+    let roll: number;
+    [s, roll] = randInt(s, 1, 100);
+    premium = roll <= PREMIUM_SHARE;
+  }
+  const c: ResidentCandidate = {
+    id,
+    name,
+    age,
+    group,
+    careLevel: level,
+    needs,
+    ...(forced?.referralDeadline !== undefined ? { referralDeadline: forced.referralDeadline } : {}),
+    ...(premium ? { premium: true } : {}),
+  };
   return { ...s, waitlist: [...s.waitlist, c] };
 }
 
@@ -102,6 +118,11 @@ export function refreshCandidates(state: GameState): GameState {
   let add: number;
   [s, add] = randInt(s, lo, hi);
   if (s.organization.reputation >= 70) add++;
+  // From Chapter 3, when the list is full the longest-waiting candidate finds another home, so new families keep arriving.
+  if (s.chapter.id >= 3 && add > 0) {
+    const open = s.waitlist.filter((c) => !c.referralDeadline);
+    if (open.length >= WAITLIST_SIZE) s = { ...s, waitlist: s.waitlist.filter((c) => c.id !== open[0].id) };
+  }
   for (let i = 0; i < add && s.waitlist.filter((c) => !c.referralDeadline).length < WAITLIST_SIZE; i++) s = makeResidentCandidate(s);
   return s;
 }
@@ -155,9 +176,11 @@ export function staffMoraleDaily(state: GameState): GameState {
 /** Remove an employee, their shifts, and hand any in-progress task back to the queue. */
 export function removeEmployee(state: GameState, employeeId: string): GameState {
   const tasks = state.tasks.map((t) => (t.assigneeId === employeeId && t.status === 'in_progress' ? { ...t, status: 'pending' as const, assigneeId: null, finishAt: null } : t));
+  const visits = state.homecare.visits.map((v) => (v.assigneeId === employeeId && v.status === 'in_progress' ? { ...v, status: 'pending' as const, assigneeId: null, finishAt: null } : v));
   return {
     ...state,
     tasks,
+    homecare: { ...state.homecare, visits },
     employees: state.employees.filter((x) => x.id !== employeeId),
     shifts: state.shifts.filter((x) => x.employeeId !== employeeId),
   };

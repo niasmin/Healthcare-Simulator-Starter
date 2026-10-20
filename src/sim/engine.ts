@@ -21,6 +21,8 @@ import { hireFromCandidate, refreshCandidates, removeEmployee, staffEnergyTick, 
 import { advanceClock, dayOf, schedule } from './systems/time';
 import { summarizeBeds } from './bedsSummary';
 import { judgeChapter, startNextChapter } from './systems/chapter';
+import { admitClient, dischargeClient, hasHomecareOffice, homecareDayEnd, homecareTick } from './systems/homecare';
+import { EXPANDED_WIDTH, LAND_PRICE } from '../data/chapters';
 import { GROUP_WARD_EQUIPMENT } from '../data/patients';
 
 /**
@@ -45,7 +47,10 @@ export type Command =
   | { type: 'setPriceLevel'; level: PriceLevel }
   | { type: 'placeDecor'; decor: DecorType; cell: Cell }
   | { type: 'resolveEvent'; choiceId: string }
-  | { type: 'startChapter' };
+  | { type: 'startChapter' }
+  | { type: 'expandLot' }
+  | { type: 'admitClient'; leadId: string }
+  | { type: 'dischargeClient'; clientId: string };
 
 export interface CommandOutcome {
   state: GameState;
@@ -83,6 +88,7 @@ export function applyCommand(state: GameState, cmd: Command): CommandOutcome {
     }
 
     case 'placeRoom': {
+      if ((ROOMS[cmd.roomType].unlockChapter ?? 1) > state.chapter.id) return fail(state, 'chapter_locked', { room: cmd.roomType });
       const check = validateRoomPlacement(state, cmd.roomType, cmd.rect);
       if (!check.ok) return fail(state, check.reason, check.params);
       let [s, id] = allocId(state, 'room');
@@ -201,10 +207,10 @@ export function applyCommand(state: GameState, cmd: Command): CommandOutcome {
     case 'admitResident': {
       const c = state.waitlist.find((x) => x.id === cmd.candidateId);
       if (!c) return fail(state, 'not_found');
-      const bed = freeBeds(state, c.group)[0];
+      const bed = freeBeds(state, c.group, !!c.premium)[0];
       if (!bed) {
         const needs = GROUP_WARD_EQUIPMENT[c.group];
-        if (needs && freeBeds(state).length) {
+        if (needs && !c.premium && freeBeds(state).length) {
           // Name the first fitting no operational ward has yet.
           const missing = needs.find((k) => !state.site.rooms.some((r) => r.type === 'ward' && (r.equipment[k] ?? 0) > 0)) ?? needs[0];
           return fail(state, 'needs_ward_equipment', { equipment: missing });
@@ -212,7 +218,7 @@ export function applyCommand(state: GameState, cmd: Command): CommandOutcome {
         return fail(state, 'no_free_bed');
       }
       let [s, id] = allocId(state, 'res');
-      const resident: Resident = { id, name: c.name, age: c.age, group: c.group, careLevel: c.careLevel, needs: { ...c.needs }, bedId: bed, admittedAt: s.minute, carePlan: null };
+      const resident: Resident = { id, name: c.name, age: c.age, group: c.group, careLevel: c.careLevel, needs: { ...c.needs }, bedId: bed, admittedAt: s.minute, carePlan: null, ...(c.premium ? { premium: true } : {}) };
       s = { ...s, waitlist: s.waitlist.filter((x) => x.id !== c.id), residents: [...s.residents, resident] };
       s = billAdmission(s, resident);
       s = log(s, 'good', 'log.admitted', { name: c.name.th, nameEn: c.name.en });
@@ -256,6 +262,31 @@ export function applyCommand(state: GameState, cmd: Command): CommandOutcome {
 
     case 'resolveEvent':
       return resolveEvent(state, cmd.choiceId);
+
+    case 'expandLot': {
+      // Chapter 3: buy the plot next door; the lot grows east, everything built stays where it is.
+      if (state.chapter.id < 3) return fail(state, 'chapter_locked');
+      const { site } = state;
+      if (site.width >= EXPANDED_WIDTH) return fail(state, 'already_done');
+      if (state.organization.cashSatang < LAND_PRICE) return fail(state, 'insufficient_funds');
+      const corridor = new Array<number>(EXPANDED_WIDTH * site.height).fill(0);
+      for (let y = 0; y < site.height; y++) for (let x = 0; x < site.width; x++) corridor[y * EXPANDED_WIDTH + x] = site.corridor[cellIndex(x, y, site.width)];
+      let s: GameState = { ...state, site: { ...site, width: EXPANDED_WIDTH, corridor } };
+      s = post(s, -LAND_PRICE, 'construction', 'ledger.land');
+      s = log(s, 'good', 'log.land_bought');
+      return { state: s, result: { ok: true, costSatang: LAND_PRICE } };
+    }
+
+    case 'admitClient': {
+      if (!hasHomecareOffice(state)) return fail(state, 'no_homecare_office');
+      const out = admitClient(state, cmd.leadId);
+      return out ? { state: out.state, result: { ok: true, id: out.id } } : fail(state, 'not_found');
+    }
+
+    case 'dischargeClient': {
+      const next = dischargeClient(state, cmd.clientId);
+      return next ? { state: next, result: { ok: true } } : fail(state, 'not_found');
+    }
 
     case 'startChapter': {
       const next = startNextChapter(state);
@@ -312,6 +343,7 @@ export function step(state: GameState): GameState {
         s = chargeDailyResidentCosts(s);
         s = collectPayments(s, closingDay);
         s = expireReferrals(s, closingDay);
+        s = homecareDayEnd(s, closingDay, ev.at);
         s = closeDay(s);
         s = judgeChapter(s, closingDay);
         // The new day starts: bill the month in advance on its first day.
@@ -332,6 +364,8 @@ export function step(state: GameState): GameState {
     }
   }
   s = eventExpiryTick(s);
+  // Home visits are booked appointments, so they claim staff before in-house tasks.
+  s = homecareTick(s);
   s = careTick(s);
   s = needsTick(s);
   s = staffEnergyTick(s);

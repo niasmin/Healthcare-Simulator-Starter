@@ -26,12 +26,45 @@ Add `?debug` to the URL to expose `window.__HE__` (store + renderer) for automat
 | **2** | Residents, staff, needs, care plans, care tasks, role × shift roster | ✅ Done |
 | **3** | Pricing, monthly invoices and payments, running costs, Financial Dashboard, 4 events, title screen, character portraits | ✅ Done |
 | **4** | Save/load, guided tutorial, 30-day chapter goal with win/lose verdict, three scripted events, balancing | ✅ Done (**MVP complete**) |
-| **5** | **Part 1 ✅** chapter campaign + Chapter 2 (30-bed nursing center, dementia / tube-feeding / tracheostomy programmes) · part 2 ⏳ premium villas (Ch. 3), home care (Ch. 4) | 🟡 In progress |
+| **5** | Chapter campaign; Ch. 2 nursing center with specialised programmes; Ch. 3 premium villas (Tranquila); Ch. 4 Home Care | ✅ Done |
 | 6 | Workforce, hospital, multi-site | ⏳ Not started |
 
 ## What you can play now
 
-Playable today: **Chapter 1 — First Care Home** (days 1–30) and **Chapter 2 — Professional Nursing Center** (the next 60 days, same business). Chapters 3–7 (Tranquila villas, Home Care, PHC workforce, Neuro Hospital, multi-site empire) come in Phase 5 part 2 and Phase 6.
+Playable today, as one 210-day campaign with the same business:
+
+| Chapter | Days |
+|---|---|
+| 1. First Care Home | 1–30 |
+| 2. Professional Nursing Center | 31–90 |
+| 3. Tranquila Senior Living | 91–150 |
+| 4. Home Care | 151–210 |
+
+Chapters 5–7 (PHC workforce, Neuro Hospital, multi-site empire) come in Phase 6.
+
+### Phase 5, part 2: Chapter 3 (Tranquila villas) and Chapter 4 (Home Care)
+
+- **Chapter 3: Tranquila Senior Living** (60 days).
+  - **Buy the neighbouring plot** (ซื้อที่ดินข้างเคียง, ฿300,000, from the Build tab). The lot grows from 20×20 to 32×20 to the east, and everything already built stays where it is.
+  - **Private villa** (new room, 9–16 tiles): needs a bed, a call bell and a sofa, and houses one premium resident.
+  - **Premium residents:** from Chapter 3, about 30% of new active-ageing and rehab candidates want a villa (marked ★), and three arrive the day the chapter opens. They take villa beds only, and pay ฿42,000 a month on top of their care fee.
+  - **High expectations:** a premium resident's satisfaction slips every tick unless the garden is lovely. Garden appeal 20 breaks even, and up to 30 helps.
+  - **Waiting-list turnover:** when the list is full, the longest-waiting candidate now leaves, so new families keep arriving (Chapter 3 onward).
+  - **To win:** 4 premium residents in villas, their average satisfaction at least 78, garden appeal at least 20, at least 30 residents and 36 beds, an operating profit, quality at least 75, and cash never below zero.
+- **Chapter 4: Home Care** (60 days).
+  - **Home Care centre** (new room): needs a coordination desk and at least one **care van** (฿180,000, ฿300 a day to run).
+  - **Clients:** enquiries arrive daily once the centre is open. Each accepted client gets one daily appointment between 08:00 and 13:00; appointments are handed out so they spread over the morning.
+  - **Visits:** a caregiver visit (personal care, ฿900) or a nurse visit (vital signs, ฿1,500) takes a qualified, on-shift employee and a free van out of the building for 100 minutes, travel included. Staff on a visit leave the map, and the staff table shows "🚐 out on a home visit".
+  - **Rules and billing:** a visit not started within 90 minutes is missed. Each done visit adds 3 satisfaction and each missed one takes 15; below 35, the family cancels. Completed visits are billed per client at midnight.
+  - **Staffing advice** now counts home visits in the morning shift.
+  - **To win:** 12 clients, at least 90% of visits done over the last 7 days, at least 30 residents and 36 beds, an operating profit, quality at least 75, and cash never below zero.
+  - **UI:** the Admit tab gains a Home Care section with enquiries, clients, the van count and the 7-day visit rate.
+- **Balance** (scripted careful player across the 210-day campaign, 5 seeds):
+  - Chapter 3 won on 4 of 5 seeds; one missed premium satisfaction at 75.
+  - Chapter 4 won on all 4 seeds that reached it, with 100% of visits done.
+  - In both chapters the lowest cash stays between ฿21k and ฿150k.
+  - The scripted player spends on land, villas, the garden and vans only when the cash runway reaches the next billing day.
+- **Save format:** schema 7 adds `homecare`. Older saves migrate automatically.
 
 ### Phase 5, part 1: the campaign and Chapter 2
 
@@ -285,7 +318,7 @@ src/
   - Food, supplies, upkeep and payroll are each charged once per day.
   - An event's cost is charged once, and a resolved event can't be resolved again.
 
-## Tests (104 passing)
+## Tests (116 passing)
 
 | File | Covers |
 |---|---|
@@ -301,6 +334,7 @@ src/
 | `decor.test.ts` | Decor placed on an empty tile and charged once; can't overlap rooms, corridor, entrance or decor, and blocks building over it; demolish refunds half; appeal is capped and makes residents happier; schema-3 saves migrate to schema 4 |
 | `chapter.test.ts` | **30-day playthrough** by a scripted sensible player using only public commands and the real applicant and waiting-list pools: wins chapter 1 with cash positive every day; every invariant holds (ledger, unique beds, no overlapping shifts, no care without the skill); roster ready and >95% of tasks done; the three scripted events fire on their days; the same seed plays byte-identically; the verdict pauses the game and survives a save. **Balance:** a full home wins on more seeds, a 40% empty home and an overstaffed home fail on targets. **Verdict rules:** bankrupt at the first negative midnight, decided once and never changed; nothing decided before day 30; a migrated save past day 30 is judged at the next midnight. **Tutorial:** step order, derived from state, a goal and a how-to hint in Thai and English for every step. **Staffing advice:** rush-hour windows, RN covering PN work, one OT for ten sessions |
 | `chapter2.test.ts` | **90-day campaign** by the scripted player: wins Chapter 1, starts Chapter 2 on day 31 and wins it on day 90 with every target; dementia residents only in secured wards; airway care only by RNs and tube feeding only by RNs/PNs; an RN on the night roster; >93% of tasks done; byte-identical rerun; a reckless builder's lowest cash falls far below the careful one, with at least one bankruptcy; a second full team fails the chapter. **Rules:** the next chapter only after a win, with one candidate per programme; secured-ward admission; RN-only airway care missed with only a PN on nights; programme fees; schema-5 migration; Thai and English text for every Chapter 2 step |
+| `chapter34.test.ts` | **Full 210-day campaign** by the careful scripted player: chapters 1–4 all won on schedule and solvent, ledger reconciles; premium residents only in villas; visits only by qualified staff, billed per visit, and staff on a visit leave the map. **Chapter 3 rules:** land bought once, from chapter 3, keeping every corridor tile; villas locked before chapter 3 and premium-only; a garden keeps premium families content. **Chapter 4 rules:** clients need a centre with a van; one van takes one visit at a time and done visits bill at midnight; missed visits lead to cancellation; visits need the skill and a shift; schema-6 migration; Thai and English text for every step |
 | `i18n-iso.test.ts` | TH/EN key parity; labels for every room, equipment and reason; Thai interpolation; iso projection inverts for all 400 cells |
 
 GDD acceptance tests covered so far: *place a room and deduct construction cost once*, *reject collisions*, *admit up to capacity*, *reject excess admission*, *schedule a qualified staff member*, *prevent overlapping shifts*, *advance 30 days deterministically with a fixed seed*, *reconcile cash ledger*, *show Thai text correctly*, *run production build without errors*. *Create monthly invoice once* is now covered too. *Save and reload identical state* is now covered as well, so **all GDD acceptance tests pass**.
@@ -334,8 +368,9 @@ A browser playtest (Playwright, run outside the repo) drove the production build
 ## Known limitations
 
 - The tutorial guides through text and a "Show me" button; it doesn't yet spotlight individual buttons on screen.
-- Chapters 1–2 are playable. After the Chapter 2 verdict the game continues as a sandbox, and chapters 3–7 stay locked.
-- The 20×20 lot fits about 37 beds with the starter layout, which is enough for Chapter 2 but not for the GDD's 80-bed upper range. A bigger lot or a second site comes with the multi-site work.
+- Chapters 1–4 are playable. After the Chapter 4 verdict the game continues as a sandbox, and chapters 5–7 stay locked.
+- Daycare (the second half of the concept art's Chapter 4) isn't modelled yet. Home visits have no travel map; travel is folded into the 100-minute visit.
+- The bought lot is 32×20. Multi-site work (Phase 6) will add separate sites.
 - Chapter 2 is easy on profit once the home is full; its real challenge is cash flow during expansion. Later chapters should add new cost pressure.
 - The scripted player used for balancing hires strictly by the roster advice. Real players can do better, for example with the premium price level, so the chapter is meant to be a fair first challenge, not a hard one.
 - Starting a **new game** overwrites the autosave once the new game has progress. Use a manual slot to keep an older game.

@@ -76,6 +76,7 @@ const PROP: Record<EquipmentId, PropStyle> = {
   door_sensor: { s: 0.2, h: 20 },
   feeding_pump: { s: 0.25, h: 18 },
   suction_unit: { s: 0.3, h: 18 },
+  care_van: { s: 0.85, h: 22 },
 };
 
 export class IsoRenderer {

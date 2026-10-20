@@ -4,6 +4,8 @@ import { log } from '../helpers';
 import { summarizeBeds } from '../bedsSummary';
 import { entryDay, totalsOf } from '../selectors';
 import { makeResidentCandidate } from './staffing';
+import { visitRate } from './homecare';
+import { gardenAppeal } from '../../data/decor';
 import { dayOf } from './time';
 
 /**
@@ -53,6 +55,25 @@ export function chapterChecks(state: GameState, def: ChapterDef = chapterDef(sta
     const have = def.programmes.filter((g) => state.residents.some((r) => r.group === g)).length;
     checks.push({ id: 'programmes', have, need: def.programmes.length, ok: have >= def.programmes.length });
   }
+  if (def.targetPremium) {
+    const premium = state.residents.filter((r) => r.premium);
+    const sat = premium.length ? Math.round(premium.reduce((a, r) => a + r.needs.satisfaction, 0) / premium.length) : 0;
+    checks.push({ id: 'premium', have: premium.length, need: def.targetPremium, ok: premium.length >= def.targetPremium });
+    if (def.targetPremiumSat) checks.push({ id: 'premium_sat', have: sat, need: def.targetPremiumSat, ok: sat >= def.targetPremiumSat });
+  }
+  if (def.targetAppeal) {
+    const appeal = gardenAppeal(state.site.decor);
+    checks.push({ id: 'appeal', have: appeal, need: def.targetAppeal, ok: appeal >= def.targetAppeal });
+  }
+  if (def.targetClients) {
+    const n = state.homecare.clients.length;
+    checks.push({ id: 'clients', have: n, need: def.targetClients, ok: n >= def.targetClients });
+  }
+  if (def.targetVisitRate) {
+    const pct = Math.round((visitRate(state) ?? 0) * 100);
+    const need = Math.round(def.targetVisitRate * 100);
+    checks.push({ id: 'visit_rate', have: pct, need, ok: pct >= need });
+  }
   checks.push({ id: 'cashflow', have: net, need: 1, ok: net > 0 }, { id: 'quality', have: quality, need: def.targetQuality, ok: quality >= def.targetQuality });
   return checks;
 }
@@ -91,5 +112,7 @@ export function startNextChapter(state: GameState): GameState | null {
   };
   // New programmes arrive on the waiting list right away, one of each.
   for (const group of chapterDef(next).programmes ?? []) s = makeResidentCandidate(s, { group });
+  // Villa families are already asking when Tranquila opens.
+  if (chapterDef(next).targetPremium) for (const group of ['active_aging', 'stroke_rehab', 'active_aging'] as const) s = makeResidentCandidate(s, { group, premium: true });
   return log(s, 'good', 'chapter.log.started', { c: next });
 }
