@@ -250,7 +250,10 @@ export function botTurn(state: GameState, opts: BotOptions = {}): GameState {
   if (!s.employees.some((e) => e.role === 'rn')) s = cover(s, 'rn', 'morning');
   // Admit, referrals first, while beds are free.
   if (s.employees.some((e) => e.role === 'rn')) {
-    const queue = [...s.waitlist].sort((a, b) => (a.referralDeadline ?? 1e9) - (b.referralDeadline ?? 1e9));
+    // Referrals first, then any chapter programme that has nobody in it (residents go home now and then).
+    const programmes = chapterDef(s.chapter.id).programmes ?? [];
+    const missing = (g: string) => programmes.includes(g as never) && !s.residents.some((r) => r.group === g);
+    const queue = [...s.waitlist].sort((a, b) => (a.referralDeadline ?? 1e9) - (b.referralDeadline ?? 1e9) || Number(missing(b.group)) - Number(missing(a.group)));
     for (const c of queue) {
       if (s.residents.length >= max) break;
       if (!freeBeds(s, c.group, !!c.premium).length) continue;

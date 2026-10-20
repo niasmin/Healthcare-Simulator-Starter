@@ -62,6 +62,27 @@ export function issue(state: GameState, resident: Pick<Resident, 'id' | 'name'>,
   return { ...s, invoices: [...s.invoices, inv] };
 }
 
+/**
+ * A resident has left: hand back prepaid room & care for the days of this month they won't use.
+ * Booked once per invoice as negative revenue ('fee_refund'), whether or not that invoice is paid yet.
+ */
+export function refundUnusedDays(state: GameState, resident: Resident): GameState {
+  const lastDay = dayOf(Math.max(0, state.minute - 1));
+  const unused = DAYS_PER_MONTH - dayInMonth(lastDay);
+  if (unused <= 0) return state;
+  const month = monthOfDay(lastDay);
+  const inv = state.invoices.find((i) => i.clientId === resident.id && i.month === month && (i.kind === 'admission' || i.kind === 'monthly'));
+  const line = inv?.lines.find((l) => l.stream === 'room_care');
+  if (!inv || !line) return state;
+  const ref = `${inv.id}:refund`;
+  if (state.ledger.some((e) => e.ref === ref)) return state;
+  const covered = inv.kind === 'admission' ? line.qty : DAYS_PER_MONTH;
+  const days = Math.min(unused, covered);
+  const amount = Math.floor((line.amountSatang * days) / covered / 100) * 100;
+  if (amount <= 0) return state;
+  return post(state, -amount, 'fee_refund', 'ledger.fee_refund', { ref, memoParams: { name: resident.name.th, nameEn: resident.name.en, days } });
+}
+
 /** Pro-rated room & care for the rest of the admission month. */
 export function billAdmission(state: GameState, resident: Resident): GameState {
   const day = dayOf(state.minute);

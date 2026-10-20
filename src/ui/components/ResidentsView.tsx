@@ -98,6 +98,7 @@ function ResidentCard({ r }: { r: Resident }) {
           <button
             type="button"
             disabled={!hasRn}
+            data-tour="create-plan"
             onClick={() => dispatch({ type: 'createCarePlan', residentId: r.id })}
             className="w-full rounded-xl bg-teal text-white font-semibold py-2 hover:bg-teal-dark disabled:opacity-40"
           >

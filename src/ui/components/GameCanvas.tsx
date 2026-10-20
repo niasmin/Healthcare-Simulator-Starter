@@ -11,6 +11,7 @@ import { EXPANDED_WIDTH, LAND_PRICE } from '../../data/chapters';
 import type { CareGroup, StaffRole } from '../../domain/types';
 import { isMobileNow, useMoney, useSummary, useT } from '../hooks';
 import { useGame } from '../store';
+import { useTourPointer } from './Tutorial';
 
 const GROUP_HEX: Record<CareGroup, number> = { active_aging: 0xc9822b, stroke_rehab: 0x4a6aa5, bedridden: 0x8a5a9e, dementia: 0xb5537a, tube_feeding: 0x3f8f86, airway: 0x2f6aa5 };
 
@@ -32,6 +33,7 @@ export function GameCanvas({ controls = true }: { controls?: boolean } = {}) {
   const selectedRoomId = useGame((s) => s.selectedRoomId);
   const showLabels = useGame((s) => s.showLabels);
   const summary = useSummary();
+  const tourHint = useTourPointer()?.hint ?? null;
 
   // Create the renderer once.
   useEffect(() => {
@@ -132,12 +134,13 @@ export function GameCanvas({ controls = true }: { controls?: boolean } = {}) {
       selectedRoomId,
       hover,
       preview: preview ? { cells: preview.cells, valid: preview.check.ok } : null,
+      hint: tourHint,
       hoverTint: tool.kind === 'bulldoze' ? 'danger' : 'neutral',
       leftDragPans: tool.kind === 'select',
       showLabels,
       sale: game.site.width < EXPANDED_WIDTH ? { toX: EXPANDED_WIDTH, label: game.chapter.id >= 3 ? t('world.sale_now', { price: money(LAND_PRICE) }) : t('world.sale_later', { c: 3 }) } : null,
     });
-  }, [game, people, summary, selectedRoomId, hover, preview, tool, t, ready, lang, showLabels]);
+  }, [game, people, summary, selectedRoomId, hover, preview, tool, t, ready, lang, showLabels, tourHint]);
 
   // The phone HUD's "overview map" button recenters through this event.
   useEffect(() => {

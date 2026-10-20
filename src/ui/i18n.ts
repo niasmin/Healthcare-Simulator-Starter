@@ -232,6 +232,7 @@ const th: Dict = {
   'tasks.waiting': 'รอคนว่าง',
 
   'alert.no_plan': 'คุณ{name} ยังไม่มี Care Plan',
+  'alert.unhappy': 'ครอบครัวของคุณ{name} ไม่พอใจ อาจย้ายออก',
   'alert.slot': 'กะ{slot}ยังไม่พร้อม',
   'alert.exhausted': '{name} เหนื่อยล้ามาก รับงานไม่ได้',
 
@@ -313,9 +314,12 @@ const th: Dict = {
   'invoice.line.special': 'บริการพิเศษ',
   'ledger.revenue': 'รับชำระจากครอบครัวคุณ{name} (เดือน {month})',
   'ledger.revenue_b2b': 'รับชำระจาก {name} (เดือน {month})',
+  'ledger.fee_refund': 'คืนค่าห้องและการดูแล {days} วันที่ไม่ได้ใช้ ให้ครอบครัวคุณ{name}',
   'ledger.food': 'ค่าอาหาร {n} คน วันที่ {day}',
   'ledger.supplies': 'เวชภัณฑ์/ของใช้ วันที่ {day}',
   'log.payments': 'รับชำระค่าบริการ {n} รายการ',
+  'log.withdrawn': 'ครอบครัวของคุณ{name}ไม่พอใจการดูแล จึงย้ายออก',
+  'log.went_home': 'ครอบครัวรับคุณ{name}กลับไปดูแลที่บ้าน เตียงว่างแล้ว',
   'log.referral_expired': 'ผู้ป่วยส่งต่อ {n} รายเลยกำหนด โรงพยาบาลคู่ค้าผิดหวัง',
   'reason.no_event': 'ไม่มีเหตุการณ์รอการตัดสินใจ',
   'reason.invalid_choice': 'ตัวเลือกไม่ถูกต้อง',
@@ -1011,6 +1015,7 @@ const en: Dict = {
   'tasks.waiting': 'Waiting for staff',
 
   'alert.no_plan': '{name} has no care plan',
+  'alert.unhappy': "{name}'s family is unhappy and may move them out",
   'alert.slot': '{slot} shift not ready',
   'alert.exhausted': '{name} is exhausted and cannot take tasks',
 
@@ -1092,9 +1097,12 @@ const en: Dict = {
   'invoice.line.special': 'Special services',
   'ledger.revenue': 'Payment from {name}\'s family (month {month})',
   'ledger.revenue_b2b': 'Payment from {name} (month {month})',
+  'ledger.fee_refund': 'Refund to {name}\'s family: {days} unused days of room & care',
   'ledger.food': 'Food for {n} residents, day {day}',
   'ledger.supplies': 'Care supplies, day {day}',
   'log.payments': 'Received {n} payments',
+  'log.withdrawn': '{name}\'s family was unhappy with the care and moved them out',
+  'log.went_home': "{name}'s family took them home; a bed is free",
   'log.referral_expired': '{n} referred patients passed their deadline; the partner hospital is disappointed',
   'reason.no_event': 'No event is waiting for a decision',
   'reason.invalid_choice': 'Invalid choice',

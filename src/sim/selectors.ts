@@ -43,7 +43,7 @@ export function summarize(state: GameState): SiteSummary {
       operationalByType[room.type]++;
     }
   }
-  const spentByCategory: Record<LedgerCategory, Satang> = { capital: 0, construction: 0, equipment: 0, refund: 0, upkeep: 0, payroll: 0, revenue: 0, food: 0, supplies: 0, event: 0, training: 0 };
+  const spentByCategory: Record<LedgerCategory, Satang> = { capital: 0, construction: 0, equipment: 0, refund: 0, upkeep: 0, payroll: 0, revenue: 0, fee_refund: 0, food: 0, supplies: 0, event: 0, training: 0 };
   for (const e of state.ledger) spentByCategory[e.category] += e.amountSatang;
   return {
     statuses,
@@ -448,7 +448,7 @@ export interface PeriodTotals {
 export function totalsOf(entries: LedgerEntry[]): PeriodTotals {
   const t: PeriodTotals = { revenue: 0, opex: 0, net: 0, capex: 0, byCategory: {} };
   for (const e of entries) {
-    if (e.category === 'revenue') t.revenue += e.amountSatang;
+    if (e.category === 'revenue' || e.category === 'fee_refund') t.revenue += e.amountSatang;
     else if (OPEX_CATEGORIES.includes(e.category)) {
       t.opex -= e.amountSatang;
       t.byCategory[e.category] = (t.byCategory[e.category] ?? 0) - e.amountSatang;
@@ -502,6 +502,9 @@ export function financeView(state: GameState, period: 'month' | 'all'): FinanceV
     if (period === 'month' && monthOfDay(paidDay) !== month) continue;
     for (const l of inv.lines) mixMap[l.stream] += l.amountSatang;
   }
+  // Refunded room & care for residents who left reduces that stream.
+  for (const e of state.ledger)
+    if (e.category === 'fee_refund' && (period !== 'month' || monthOfDay(entryDay(e)) === month)) mixMap.room_care += e.amountSatang;
   return {
     month,
     day,

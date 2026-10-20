@@ -206,6 +206,14 @@ The attached project is a separate, simpler engine (one counter per centre, V4�
   | Full home plus a second full team | loss | failed |
 
   A full, well-run home then makes about 16–21% in month 2. Cash never comes close to zero with sensible play (the build costs about ฿1.1M of the ฿2M), so the real challenge is operating profit: filling beds quickly without overhiring.
+- **Tutorial pointers (part 3):** on top of the card, a pulsing orange ring marks the control the current step needs: the tool, the "+" for equipment, the Hire/Admit tab and button, "Create Care Plan", the short roster cell, or the play speed. Blue tiles on the map suggest where to build each Chapter 1 room beside the entrance, or which room to tap next. Suggestions appear only while still buildable. On desktop the card sits at the top-left of the map, away from the entrance where the first steps happen. Pointers follow the same state-derived goals and disappear when the card is hidden.
+- **Consequences, turnover and refunds (part 3):**
+  - **Families move unhappy residents out.** Below 40 satisfaction there's a seeded daily chance that grows with dissatisfaction (1.5% per point). Each move-out costs 2 reputation. A red "family is unhappy" alert appears at 45.
+  - **Ordinary turnover.** After a 7-day settling-in week, a family occasionally takes their relative home (0.4% a day, about one a month in a full home). There's no reputation cost, so beds must be refilled.
+  - **Unused days are refunded.** Whoever leaves gets back prepaid room & care for the rest of the month. This is a `fee_refund` ledger line netted off revenue and the room & care mix. It closes an exploit where admitting and losing residents earned a full month each time.
+  - **Reputation decides refills.** Missed care costs 0.08 reputation per task at day end (at most 3 per day). Below 30 reputation, enquiries slow and the oldest waiting family leaves each day. Below 15, enquiries stop and two leave.
+  - **Premium prices raise expectations more** (−0.06 per tick; value prices +0.02).
+  - **Result over 90 days with beds refilled daily:** the advice-following scripted player wins Chapter 1 and stays full at 100 reputation. A skeleton crew loses money from month 1 and empties. Thin or lean staffing ends with reputation under 15, an empty waiting list and empty beds, earning less than a home staffed close to the advice.
 - **Save format:** schema 5 adds `chapter.result`. Schema-3 and schema-4 saves migrate automatically; a migrated game already past day 30 is judged at its next midnight.
 
 ### Visual upgrade from the Game Assets Pack
@@ -378,7 +386,7 @@ src/
   - Food, supplies, upkeep and payroll are each charged once per day.
   - An event's cost is charged once, and a resolved event can't be resolved again.
 
-## Tests (134 passing)
+## Tests (TBD passing)
 
 | File | Covers |
 |---|---|
@@ -397,6 +405,9 @@ src/
 | `chapter5.test.ts` | **Full 270-day campaign:** chapters 1–5 all won on schedule and solvent, ledger reconciles, at least 6 certified staff, b2b invoices are quantity × rate, and placed staff hold no shifts. **Training:** needs a room, the right role and a free seat; the cost is charged; class is taken in the shift, in the room; passing adds the certificate and qualification; staff without shifts attend 08:00–16:00. **Placements:** role and certificate checks; placed staff leave the roster and can’t get shifts or courses; 07:00–15:00 away, billed per day, released at the end; ending early or dismissal costs reputation; requests only from chapter 5 with a room, and they expire. Guide order; v7→v8 save migration |
 | `chapter34.test.ts` | **Full 210-day campaign** by the careful scripted player: chapters 1–4 all won on schedule and solvent, ledger reconciles; premium residents only in villas; visits only by qualified staff, billed per visit, and staff on a visit leave the map. **Chapter 3 rules:** land bought once, from chapter 3, keeping every corridor tile; villas locked before chapter 3 and premium-only; a garden keeps premium families content. **Chapter 4 rules:** clients need a centre with a van; one van takes one visit at a time and done visits bill at midnight; missed visits lead to cancellation; visits need the skill and a shift; schema-6 migration; Thai and English text for every step |
 | `prefabs.test.ts` | Ready-made rooms place the room and equipment in one command for exactly the hand-built price; all or nothing on overlap or short cash; rotation; chapter locks; labels. Starter campus: built and paid from capital, tutorial skips straight to the ward step, deterministic; the empty template changes nothing. Retrying a failed chapter restarts its days with the same business and is refused otherwise |
+| `care-fairness.test.ts` | Regression for care triage: when staff are briefly short, equal-priority tasks go to the least satisfied resident first, so no resident in a 30-day scripted playthrough is left far below the rest (seeds 1 and 3 used to leave the last-admitted resident near 60 satisfaction while everyone else was near 100) |
+| `balance.test.ts` | 90 days with daily refills: a skeleton crew loses money and empties; thin and lean staffing lose reputation, their waiting list and beds, and earn less than mid staffing; premium prices with thin care drive families away; a 60%-full home barely breaks even; shortfalls are shared; the advice-following player wins and stays full and well regarded for 90 days. Leaving: unused days refunded once; no departures in the settling-in week; turnover costs no reputation; low reputation makes waiting families look elsewhere. Unhappy families move out (bed freed, reputation hit, deterministic); missed tasks cost reputation; low reputation dries up enquiries |
+| `tour.test.ts` | Tutorial pointers: walking the build-up by the suggested tiles alone gives a working home (ward with 10 beds, station, therapy, staff room); the ring targets the tool, then the equipment "+", then the Hire, Admit, Care Plan and roster controls; no suggestion on taken tiles; long goals carry no pointer |
 | `i18n-iso.test.ts` | TH/EN key parity; labels for every room, equipment and reason; Thai interpolation; iso projection inverts for all 400 cells |
 
 GDD acceptance tests covered so far: *place a room and deduct construction cost once*, *reject collisions*, *admit up to capacity*, *reject excess admission*, *schedule a qualified staff member*, *prevent overlapping shifts*, *advance 30 days deterministically with a fixed seed*, *reconcile cash ledger*, *show Thai text correctly*, *run production build without errors*. *Create monthly invoice once* is now covered too. *Save and reload identical state* is now covered as well, so **all GDD acceptance tests pass**.
@@ -423,13 +434,12 @@ A browser playtest (Playwright, run outside the repo) drove the production build
 - Doors are automatic, not hand-placed: the first front-facing perimeter tile that touches a reachable corridor.
 - A room can sit next to another room, but you can't walk through one room to reach another. Access is only by corridor.
 - 50% refund on demolition and on selling equipment.
-- Reputation starts at 50 and drifts each day with average resident satisfaction (above 60 raises it).
+- Reputation starts at 50. Each day it drifts with average resident satisfaction (above 60 raises it), loses 0.08 per missed task (at most 3), and loses 2 per family move-out.
 - Staffing "needed" counts: one RN on each day shift while residents are present, plus enough people that every busy window of the shift fits (each task may start until its grace time runs out, capped at the shift end). Night shifts only need the skills their tasks use.
 - Care is abstract and non-prescriptive. Tasks name only a kind of work and the qualification it needs, never a treatment.
 
 ## Known limitations
 
-- The tutorial guides through text and a "Show me" button; it doesn't yet spotlight individual buttons on screen.
 - Chapters 1–4 are playable. After the Chapter 4 verdict the game continues as a sandbox, and chapters 5–7 stay locked.
 - Daycare (the second half of the concept art's Chapter 4) isn't modelled yet. Home visits have no travel map; travel is folded into the 100-minute visit.
 - The bought lot is 32×20. Multi-site work (Phase 6) will add separate sites.
@@ -437,8 +447,9 @@ A browser playtest (Playwright, run outside the repo) drove the production build
 - The scripted player used for balancing hires strictly by the roster advice. Real players can do better, for example with the premium price level, so the chapter is meant to be a fair first challenge, not a hard one.
 - Starting a **new game** overwrites the autosave once the new game has progress. Use a manual slot to keep an older game.
 - Cloud saves need a signed-in viewer allowed to use the page (the owner always is). Anyone opening a public link with view-only access saves in their browser only.
-- Months are a flat 30 game days. Discharge mid-month doesn't refund prepaid room & care. Families always pay; there are no bad debts or late fees yet.
+- Months are a flat 30 game days. Families always pay; there are no bad debts or late fees yet.
 - Portraits are per role, so two nurses share a face (with different expressions). Female residents still use the earlier portrait style. Map characters stand still; walking (as in CMNH V16) is not done yet.
+- Within the first 90 days, staffing a little below the roster advice (about 85% of tasks done) can still out-earn following it exactly. The risk shows up later, as reputation slides and empty beds stop refilling. The Phase 4 balancing table above was measured before turnover and refunds were added; the chapter tests still pass.
 - Events are generic: they don't yet react to specific causes (for example, burnout after many double shifts).
 - Shifts are a standing daily roster (the same every day). There's no weekly pattern, leave or sick days yet.
 - Staff don't walk. They appear at the station or at the bedside when a task starts, and travel time isn't simulated.
