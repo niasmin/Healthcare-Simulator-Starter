@@ -12,6 +12,8 @@ import {
 } from '../../data/finance';
 import type { GameState, Invoice, InvoiceLine, Resident, RevenueStream } from '../../domain/types';
 import { allocId, log, post, randInt } from '../helpers';
+import { hasUpgrade, KITCHEN_FOOD_PERCENT, LAUNDRY_SUPPLIES_PERCENT } from '../../data/shop';
+import { pctOf } from '../../domain/money';
 import { dayOf } from './time';
 
 /**
@@ -139,9 +141,12 @@ export function collectPayments(state: GameState, closingDay: number): GameState
 /** Daily food and care supplies, one ledger entry each per day. */
 /** Today's food and supplies for every resident. */
 export function dailyResidentCosts(state: GameState): { food: number; supplies: number } {
+  const food = FOOD_PER_RESIDENT_DAY * state.residents.length;
+  const supplies = state.residents.reduce((a, r) => a + SUPPLIES_BASE_PER_DAY + SUPPLIES_PER_LEVEL_DAY * r.careLevel + (PROGRAMME_SUPPLIES_PER_DAY[r.group] ?? 0), 0);
+  // Shop upgrades: a central kitchen and an in-house laundry and supply room cut these costs.
   return {
-    food: FOOD_PER_RESIDENT_DAY * state.residents.length,
-    supplies: state.residents.reduce((a, r) => a + SUPPLIES_BASE_PER_DAY + SUPPLIES_PER_LEVEL_DAY * r.careLevel + (PROGRAMME_SUPPLIES_PER_DAY[r.group] ?? 0), 0),
+    food: hasUpgrade(state, 'central_kitchen') ? pctOf(food, KITCHEN_FOOD_PERCENT) : food,
+    supplies: hasUpgrade(state, 'laundry_supply') ? pctOf(supplies, LAUNDRY_SUPPLIES_PERCENT) : supplies,
   };
 }
 

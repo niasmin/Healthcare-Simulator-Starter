@@ -1,3 +1,4 @@
+import { hasUpgrade, MARKETING_EXTRA_ENQUIRIES, WELFARE_MORALE_PER_DAY } from '../../data/shop';
 import { GROUP_LEVELS, RESIDENT_NAMES } from '../../data/patients';
 import { chapterDef, PREMIUM_SHARE } from '../../data/chapters';
 import { ROLES, STAFF_NAMES, wageFor } from '../../data/staff';
@@ -121,6 +122,8 @@ export function refreshCandidates(state: GameState): GameState {
   [s, add] = randInt(s, lo, hi);
   // Word of mouth: a strong reputation brings extra enquiries, a poor one dries them up.
   if (s.organization.reputation >= 70) add++;
+  // Shop upgrade: online marketing brings more enquiries.
+  if (hasUpgrade(s, 'online_marketing')) add += MARKETING_EXTRA_ENQUIRIES;
   if (s.organization.reputation < 30) add = Math.max(0, add - 1);
   if (s.organization.reputation < 15) add = 0;
   // ...and families already waiting look elsewhere (the oldest leave first; urgent referrals are separate).
@@ -175,12 +178,14 @@ export function staffEnergyTick(state: GameState): GameState {
 export function staffMoraleDaily(state: GameState): GameState {
   const statuses = allRoomStatuses(state.site);
   const hasStaffRoom = state.site.rooms.some((r) => r.type === 'staff_room' && statuses.get(r.id)?.operational);
+  const welfare = hasUpgrade(state, 'staff_welfare');
   const employees = state.employees.map((e) => {
     const minutes = state.shifts.filter((s) => s.employeeId === e.id).reduce((a, s) => a + shiftMinutes(s.start, s.end), 0);
     let d = e.morale < 70 ? 1 : e.morale > 70 ? -1 : 0;
     if (minutes > 8 * 60) d -= 4;
     if (e.energy < 30) d -= 3;
     if (hasStaffRoom) d += 1;
+    if (welfare) d += WELFARE_MORALE_PER_DAY;
     return { ...e, morale: r2(clamp(e.morale + d)) };
   });
   return { ...state, employees };

@@ -308,7 +308,6 @@ export function MobileShell() {
   const setSheet = useGame((s) => s.setSheet);
   const tool = useGame((s) => s.tool);
   const setTool = useGame((s) => s.setTool);
-  const setLeftTab = useGame((s) => s.setLeftTab);
   const showLabels = useGame((s) => s.showLabels);
   const setShowLabels = useGame((s) => s.setShowLabels);
   const nextChapter = useGame((s) => nextChapterAvailable(s.game));
@@ -391,10 +390,7 @@ export function MobileShell() {
                   <FloatButton
                     icon={shopIcon}
                     label={t('hud.shop')}
-                    onClick={() => {
-                      setLeftTab('build');
-                      setSheet('tools');
-                    }}
+                    onClick={() => useGame.getState().setShopOpen(true)}
                   />
                 </div>
               </>

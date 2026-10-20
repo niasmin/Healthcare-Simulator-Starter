@@ -8,7 +8,7 @@ import { SHIFT_SLOTS } from '../data/staff';
 import { freeBeds, parseBedId, residentsInRoom } from '../domain/rules/beds';
 import { roomStatus } from '../domain/rules/rooms';
 import { validateShift } from '../domain/rules/shifts';
-import type { BranchKind, Cell, CommandResult, CourseId, DayStats, DecorType, EquipmentId, GameSpeed, GameState, PriceLevel, Rect, Resident, Room, RoomType, ShiftSlot } from '../domain/types';
+import type { UpgradeId, BranchKind, Cell, CommandResult, CourseId, DayStats, DecorType, EquipmentId, GameSpeed, GameState, PriceLevel, Rect, Resident, Room, RoomType, ShiftSlot } from '../domain/types';
 import { dayInMonth, monthOfDay, PRICE_LEVELS } from '../data/finance';
 import { billAdmission, billFinal, billMonth, chargeDailyResidentCosts, collectPayments, refundUnusedDays } from './systems/billing';
 import { eventCheck, eventExpiryTick, expireReferrals, resolveEvent } from './systems/events';
@@ -25,6 +25,7 @@ import { admitClient, dischargeClient, hasHomecareOffice, homecareDayEnd, homeca
 import { EXPANDED_WIDTH, LAND_PRICE } from '../data/chapters';
 import { prefabCost, prefabDef, prefabRect } from '../data/prefabs';
 import { GROUP_WARD_EQUIPMENT } from '../data/patients';
+import { FAMILY_APP_REPUTATION, FAMILY_APP_SATISFACTION_LINE, UPGRADES, hasUpgrade } from '../data/shop';
 import { admitInpatient, hospitalDayEnd, hospitalTick } from './systems/hospital';
 import { assignManager, closeBranch, networkDayEnd, openBranch, supportBranch } from './systems/network';
 import { acceptOffer, endContract, startTraining, workforceDayEnd, workforceTick } from './systems/workforce';
@@ -64,7 +65,8 @@ export type Command =
   | { type: 'openBranch'; kind: BranchKind; managerId: string }
   | { type: 'assignBranchManager'; branchId: string; managerId: string }
   | { type: 'supportBranch'; branchId: string }
-  | { type: 'closeBranch'; branchId: string };
+  | { type: 'closeBranch'; branchId: string }
+  | { type: 'buyUpgrade'; upgrade: UpgradeId };
 
 export interface CommandOutcome {
   state: GameState;
@@ -364,6 +366,18 @@ export function applyCommand(state: GameState, cmd: Command): CommandOutcome {
       return next ? { state: next, result: { ok: true } } : fail(state, 'not_found');
     }
 
+    case 'buyUpgrade': {
+      const def = UPGRADES[cmd.upgrade];
+      if (!def) return fail(state, 'not_found');
+      if (hasUpgrade(state, cmd.upgrade)) return fail(state, 'already_owned');
+      if (state.mode !== 'sandbox' && state.chapter.id < def.unlockChapter) return fail(state, 'chapter_locked');
+      if (state.organization.cashSatang < def.costSatang) return fail(state, 'insufficient_funds');
+      let s: GameState = { ...state, upgrades: [...(state.upgrades ?? []), cmd.upgrade] };
+      s = post(s, -def.costSatang, 'equipment', 'ledger.upgrade', { memoParams: { upgrade: cmd.upgrade } });
+      s = log(s, 'good', 'log.upgrade', { upgrade: cmd.upgrade });
+      return { state: s, result: { ok: true, costSatang: def.costSatang } };
+    }
+
     case 'startChapter': {
       const next = startNextChapter(state);
       return next ? { state: next, result: { ok: true } } : fail(state, 'chapter_locked');
@@ -453,7 +467,9 @@ function closeDay(state: GameState): GameState {
   if (n) {
     const sat = state.residents.reduce((a, r) => a + r.needs.satisfaction, 0) / n;
     const missedPenalty = Math.min(MAX_MISSED_REP_PENALTY, state.today.missed * MISSED_TASK_REP);
-    reputation = Math.max(0, Math.min(100, Math.round((reputation + (sat - 60) / 15 - missedPenalty) * 10) / 10));
+    // Shop upgrade: a family app keeps families informed, which helps the name while they are content.
+    const app = hasUpgrade(state, 'family_app') && sat >= FAMILY_APP_SATISFACTION_LINE ? FAMILY_APP_REPUTATION : 0;
+    reputation = Math.max(0, Math.min(100, Math.round((reputation + (sat - 60) / 15 - missedPenalty + app) * 10) / 10));
   }
   return { ...state, history, today: { done: 0, missed: 0 }, organization: { ...state.organization, reputation } };
 }

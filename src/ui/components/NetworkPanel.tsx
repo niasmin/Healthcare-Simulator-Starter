@@ -9,7 +9,12 @@ import { useMoney, useT } from '../hooks';
 import { useGame } from '../store';
 import { Avatar, StatBar, useName } from './people';
 
-const KIND_ICON: Record<BranchKind, string> = { nursing: '🏡', homecare: '🚐', clinic: '🧠' };
+import nursingArt from '../../assets/title/ic_nursing.png';
+import homecareArt from '../../assets/title/ic_homecare.png';
+import clinicArt from '../../assets/title/ic_neuro.png';
+
+/** Branch pictures: the business-card art from the title-screen key art. */
+const KIND_ART: Record<BranchKind, string> = { nursing: nursingArt, homecare: homecareArt, clinic: clinicArt };
 
 /** Pick an employee who may manage this kind of branch (staff without shifts first). */
 function ManagerSelect({ kind, value, onChange }: { kind: BranchKind; value: string; onChange: (id: string) => void }) {
@@ -47,9 +52,7 @@ function OpenRow({ kind }: { kind: BranchKind }) {
   return (
     <div className="rounded-xl border border-line bg-white p-2 flex flex-col gap-1.5">
       <div className="flex items-start gap-2">
-        <span className="text-xl leading-none" aria-hidden>
-          {KIND_ICON[kind]}
-        </span>
+        <img src={KIND_ART[kind]} alt="" className="h-9 w-11 object-contain shrink-0" draggable={false} />
         <div className="min-w-0 flex-1">
           <div className="text-sm font-semibold">{t(`net.kind.${kind}`)}</div>
           <div className="text-[11px] text-ink-soft leading-snug">
@@ -93,9 +96,7 @@ function BranchCard({ id }: { id: string }) {
   return (
     <div className={`rounded-xl border p-2 flex flex-col gap-1.5 ${b.quality < 50 ? 'border-warn/50 bg-warn/5' : 'border-line bg-white'}`}>
       <div className="flex items-center gap-2">
-        <span className="text-xl leading-none" aria-hidden>
-          {KIND_ICON[b.kind]}
-        </span>
+        <img src={KIND_ART[b.kind]} alt="" className="h-9 w-11 object-contain shrink-0" draggable={false} />
         <div className="min-w-0 flex-1">
           <div className="text-sm font-semibold truncate">{name(b.name)}</div>
           <div className="text-[11px] text-ink-soft">{t(`net.kind.${b.kind}`)}</div>

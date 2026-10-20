@@ -12,6 +12,7 @@ import { SaveModal } from "./SaveModal";
 import type { GameTemplate } from "../../sim/templates";
 import { ROADMAP_CHAPTERS } from "../../data/chapters";
 import { CHALLENGES, CHALLENGE_ORDER } from "../../sim/modes";
+import { ShopList } from "./ShopModal";
 import type { ChallengeId, GameMode } from "../../domain/types";
 
 const icons = import.meta.glob("../../assets/title/ic_*.png", {
@@ -35,7 +36,7 @@ const CARDS: Array<{ id: string; chapter: number | null }> = [
 /** Chapters playable in this version. */
 const PLAYABLE = 7;
 
-type Panel = "new" | "help" | "news" | "settings" | null;
+type Panel = "new" | "help" | "news" | "settings" | "shop" | null;
 const glyphs = import.meta.glob("../../assets/title/w_*.png", {
   eager: true,
   import: "default",
@@ -357,7 +358,7 @@ export function TitleScreen() {
                   onClick={openChapters}
                   badge={won > 0}
                 />
-                <GlyphButton name="shop" label={t("home.shop")} locked />
+                <GlyphButton name="shop" label={t("home.shop")} onClick={() => setPanel("shop")} />
               </nav>
               <nav className="flex flex-col gap-2" aria-label={t("home.more")}>
                 <GlyphButton
@@ -560,7 +561,7 @@ export function TitleScreen() {
                   icon="📖"
                   onClick={() => setPanel("help")}
                 />
-                <SideButton label={t("home.shop")} icon="🏪" locked />
+                <SideButton label={t("home.shop")} icon="🏪" onClick={() => setPanel("shop")} />
                 <SideButton label={t("home.ranking")} icon="🏆" locked />
               </nav>
               <nav
@@ -745,6 +746,12 @@ export function TitleScreen() {
               <li key={n}>{t(`home.help${n}`)}</li>
             ))}
           </ol>
+        </Modal>
+      )}
+      {panel === "shop" && (
+        <Modal title={`🛒 ${t("shop.title")}`} onClose={() => setPanel(null)}>
+          <p className="text-xs text-ink-soft leading-relaxed">{t("shop.browse")}</p>
+          <ShopList browse />
         </Modal>
       )}
       {panel === "news" && (
