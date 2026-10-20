@@ -51,7 +51,7 @@ export interface SupabaseAccount {
 
 /** An auth result the UI can show: ok, or one of a few known reasons (anything else is 'unknown'). */
 export type AuthResult = { ok: true; needsConfirm?: boolean } | { ok: false; reason: AuthError; message?: string };
-export type OAuthProvider = 'google' | 'apple';
+export type OAuthProvider = 'google';
 export type AuthError = 'provider_off' | 'invalid_login' | 'not_confirmed' | 'already_registered' | 'weak_password' | 'invalid_email' | 'rate_limited' | 'network' | 'unknown';
 
 export function authReason(message: string | undefined): AuthError {
@@ -78,9 +78,9 @@ export interface SupabaseConnection {
   /** Set a new password (after following a reset link, or while signed in). */
   updatePassword(password: string): Promise<AuthResult>;
   signOut(): Promise<void>;
-  /** Sign in with Google or Apple: the browser goes to the provider and comes back signed in. */
+  /** Sign in with Google: the browser goes to Google and comes back signed in. */
   signInWith(provider: OAuthProvider): Promise<AuthResult>;
-  /** Which of those the project has switched on (Auth → Providers), so only working buttons show. */
+  /** Whether the project has switched Google on (Auth → Providers), so the button shows only when it works. */
   providers(): Promise<Record<OAuthProvider, boolean>>;
   /** True after the player followed a password-reset link and should choose a new password. */
   recovering: boolean;
@@ -151,9 +151,9 @@ export async function connectSupabase(): Promise<SupabaseConnection | null> {
         try {
           const res = await fetch(`${cfg.url}/auth/v1/settings`, { headers: { apikey: cfg.key } });
           const body = (await res.json()) as { external?: Record<string, boolean> };
-          return { google: !!body.external?.google, apple: !!body.external?.apple };
+          return { google: !!body.external?.google };
         } catch {
-          return { google: false, apple: false };
+          return { google: false };
         }
       },
       resetPassword: async (email) => {
