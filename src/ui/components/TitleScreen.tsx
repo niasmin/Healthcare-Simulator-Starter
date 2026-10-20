@@ -7,6 +7,7 @@ import { useT } from '../hooks';
 import { initCloud, saves, useSaveStatus } from '../saveService';
 import { useGame } from '../store';
 import { SaveModal } from './SaveModal';
+import type { GameTemplate } from '../../sim/templates';
 
 /** Opening screen over the world-map concept art, with Continue when a save exists. */
 export function TitleScreen() {
@@ -20,6 +21,7 @@ export function TitleScreen() {
   const version = useSaveStatus((s) => s.version);
   const [latest, setLatest] = useState<SlotInfo | null | undefined>(undefined);
   const [loadOpen, setLoadOpen] = useState(false);
+  const [choosing, setChoosing] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -32,10 +34,11 @@ export function TitleScreen() {
     };
   }, [version]);
 
-  const start = () => {
-    newGame();
+  const begin = (template: GameTemplate) => {
+    newGame(template);
     setStarted(true);
   };
+  const start = () => setChoosing(true);
   const resume = async () => {
     if (!latest) return;
     const r = await saves.load(latest.slot);
@@ -80,6 +83,18 @@ export function TitleScreen() {
             {t('top.lang')}
           </button>
         </div>
+        {choosing && (
+          <div className="grid sm:grid-cols-2 gap-2 w-full max-w-xl mt-1" role="group" aria-label={t('title.new')}>
+            <button type="button" autoFocus onClick={() => begin('starter')} className="rounded-xl bg-coral text-white p-3 text-left shadow-lg hover:brightness-110">
+              <span className="block font-bold">🏥 {t('title.tpl_starter')}</span>
+              <span className="block text-xs text-white/85 mt-0.5 leading-snug">{t('title.tpl_starter_sub')}</span>
+            </button>
+            <button type="button" onClick={() => begin('empty')} className="rounded-xl bg-white/15 border border-white/40 text-white p-3 text-left hover:bg-white/25">
+              <span className="block font-bold">🌱 {t('title.tpl_empty')}</span>
+              <span className="block text-xs text-white/80 mt-0.5 leading-snug">{t('title.tpl_empty_sub')}</span>
+            </button>
+          </div>
+        )}
         <p className="text-[11px] text-white/60 mt-2">{t('title.note')}</p>
       </div>
       {loadOpen && <SaveModal mode="title" onClose={() => setLoadOpen(false)} />}

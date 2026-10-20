@@ -57,6 +57,17 @@ export function ChapterResultModal() {
                 {t('chapter.retry')}
               </button>
             )}
+            {!won && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (useGame.getState().dispatch({ type: 'retryChapter' }).ok) setSeen(false);
+                }}
+                className="px-4 py-2 rounded-lg bg-teal text-white text-sm font-bold"
+              >
+                ↻ {t('chapter.retry_chapter')}
+              </button>
+            )}
             <button type="button" onClick={() => setSeen(true)} className={`px-4 py-2 rounded-lg text-sm font-bold ${next ? 'bg-white border border-line' : 'bg-teal text-white'}`}>
               {t('chapter.continue')}
             </button>

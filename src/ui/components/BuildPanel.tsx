@@ -7,6 +7,7 @@ import { ROLES, wageFor } from '../../data/staff';
 import { freeBeds } from '../../domain/rules/beds';
 import { monthlyFee, PROGRAMME_FEE, VISIT_PRICE } from '../../data/finance';
 import { EXPANDED_WIDTH, LAND_PRICE } from '../../data/chapters';
+import { PREFABS, prefabCost } from '../../data/prefabs';
 import { vansAvailable, visitRate } from '../../sim/systems/homecare';
 import { GROUP_WARD_EQUIPMENT } from '../../data/patients';
 import type { RoomType } from '../../domain/types';
@@ -38,6 +39,7 @@ function sameTool(a: Tool, b: Tool) {
   if (a.kind !== b.kind) return false;
   if (a.kind === 'room') return b.kind === 'room' && a.roomType === b.roomType;
   if (a.kind === 'decor') return b.kind === 'decor' && a.decor === b.decor;
+  if (a.kind === 'prefab') return b.kind === 'prefab' && a.prefab === b.prefab;
   return true;
 }
 
@@ -93,6 +95,39 @@ function BuildTools() {
       {item({ kind: 'select' }, `🖐 ${t('tool.select')}`, t('tool.select.hint'))}
       {item({ kind: 'corridor' }, t('tool.corridor'), `${money(CORRIDOR_COST_PER_TILE)}${t('tool.per_tile')}`, '#d8cdb6')}
       {item({ kind: 'bulldoze' }, `⛏ ${t('tool.bulldoze')}`, t('tool.bulldoze.hint', { pct: REFUND_PERCENT }))}
+      <h3 className="text-xs font-semibold text-ink-soft uppercase tracking-wide mt-1">⚡ {t('prefab.section')}</h3>
+      <p className="text-[11px] text-ink-soft leading-snug -mt-1">{t('prefab.hint')}</p>
+      <div className="grid grid-cols-2 gap-1.5">
+        {PREFABS.map((p) => {
+          const def = ROOMS[p.roomType];
+          const lockedAt = (def.unlockChapter ?? 1) > chapter ? def.unlockChapter : undefined;
+          const active = tool.kind === 'prefab' && tool.prefab === p.id;
+          return (
+            <button
+              key={p.id}
+              type="button"
+              disabled={lockedAt !== undefined}
+              aria-pressed={active}
+              onClick={() => choose({ kind: 'prefab', prefab: p.id, rotated: active ? !tool.rotated : false })}
+              className={`rounded-xl border p-1.5 flex flex-col items-center text-center transition-colors disabled:opacity-45 ${
+                active ? 'border-teal bg-teal text-white' : 'border-line bg-white hover:border-teal/50'
+              }`}
+            >
+              <img src={spriteUrl(ROOM_ART[p.roomType])} alt="" className="h-10 w-full object-contain" draggable={false} />
+              <span className="text-xs font-semibold leading-tight mt-0.5">{t(`prefab.${p.id}`)}</span>
+              <span className={`text-[10px] tabular ${active ? 'text-white/80' : 'text-ink-soft'}`}>
+                {lockedAt !== undefined ? `🔒 ${t('build.locked', { c: lockedAt })}` : `${active && tool.rotated ? `${p.h}×${p.w}` : `${p.w}×${p.h}`} · ${money(prefabCost(p))}`}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+      {tool.kind === 'prefab' && (
+        <button type="button" onClick={() => setTool({ ...tool, rotated: !tool.rotated })} className="w-full rounded-lg border border-line bg-white px-3 py-1.5 text-xs font-semibold">
+          ⟳ {t('prefab.rotate')}
+        </button>
+      )}
+      <div className="h-px bg-line my-1" />
       {chapter >= 3 && (
         <button
           type="button"

@@ -42,6 +42,23 @@ Playable today, as one 210-day campaign with the same business:
 
 Chapters 5–7 (PHC workforce, Neuro Hospital, multi-site empire) come in Phase 6.
 
+### Play-screen upgrade: a living town, ready-made rooms and a starter campus
+
+- **The map is a town now.** All of this is drawn by `render/WorldBackdrop.ts`, never the game's random generator, and nothing is saved:
+  - Around the lot: lawns, a ring road with lane markings, houses and shophouses with pitched roofs, cherry and shade trees, and a pond.
+  - A white fence marks the lot, with the gate left open.
+  - Next door, the plot for sale has a dashed outline and a sign: "ขายที่ดิน · เปิดบทที่ 3" before chapter 3, then its price.
+- **Camera:** on phones the lot fills the screen width; zooming out stops before the town's edge.
+- **Time of day:** a soft tint follows the game clock (dawn glow, evening amber, blue night), and cars drive along the street while the game runs.
+- **Ready-made rooms (ห้องสำเร็จรูป):** pick one, then tap or drag on the map to place it. You get the room and all its equipment in one command:
+  - 10-bed ward, 15-bed ward, nursing station, therapy room and staff room.
+  - Move-in villa (Chapter 3) and Home Care centre (Chapter 4).
+  - Each costs exactly what building it by hand costs, goes through the same placement and equipment rules, and is all-or-nothing.
+  - ⟳ (or R) rotates the room. Dragging on a phone moves the ghost footprint, and lifting your finger places it.
+- **New game choice:** **ศูนย์เริ่มต้นสำเร็จรูป** (recommended) starts with a corridor spine, a ready nursing station and staff room, and plants at the gate, all paid from capital; **ที่ดินเปล่า** is the original empty lot.
+- **Try a chapter again:** a failed chapter can be replayed with the same business (↻ on the result card and the tutorial card); its days count from the retry.
+- **Less clutter:** the controls hint at the bottom of the map hides after 45 seconds. Placement previews still show there.
+
 ### Phase 5, part 2: Chapter 3 (Tranquila villas) and Chapter 4 (Home Care)
 
 - **Chapter 3: Tranquila Senior Living** (60 days).
@@ -318,7 +335,7 @@ src/
   - Food, supplies, upkeep and payroll are each charged once per day.
   - An event's cost is charged once, and a resolved event can't be resolved again.
 
-## Tests (116 passing)
+## Tests (123 passing)
 
 | File | Covers |
 |---|---|
@@ -335,6 +352,7 @@ src/
 | `chapter.test.ts` | **30-day playthrough** by a scripted sensible player using only public commands and the real applicant and waiting-list pools: wins chapter 1 with cash positive every day; every invariant holds (ledger, unique beds, no overlapping shifts, no care without the skill); roster ready and >95% of tasks done; the three scripted events fire on their days; the same seed plays byte-identically; the verdict pauses the game and survives a save. **Balance:** a full home wins on more seeds, a 40% empty home and an overstaffed home fail on targets. **Verdict rules:** bankrupt at the first negative midnight, decided once and never changed; nothing decided before day 30; a migrated save past day 30 is judged at the next midnight. **Tutorial:** step order, derived from state, a goal and a how-to hint in Thai and English for every step. **Staffing advice:** rush-hour windows, RN covering PN work, one OT for ten sessions |
 | `chapter2.test.ts` | **90-day campaign** by the scripted player: wins Chapter 1, starts Chapter 2 on day 31 and wins it on day 90 with every target; dementia residents only in secured wards; airway care only by RNs and tube feeding only by RNs/PNs; an RN on the night roster; >93% of tasks done; byte-identical rerun; a reckless builder's lowest cash falls far below the careful one, with at least one bankruptcy; a second full team fails the chapter. **Rules:** the next chapter only after a win, with one candidate per programme; secured-ward admission; RN-only airway care missed with only a PN on nights; programme fees; schema-5 migration; Thai and English text for every Chapter 2 step |
 | `chapter34.test.ts` | **Full 210-day campaign** by the careful scripted player: chapters 1–4 all won on schedule and solvent, ledger reconciles; premium residents only in villas; visits only by qualified staff, billed per visit, and staff on a visit leave the map. **Chapter 3 rules:** land bought once, from chapter 3, keeping every corridor tile; villas locked before chapter 3 and premium-only; a garden keeps premium families content. **Chapter 4 rules:** clients need a centre with a van; one van takes one visit at a time and done visits bill at midnight; missed visits lead to cancellation; visits need the skill and a shift; schema-6 migration; Thai and English text for every step |
+| `prefabs.test.ts` | Ready-made rooms place the room and equipment in one command for exactly the hand-built price; all or nothing on overlap or short cash; rotation; chapter locks; labels. Starter campus: built and paid from capital, tutorial skips straight to the ward step, deterministic; the empty template changes nothing. Retrying a failed chapter restarts its days with the same business and is refused otherwise |
 | `i18n-iso.test.ts` | TH/EN key parity; labels for every room, equipment and reason; Thai interpolation; iso projection inverts for all 400 cells |
 
 GDD acceptance tests covered so far: *place a room and deduct construction cost once*, *reject collisions*, *admit up to capacity*, *reject excess admission*, *schedule a qualified staff member*, *prevent overlapping shifts*, *advance 30 days deterministically with a fixed seed*, *reconcile cash ledger*, *show Thai text correctly*, *run production build without errors*. *Create monthly invoice once* is now covered too. *Save and reload identical state* is now covered as well, so **all GDD acceptance tests pass**.

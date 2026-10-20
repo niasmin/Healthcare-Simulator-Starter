@@ -95,6 +95,7 @@ function StepBody({ goal }: { goal: Objective }) {
   const game = useGame((s) => s.game);
   const checks = useMemo(() => (goal.id === 'chapter' ? chapterChecks(game) : null), [goal.id, game]);
   const days = chapterDef(game.chapter.id).days;
+  const failed = goal.id === 'chapter' && game.chapter.result?.outcome === 'failed';
   return (
     <>
       <p className="text-xs leading-relaxed text-ink-soft">{t(goal.hint, goal.params)}</p>
@@ -103,6 +104,11 @@ function StepBody({ goal }: { goal: Objective }) {
           <div className="text-[11px] font-semibold mb-1 tabular">{t('chapter.day', { day: Math.min(dayOf(game.minute) - game.chapter.startDay + 1, days), n: days })}</div>
           <ChapterChecks checks={checks} />
         </div>
+      )}
+      {failed && (
+        <button type="button" onClick={() => useGame.getState().dispatch({ type: 'retryChapter' })} className="self-start px-3 py-1.5 rounded-lg bg-coral text-white text-xs font-bold">
+          ↻ {t('chapter.retry_chapter')}
+        </button>
       )}
     </>
   );

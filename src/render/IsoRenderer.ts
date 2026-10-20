@@ -1,5 +1,6 @@
 import { Application, Container, Graphics, Sprite, Text, type Texture } from 'pixi.js';
 import { DECOR_SPRITE, EQUIP_SPRITE, PERSON_SPRITE_WIDTH, loadSpriteTextures } from './sprites';
+import { WORLD_MARGIN, drawWorld, worldBounds } from './WorldBackdrop';
 import { EQUIPMENT, ROOMS } from '../data/rooms';
 import { cellIndex } from '../domain/grid';
 import type { RoomStatus } from '../domain/rules/rooms';
@@ -36,6 +37,8 @@ export interface RenderInput {
   preview: { cells: Cell[]; valid: boolean } | null;
   hoverTint: 'neutral' | 'danger';
   leftDragPans: boolean;
+  /** Sign on the plot for sale next door, or null when there is none. */
+  sale: { toX: number; label: string } | null;
 }
 
 export interface RendererCallbacks {
@@ -82,6 +85,14 @@ const PROP: Record<EquipmentId, PropStyle> = {
 export class IsoRenderer {
   private app = new Application();
   private world = new Container();
+  private backdropLayer = new Container();
+  private lastBackdrop = '';
+  private carsLayer = new Container();
+  private cars: Array<{ g: Graphics; x: number; speed: number; row: number }> = [];
+  private night = new Graphics();
+  private lastNight = '';
+  /** Smallest zoom at which the town still covers the whole screen. */
+  private minScale = 0.2;
   private staticLayer = new Container();
   private overlay = new Graphics();
   private labelLayer = new Container();
@@ -121,7 +132,7 @@ export class IsoRenderer {
   async init(host: HTMLElement): Promise<void> {
     await this.app.init({
       resizeTo: host,
-      background: 0xe9e4d8,
+      background: 0x8ea86b,
       antialias: true,
       autoDensity: true,
       resolution: Math.min(window.devicePixelRatio || 1, 2),
@@ -134,8 +145,10 @@ export class IsoRenderer {
     host.appendChild(this.app.canvas);
     this.app.canvas.style.display = 'block';
     this.app.canvas.style.touchAction = 'none';
-    this.world.addChild(this.staticLayer, this.overlay, this.peopleLayer, this.labelLayer);
-    this.app.stage.addChild(this.world);
+    this.world.addChild(this.backdropLayer, this.staticLayer, this.carsLayer, this.overlay, this.peopleLayer, this.labelLayer);
+    this.night.eventMode = 'none';
+    this.app.stage.addChild(this.world, this.night);
+    this.app.ticker.add((tk) => this.driveCars(tk.deltaMS));
     this.app.stage.eventMode = 'static';
     this.app.stage.hitArea = this.app.screen;
     this.app.stage.on('pointerdown', (e) => {
@@ -172,6 +185,9 @@ export class IsoRenderer {
     this.app.canvas.addEventListener('wheel', this.onWheel, { passive: false });
     this.app.canvas.addEventListener('contextmenu', this.onContext);
     this.app.renderer.on('resize', () => {
+      this.lastNight = '';
+      this.updateMinScale();
+      if (this.input) this.drawNight(this.input.game.minute);
       if (!this.userMovedCamera) this.recenter();
     });
     // resizeTo only listens to window resizes; also follow the host element (phone layouts settle late).
@@ -206,14 +222,16 @@ export class IsoRenderer {
   }
 
   private fitTo(w: number, h: number): void {
-    const worldW = (w + h) * (TILE_W / 2) + 80;
+    const lotW = (w + h) * (TILE_W / 2);
+    const worldW = lotW + 80;
     const worldH = (w + h) * (TILE_H / 2) + 140;
     const sw = this.app.screen.width;
     const sh = this.app.screen.height;
-    let scale = Math.min(sw / worldW, sh / worldH);
-    // Portrait phones: zoom in a little so tiles are big enough for fingers (the lot's side corners crop).
-    if (sh > sw * 1.2) scale *= 1.35;
-    scale = Math.max(0.2, Math.min(2.2, scale));
+    this.updateMinScale();
+    // Portrait phones: the lot spans the full screen width (its side corners crop slightly);
+    // wider screens show the whole lot with a little of the town around it.
+    let scale = sh > sw * 1.2 ? (sw / lotW) * 1.12 : Math.min(sw / worldW, sh / worldH) * 1.08;
+    scale = Math.max(this.minScale, Math.min(2.2, scale));
     this.world.scale.set(scale);
     const centre = cellToWorld(w / 2, h / 2);
     this.world.position.set(sw / 2 - centre.x * scale, sh / 2 - centre.y * scale + 10 * scale);
@@ -229,7 +247,7 @@ export class IsoRenderer {
     if (!this.ready) return;
     this.userMovedCamera = true;
     const old = this.world.scale.x;
-    const next = Math.max(0.2, Math.min(3, old * factor));
+    const next = Math.max(this.minScale, Math.min(3, old * factor));
     const wx = (sx - this.world.x) / old;
     const wy = (sy - this.world.y) / old;
     this.world.scale.set(next);
@@ -264,7 +282,7 @@ export class IsoRenderer {
     const dist = Math.max(1, Math.hypot(a.x - b.x, a.y - b.y));
     const midX = (a.x + b.x) / 2;
     const midY = (a.y + b.y) / 2;
-    const next = Math.max(0.2, Math.min(3, (pz.scale * dist) / pz.dist));
+    const next = Math.max(this.minScale, Math.min(3, (pz.scale * dist) / pz.dist));
     // Keep the world point under the starting midpoint under the fingers' current midpoint.
     const worldX = (pz.midX - pz.wx) / pz.scale;
     const worldY = (pz.midY - pz.wy) / pz.scale;
@@ -337,10 +355,71 @@ export class IsoRenderer {
     p.mode = 'none';
   }
 
+  /** Zooming out stops once the town spans the screen (the grass-coloured background fills its far corners). */
+  private updateMinScale(): void {
+    if (!this.input) return;
+    const b = worldBounds(this.input.game.site, this.input.sale?.toX ?? null);
+    const span = b.maxX - b.minX + (b.maxY - b.minY);
+    const W = span * (TILE_W / 2);
+    const H = span * (TILE_H / 2);
+    this.minScale = Math.max(0.2, this.app.screen.width / W, this.app.screen.height / H);
+  }
+
+  /** Ambient traffic on the front street; it pauses with the game. */
+  private driveCars(dtMs: number): void {
+    if (!this.input || !this.cars.length) return;
+    const speed = this.input.game.speed;
+    if (!speed) return;
+    const { site } = this.input.game;
+    const east = (this.input.sale?.toX ?? site.width) + WORLD_MARGIN;
+    for (const car of this.cars) {
+      car.x += car.speed * speed * (dtMs / 1000);
+      if (car.x > east) car.x = -WORLD_MARGIN;
+      if (car.x < -WORLD_MARGIN) car.x = east;
+      const c = cellCenter(car.x, car.row + 0.5);
+      car.g.position.set(c.x, c.y + SLAB_DEPTH - TILE_H / 2);
+    }
+  }
+
+  private makeCars(site: GameState['site']): void {
+    for (const c of this.carsLayer.removeChildren()) c.destroy();
+    const colors = [0xd9534f, 0x2f6aa5, 0xf2f2f2, 0x3f8f86, 0xe0a23b];
+    this.cars = colors.map((color, i) => {
+      const g = new Graphics();
+      // a small iso car: body, roof and windows
+      g.poly([-12, 0, 0, -6, 12, 0, 0, 6]).fill(shade(color, 0.7));
+      g.poly([-12, 0, 0, 6, 0, 1, -12, -5]).fill(shade(color, 0.85));
+      g.poly([0, 6, 12, 0, 12, -5, 0, 1]).fill(shade(color, 0.7));
+      g.poly([-12, -5, 0, -11, 12, -5, 0, 1]).fill(color);
+      g.poly([-6, -6, 0, -9, 6, -6, 0, -3]).fill({ color: 0x9cc3cf, alpha: 0.9 });
+      this.carsLayer.addChild(g);
+      return { g, x: -WORLD_MARGIN + i * 9, speed: (i % 2 ? -1 : 1) * (1.4 + (i % 3) * 0.5), row: site.height };
+    });
+  }
+
+  /** Morning glow, clear day, evening amber and a blue night, from the game clock (screen-space tint). */
+  private drawNight(minute: number): void {
+    const hour = Math.floor((minute % 1440) / 60);
+    const [color, alpha] = hour >= 20 || hour < 5 ? [0x14223f, 0.34] : hour < 7 ? [0xf2a65a, 0.1] : hour >= 18 ? [0xe5904a, 0.14] : [0, 0];
+    const key = `${hour >= 20 || hour < 5 ? 'n' : hour < 7 ? 'd' : hour >= 18 ? 'e' : 'x'}|${this.app.screen.width}x${this.app.screen.height}`;
+    if (key === this.lastNight) return;
+    this.lastNight = key;
+    this.night.clear();
+    if (alpha) this.night.rect(0, 0, this.app.screen.width, this.app.screen.height).fill({ color, alpha });
+  }
+
   // ---------- drawing ----------
   update(input: RenderInput): void {
     this.input = input;
     if (!this.ready) return;
+    this.drawNight(input.game.minute);
+    const backdropKey = `${input.game.site.width}x${input.game.site.height}|${input.sale?.label ?? ''}|${this.tex.size}`;
+    if (backdropKey !== this.lastBackdrop) {
+      this.lastBackdrop = backdropKey;
+      drawWorld(this.backdropLayer, input.game.site, { sale: input.sale ? { fromX: input.game.site.width, toX: input.sale.toX, label: input.sale.label } : null, textures: this.tex });
+      this.makeCars(input.game.site);
+      this.updateMinScale();
+    }
     const staticKey = `${input.labelFor({ id: '', type: 'ward', rect: { x: 0, y: 0, w: 1, h: 1 }, equipment: {}, builtAt: 0 })}|${input.entranceLabel}`;
     if (input.game.site !== this.lastSite || staticKey !== this.lastStatic) {
       this.lastSite = input.game.site;
@@ -370,15 +449,7 @@ export class IsoRenderer {
     g.poly([B.x, B.y, R.x, R.y, R.x, R.y + SLAB_DEPTH, B.x, B.y + SLAB_DEPTH]).fill(0x7a845c);
     void T;
 
-    // Street in front of the lot (row y = height), purely decorative
-    for (let x = -2; x < site.width + 2; x++) {
-      const d = cellDiamond(x, site.height);
-      g.poly(d.map((v, i) => (i % 2 ? v + SLAB_DEPTH : v))).fill(0x6f7378);
-    }
-    for (let x = -2; x < site.width + 2; x += 2) {
-      const c = cellCenter(x, site.height);
-      g.poly([c.x - 8, c.y + SLAB_DEPTH - 2, c.x + 8, c.y + SLAB_DEPTH + 2, c.x + 6, c.y + SLAB_DEPTH + 3, c.x - 10, c.y + SLAB_DEPTH - 1]).fill(0xe8e3c9);
-    }
+    // The street, the town and the plot for sale are drawn by the world backdrop.
 
     // Ground tiles
     for (let y = 0; y < site.height; y++)
@@ -387,6 +458,29 @@ export class IsoRenderer {
         const color = corridor ? ((x + y) % 2 ? 0xf3ede0 : 0xeee6d5) : (x + y) % 2 ? 0xa9bf86 : 0xa2b97f;
         g.poly(cellDiamond(x, y)).fill(color).stroke({ width: 1, color: corridor ? 0xd8cdb6 : 0x93aa71, alpha: 0.7 });
       }
+
+    // A low white fence around the lot, with a gap at the entrance, so the home reads apart from the town.
+    const fence = new Graphics();
+    const corners = [cellToWorld(0, 0), cellToWorld(site.width, 0), cellToWorld(site.width, site.height), cellToWorld(0, site.height)];
+    for (let i = 0; i < 4; i++) {
+      const a = corners[i];
+      const b = corners[(i + 1) % 4];
+      fence.moveTo(a.x, a.y - 5).lineTo(b.x, b.y - 5);
+    }
+    fence.stroke({ width: 2.5, color: 0xfbf8f2, alpha: 0.95 });
+    for (let x = 0; x <= site.width; x += 2) for (const yy of [0, site.height]) {
+      const p = cellToWorld(x, yy);
+      fence.rect(p.x - 1.2, p.y - 8, 2.4, 8).fill(0xfbf8f2);
+    }
+    for (let y = 0; y <= site.height; y += 2) for (const xx of [0, site.width]) {
+      const p = cellToWorld(xx, y);
+      fence.rect(p.x - 1.2, p.y - 8, 2.4, 8).fill(0xfbf8f2);
+    }
+    // keep the gate open
+    const gateL = cellToWorld(site.entrance.x, site.height);
+    const gateR = cellToWorld(site.entrance.x + 1, site.height);
+    fence.moveTo(gateL.x, gateL.y - 5).lineTo(gateR.x, gateR.y - 5).stroke({ width: 4, color: 0xf6d58e });
+    this.staticLayer.addChild(fence);
 
     // Entrance gate
     const e = site.entrance;

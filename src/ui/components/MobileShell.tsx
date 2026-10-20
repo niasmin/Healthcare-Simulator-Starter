@@ -189,7 +189,15 @@ export function MobileShell() {
   ];
   const placing = tool.kind !== 'select';
   const toolName =
-    tool.kind === 'room' ? t(`room.${tool.roomType}`) : tool.kind === 'decor' ? t(`decor.${tool.decor}`) : tool.kind === 'corridor' ? t('tool.corridor') : t('tool.bulldoze');
+    tool.kind === 'room'
+      ? t(`room.${tool.roomType}`)
+      : tool.kind === 'decor'
+        ? t(`decor.${tool.decor}`)
+        : tool.kind === 'prefab'
+          ? t(`prefab.${tool.prefab}`)
+          : tool.kind === 'corridor'
+            ? t('tool.corridor')
+            : t('tool.bulldoze');
 
   return (
     <div className="h-[100dvh] flex flex-col overflow-hidden">
@@ -202,6 +210,11 @@ export function MobileShell() {
             {placing ? (
               <div className="pointer-events-auto flex items-center gap-2 rounded-xl bg-teal text-white pl-3 pr-1 py-1 shadow-lg">
                 <span className="text-sm font-semibold">{t('m.placing', { what: toolName })}</span>
+                {tool.kind === 'prefab' && (
+                  <button type="button" onClick={() => setTool({ ...tool, rotated: !tool.rotated })} className="px-2.5 py-1.5 rounded-lg bg-white/20 text-sm font-bold" aria-label={t('prefab.rotate')}>
+                    ⟳
+                  </button>
+                )}
                 <button type="button" onClick={() => setTool({ kind: 'select' })} className="px-3 py-1.5 rounded-lg bg-white text-teal text-sm font-bold">
                   {t('m.done')}
                 </button>

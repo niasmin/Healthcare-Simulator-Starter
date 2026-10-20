@@ -3,8 +3,9 @@ import { applyCommand, step, type Command } from '../sim/engine';
 import { createInitialState } from '../sim/state';
 import type { Cell, CommandResult, DecorType, GameState, RoomType } from '../domain/types';
 import type { Lang } from './i18n';
+import { applyTemplate, type GameTemplate } from '../sim/templates';
 
-export type Tool = { kind: 'select' } | { kind: 'corridor' } | { kind: 'bulldoze' } | { kind: 'room'; roomType: RoomType } | { kind: 'decor'; decor: DecorType };
+export type Tool = { kind: 'select' } | { kind: 'corridor' } | { kind: 'bulldoze' } | { kind: 'room'; roomType: RoomType } | { kind: 'decor'; decor: DecorType } | { kind: 'prefab'; prefab: string; rotated: boolean };
 
 export type View = 'map' | 'residents' | 'roster' | 'finance';
 export type LeftTab = 'build' | 'hire' | 'admit';
@@ -43,7 +44,7 @@ interface UIStore {
   setDrag: (drag: { start: Cell; end: Cell } | null) => void;
   setLang: (lang: Lang) => void;
   togglePause: () => void;
-  newGame: () => void;
+  newGame: (template?: GameTemplate) => void;
   /** Replace the running game with a loaded save (paused, UI reset). */
   loadGame: (game: GameState) => void;
   /** True once the player pressed Start or Continue; autosave waits for it. */
@@ -134,8 +135,8 @@ export const useGame = create<UIStore>((set, get) => ({
     const { game, lastSpeed, dispatch } = get();
     dispatch({ type: 'setSpeed', speed: game.speed === 0 ? lastSpeed : 0 });
   },
-  newGame: () =>
-    set({ game: createInitialState(), selectedRoomId: null, drag: null, tool: { kind: 'select' }, toast: null, view: 'map', leftTab: 'build', sheet: null, chapterSeen: false }),
+  newGame: (template = 'starter') =>
+    set({ game: applyTemplate(createInitialState(), template), selectedRoomId: null, drag: null, tool: { kind: 'select' }, toast: null, view: 'map', leftTab: 'build', sheet: null, chapterSeen: false }),
   dismissToast: () => set({ toast: null }),
   loadGame: (game) =>
     set({ game: { ...game, speed: 0 }, selectedRoomId: null, drag: null, tool: { kind: 'select' }, view: 'map', sheet: null, started: true, saveOpen: false, chapterSeen: !!game.chapter.result }),

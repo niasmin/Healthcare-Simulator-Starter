@@ -23,6 +23,7 @@ import { summarizeBeds } from './bedsSummary';
 import { judgeChapter, startNextChapter } from './systems/chapter';
 import { admitClient, dischargeClient, hasHomecareOffice, homecareDayEnd, homecareTick } from './systems/homecare';
 import { EXPANDED_WIDTH, LAND_PRICE } from '../data/chapters';
+import { prefabCost, prefabDef, prefabRect } from '../data/prefabs';
 import { GROUP_WARD_EQUIPMENT } from '../data/patients';
 
 /**
@@ -49,6 +50,8 @@ export type Command =
   | { type: 'resolveEvent'; choiceId: string }
   | { type: 'startChapter' }
   | { type: 'expandLot' }
+  | { type: 'placePrefab'; prefab: string; origin: Cell; rotated?: boolean }
+  | { type: 'retryChapter' }
   | { type: 'admitClient'; leadId: string }
   | { type: 'dischargeClient'; clientId: string };
 
@@ -262,6 +265,35 @@ export function applyCommand(state: GameState, cmd: Command): CommandOutcome {
 
     case 'resolveEvent':
       return resolveEvent(state, cmd.choiceId);
+
+    case 'placePrefab': {
+      // All or nothing: the room and every piece of equipment, or no change at all.
+      const def = prefabDef(cmd.prefab);
+      if (!def) return fail(state, 'not_found');
+      const rect = prefabRect(def, cmd.origin, cmd.rotated);
+      const cost = prefabCost(def, rect);
+      if (state.organization.cashSatang < cost) return fail(state, 'insufficient_funds');
+      const placed = applyCommand(state, { type: 'placeRoom', roomType: def.roomType, rect });
+      if (!placed.result.ok || !placed.result.id) return placed;
+      const roomId = placed.result.id;
+      let s = placed.state;
+      for (const [equipment, n] of Object.entries(def.equipment) as [EquipmentId, number][])
+        for (let i = 0; i < n; i++) {
+          const out = applyCommand(s, { type: 'installEquipment', roomId, equipment });
+          if (!out.result.ok) return { state, result: out.result };
+          s = out.state;
+        }
+      return { state: s, result: { ok: true, id: roomId, costSatang: cost } };
+    }
+
+    case 'retryChapter': {
+      // A failed chapter can be played again with the same business, from today.
+      const { result } = state.chapter;
+      if (!result || result.outcome !== 'failed') return fail(state, 'chapter_locked');
+      if (state.organization.cashSatang < 0) return fail(state, 'insufficient_funds');
+      const s: GameState = { ...state, chapter: { id: state.chapter.id, startDay: dayOf(state.minute), result: null, past: [...state.chapter.past, result] } };
+      return { state: log(s, 'info', 'chapter.log.retry', { c: state.chapter.id }), result: { ok: true } };
+    }
 
     case 'expandLot': {
       // Chapter 3: buy the plot next door; the lot grows east, everything built stays where it is.
