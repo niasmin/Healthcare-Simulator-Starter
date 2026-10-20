@@ -4,6 +4,7 @@ import { useTelemetry } from './telemetry';
 import { useAlerts } from './alerts';
 import { ShopModal } from './components/ShopModal';
 import { CityModal } from './components/CityModal';
+import { GoalsModal, useGoalToasts } from './components/GoalsModal';
 import { AutoModal, AwayProgress, AwayReportModal } from './components/AutoModal';
 import { useEffect } from 'react';
 import { SaveModal } from './components/SaveModal';
@@ -33,6 +34,7 @@ export function App() {
   const mobile = useIsMobile();
   useAutosave();
   useTutorialToasts();
+  useGoalToasts();
   const started = useGame((s) => s.started);
   const setStarted = useGame((s) => s.setStarted);
   const saveOpen = useGame((s) => s.saveOpen);
@@ -40,6 +42,7 @@ export function App() {
   const chaptersOpen = useGame((s) => s.chaptersOpen);
   const shopOpen = useGame((s) => s.shopOpen);
   const cityOpen = useGame((s) => s.cityOpen);
+  const goalsOpen = useGame((s) => s.goalsOpen);
   const autoOpen = useGame((s) => s.autoOpen);
   const accountOpen = useGame((s) => s.accountOpen);
   const recovering = useSaveStatus((s) => s.recovering);
@@ -64,6 +67,7 @@ export function App() {
       {started && saveOpen && <SaveModal mode="game" onClose={() => setSaveOpen(false)} />}
       {chaptersOpen && <ChaptersModal onClose={() => setChaptersOpen(false)} />}
       {shopOpen && <ShopModal onClose={() => useGame.getState().setShopOpen(false)} />}
+      {started && goalsOpen && <GoalsModal onClose={() => useGame.getState().setGoalsOpen(false)} />}
       {cityOpen && <CityModal tab={cityOpen} onClose={() => useGame.getState().setCityOpen(null)} />}
       {autoOpen && <AutoModal onClose={() => useGame.getState().setAutoOpen(false)} />}
       {accountOpen && <AccountModal onClose={() => useGame.getState().setAccountOpen(false)} />}

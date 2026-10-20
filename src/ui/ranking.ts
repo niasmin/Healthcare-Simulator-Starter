@@ -44,6 +44,7 @@ export function rankEntry(game: GameState, account: SupabaseAccount | null): Ran
     reputation: s.reputation,
     satisfaction: s.satisfaction,
     staff: s.staff,
+    stars: s.stars,
     day: dayOf(game.minute),
     chapter: game.chapter.id,
     site: game.site,

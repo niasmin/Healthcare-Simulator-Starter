@@ -7,7 +7,7 @@ import { EQUIPMENT } from '../data/rooms';
 import { COURSES } from '../data/workforce';
 import { thb } from '../domain/money';
 import { cellIndex } from '../domain/grid';
-import type { AutoSettings, BranchKind, CourseId, DecorType, GameState, StaffRole } from '../domain/types';
+import type { AutoSettings, BranchKind, CityPlace, CourseId, DecorType, GameState, StaffRole } from '../domain/types';
 import { UPGRADES, UPGRADE_ORDER, hasUpgrade } from '../data/shop';
 import { buildSomewhere, tryCmd, type Apply } from './autoBuild';
 import { freeBeds } from '../domain/rules/beds';
@@ -15,6 +15,7 @@ import { log } from './helpers';
 import { dailyRunningCost, nextBillingDay, summarize } from './selectors';
 import { certifiedCount, isCertified, placementBlocker, trainingBlocker, trainingSeats } from './systems/workforce';
 import { dayOf } from './systems/time';
+import { cityBlocker, cityCost } from './systems/city';
 
 /**
  * Autopilot, "play every chapter": the chapter goals a careful player would work on, chapter by
@@ -306,6 +307,23 @@ function shop(s: GameState, apply: Apply): GameState {
   return ok ? log(out, 'good', 'auto.log.shop', { upgrade: next.id }) : s;
 }
 
+/**
+ * An accounting office once the home has 30 beds (bills paid on time, daily costs 3% lower), with
+ * one accountant on the morning shift.
+ */
+function office(s: GameState, apply: Apply): GameState {
+  if (summarize(s).bedsOperational < SHOP_MIN_BEDS) return s;
+  if (!s.site.rooms.some((r) => r.type === 'accounting_office')) {
+    if (s.organization.cashSatang < 30 * dailyRunningCost(s) + SHOP_RESERVE) return s;
+    return build(s, apply, 'accounting');
+  }
+  if (s.employees.some((e) => e.role === 'accountant')) return s;
+  let id: string | null;
+  [s, id] = hireRole(s, apply, 'accountant');
+  if (id) [s] = tryCmd(s, apply, { type: 'assignShift', employeeId: id, slot: 'morning' });
+  return s;
+}
+
 /** Chapter 6: the neuro clinic, then the stroke unit (the admit switch fills its beds). */
 function hospital(s: GameState, apply: Apply): GameState {
   if (!s.site.rooms.some((r) => r.type === 'neuro_clinic')) return build(s, apply, 'clinic');
@@ -353,6 +371,7 @@ export function campaignTurn(state: GameState, apply: Apply, on: BusinessSwitche
   if (c >= 4 && (all || on.homecare)) s = homeCare(s, apply);
   if (c >= 5 && (all || on.training)) s = training(s, apply);
   if (c >= 5 && (all || on.placements)) s = placements(s, apply);
+  if (c >= 2 && (all || on.build)) s = office(s, apply);
   if (c >= 6 && (all || on.build)) s = hospital(s, apply);
   if (c >= 7 && (all || on.branches)) s = network(s, apply);
   if (all || on.shop) s = shop(s, apply);
@@ -360,11 +379,34 @@ export function campaignTurn(state: GameState, apply: Apply, on: BusinessSwitche
   return s;
 }
 
-/** Once a day before the morning shift: staff care at 05:00, pricing at 06:00. */
+/** Below these averages, staff care takes everyone out: coffee for the staff, cake for residents. */
+export const OUTING_MORALE = 60;
+export const OUTING_HAPPINESS = 55;
+/** The park is free, so residents go whenever they are less than happy. */
+export const PARK_HAPPINESS = 80;
+
+/** Town outings at 10:00, only with the cash to spare (the park costs nothing). */
+function outings(s: GameState, apply: Apply): GameState {
+  const avg = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 100);
+  const morale = avg(s.employees.map((e) => e.morale));
+  const happy = avg(s.residents.map((r) => r.needs.happiness));
+  const go = (place: CityPlace) => {
+    if (cityBlocker(s, place) || !affords(s, cityCost(s, place))) return;
+    const [next, ok] = tryCmd(s, apply, { type: 'visitPlace', place });
+    if (ok) s = log(next, 'good', 'auto.log.outing', { place });
+  };
+  if (morale < OUTING_MORALE) go('coffee');
+  if (happy < OUTING_HAPPINESS) go('cake');
+  if (happy < PARK_HAPPINESS) go('park');
+  return s;
+}
+
+/** Once a day before the morning shift: staff care at 05:00, pricing at 06:00; town outings at 10:00. */
 export function dailyCare(state: GameState, apply: Apply, on: Partial<AutoSettings>): GameState {
   const mod = state.minute % (24 * 60);
   let s = state;
   if (on.staffCare && mod === 5 * 60) s = staffCare(s, apply);
+  if (on.staffCare && mod === 10 * 60) s = outings(s, apply);
   if (on.pricing && mod === 6 * 60) s = pricing(s, apply);
   return s;
 }

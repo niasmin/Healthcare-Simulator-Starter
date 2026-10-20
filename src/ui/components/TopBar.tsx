@@ -1,3 +1,4 @@
+import { useOpenMissions } from './GoalsModal';
 import { MuteButton } from './Prefs';
 import { useAutoOn } from './AutoModal';
 import { useEffect, useState } from 'react';
@@ -17,6 +18,7 @@ const SPEEDS: { speed: GameSpeed; label: string }[] = [
 ];
 
 export function TopBar() {
+  const openMissions = useOpenMissions();
   const t = useT();
   const autoOn = useAutoOn();
   const money = useMoney();
@@ -114,6 +116,14 @@ export function TopBar() {
           className={`px-3 py-1 rounded-md border text-sm font-semibold ${autoOn ? 'bg-[#f2b631] text-ink border-[#f2b631]' : 'bg-white/15 border-white/30 hover:bg-white/25'}`}
         >
           🤖 {t('hud.auto')}{autoOn ? ' ✓' : ''}
+        </button>
+        <button
+          type="button"
+          onClick={() => useGame.getState().setGoalsOpen(true)}
+          className="relative px-3 py-1 rounded-md bg-white/15 border border-white/30 text-sm hover:bg-white/25 font-semibold"
+        >
+          🎯 {t('hud.daily')}
+          {openMissions > 0 && <span className="absolute -top-1.5 -right-1.5 min-w-4 h-4 px-1 rounded-full bg-coral text-white text-[10px] font-black grid place-items-center">{openMissions}</span>}
         </button>
         <button
           type="button"

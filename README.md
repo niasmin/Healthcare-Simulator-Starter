@@ -209,8 +209,20 @@ The 🏙️ Town button (desktop top bar, phone map's left column) opens a town 
 A place can't be used twice on one day, for nobody, or without the cash. Spending is booked as "Town outings".
 
 - **Rival homes:** five fictional homes in town (standard, premium villas, budget, rehab). They are not simulated: their beds, residents, reputation and satisfaction grow with the calendar from a fixed recipe, with a small repeatable wobble. **Visit** builds a look-alike from the same ready-made rooms in a throwaway sandbox, moves residents and staff in for a few hours, and shows it read-only in the map renderer.
-- **Score:** residents × 10 + beds × 2 + reputation × 5 + family satisfaction × 3. The Ranking tab lists the town's homes with yours.
-- **Online ranking (real players):** on the deployed site, a signed-in player can choose to show their home. The row holds their sign-up name, the home's name, the score and headline numbers, and the building layout (no email, money or people). It is refreshed with every cloud autosave. Anyone can read the board and visit a published layout; each player can write only their own row (Supabase `public.leaderboard`, RLS). The title screen's 🏆 Ranking button opens it.
+- **Score:** residents × 10 + beds × 2 + reputation × 5 + family satisfaction × 3 + stars. The Ranking tab lists the town's homes with yours.
+- **Online ranking (real players):** on the deployed site, a signed-in player can choose to show their home. The row holds their sign-up name, the home's name, the score and headline numbers, and the building layout (no email, money or people). It is refreshed with every cloud autosave. Anyone can read the board and visit a published layout; each player can write only their own row (Supabase `public.leaderboard`, RLS).
+  - **Anti-cheat:** a database trigger decides each row's numbers. Beds are counted from the published layout (care beds in wards and villas, capped by room size). Residents can't exceed beds. Reputation and satisfaction are held to 0–100, and stars to 7 a day played plus 150. The trigger computes the score itself with the game's formula and refuses refreshes less than 10 seconds apart. (In a test, a row claiming 500 beds and a score of 999,999 was stored as 11 beds and 902.) The title screen's 🏆 Ranking button opens it.
+
+### Daily missions and achievements
+
+The 🎯 Daily button (desktop top bar, phone map's left column, with a badge while missions are open) opens three missions for the day and the achievements.
+
+- **Missions:** three a day, picked from nine by a hash of the game's seed and the day, so the game's random sequence is never touched. Examples: admit a resident, hire someone, take everyone out in town, no care missed all day, 40 tasks done, every bed taken, satisfaction 75+ or happiness 70+ at day close, more cash than yesterday. Most are ticked off within the hour. The day-close ones are judged at midnight.
+- **Rewards are ⭐ stars, not cash:** 1–2 stars a mission, +1 for all three, and a streak counter for days in a row. Cash rewards were tried first, and even small ones changed the chapter 2 balance (an over-eager build no longer went bankrupt, and an over-staffed home won), so stars keep the economy as it was.
+- **Achievements:** 14 one-off goals (first resident, 30 and 60 beds, 3 villas, 20 staff, every profession, a perfect day, a happy week, 5 shop upgrades, the town tour, first in town, 10 and 50 missions), worth 2–20 stars each.
+- **Stars count in the ranking score:** rival homes earn about two a day. Nothing is written to the event log (it is capped at 60 entries); a toast and a chime announce each completion.
+
+**Autopilot additions:** with the build switch (or "play every chapter"), a home with 30 beds builds an accounting office and puts an accountant on the morning shift. Staff care takes everyone to town at 10:00: coffee when average morale is under 60, cake when residents' happiness is under 55, and the free park under 80. Both spend only with the reserves the autopilot already keeps.
 
 ### More land
 
@@ -639,7 +651,7 @@ src/
   - Food, supplies, upkeep and payroll are each charged once per day.
   - An event's cost is charged once, and a resolved event can't be resolved again.
 
-## Tests (242 passing)
+## Tests (254 passing)
 
 | File | Covers |
 |---|---|
@@ -662,6 +674,8 @@ src/
 | `buildings.test.ts` | Wards and villas are numbered by age, one-of-a-kind rooms are not; renaming trims, caps at 30 characters, and an empty name brings the default back; the staff list groups by profession, costliest first, highest wage first |
 | `accounting.test.ts` | An accountant with a shift cuts daily costs by 3% and has invoices paid the day they are issued, without changing the random sequence; the four new shop items are priced and labelled, and the solar roof, scholarship fund and electronic records have their effects; every role has a job description; tasks done, minutes and missed work are counted per profession and closed into a 7-day report; older saves without the report still play |
 | `city.test.ts` | Coffee lifts morale and is paid per head with one ledger entry; cake, restaurant and park cheer residents (the park is free); each place once a day, never for nobody or into debt; the mall deal cuts supplies for 7 days then ends; rivals grow repeatably within their limits; the town ranking puts the player among the rivals, best first; a visit builds the same lived-in look-alike every time |
+| `goals.test.ts` | Three distinct missions a day, repeatable per seed and day, without touching the RNG; a mission done in the day earns its stars once; day-close missions, the all-three bonus and the streak; rewards are stars and never cash; labels in both languages; stars stay within the online ranking's server cap; achievements unlock once with their stars; the town tour and shopper conditions; goals run in the clock and older saves still play |
+| `autoextras.test.ts` | The autopilot builds an accounting office at 30 beds and rosters an accountant, never in a small home; staff care takes low-morale staff for coffee and unhappy residents for cake and the park at 10:00, and leaves content people home |
 | `shop.test.ts` | Upgrades are bought once, for their price, from their chapter (all at once in the sandbox); the central kitchen and laundry cut food and supplies by their percentages; staff welfare adds morale; online marketing adds an enquiry; the family app lifts reputation while residents are content; the smart call system keeps late routine care pending 30 minutes longer |
 | `modes.test.ts` | Campaign games are unchanged; sandbox books ฿50M as capital, unlocks every room, has no tutorial steps and is never judged after 70 days; each challenge opens with its own cash, reputation or chapter; each challenge is won by the scripted player and ends without a next chapter |
 | `chapter7.test.ts` | **Full 390-day campaign:** all 7 chapters won on schedule and solvent, ledger reconciles; one branch of each kind, each manager of the right role and off the roster; branch invoices exact; network occupancy ≥ 70%. **Opening:** locked before chapter 7; manager role checked; full opening cost charged; managers can’t take shifts or a second branch; cap of 5. **Running:** good branches fill and bill daily, poor ones empty, a poor name at headquarters stops growth; certificates raise the quality target; a lost manager leaves the branch leaderless until one is appointed; support visits lift quality, cost money and have a cooldown; closing refunds 30% and frees the manager; busy clinic branches refer to the stroke unit. Guide order; v9→v10 migration |

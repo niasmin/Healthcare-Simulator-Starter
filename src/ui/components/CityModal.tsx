@@ -196,7 +196,7 @@ function StatsLine({ stats }: { stats: CenterStats }) {
           ['residents', `${stats.residents}/${stats.beds}`],
           ['reputation', stats.reputation],
           ['satisfaction', stats.satisfaction],
-          ['staff', stats.staff],
+          ['stars', stats.stars],
         ] as const
       ).map(([k, v]) => (
         <div key={k} className="rounded-lg bg-sand/70 py-1">
