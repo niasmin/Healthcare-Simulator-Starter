@@ -42,6 +42,15 @@ Playable today, as one 210-day campaign with the same business:
 
 Chapters 5–7 (PHC workforce, Neuro Hospital, multi-site empire) come in Phase 6.
 
+### Phone play screen in the concept-art style
+
+- **HUD over the map:** a manager card (portrait, chapter and day, chapter progress bar; tap for the road map), a cash pill (its “+” opens Finance), the alerts bell and settings. A second row has the clock with pause/1×/2×/4× and residents/beds, satisfaction and reputation.
+- **Mission card:** clipboard, “chapter · step”, the current goal and a progress bar. ▼ unfolds the hint and the “Show me” button. The gift opens the chapter road map (what the next chapter unlocks).
+- **Floating buttons:** Missions (every step of the chapter with ticks and “Show me”), Events (the latest log entries), Rewards (chapter road map, with a “!” when the next chapter is ready) and Shop (the build sheet with ready-made rooms and garden decor). Bottom left, “Overview map” recenters the camera. Bottom right, the layers button hides or shows the room labels.
+- **Room labels** are coloured pills with a glyph per room type (ward, nursing station, therapy, staff room, villa, home-care office). They stay readable when you zoom out.
+- **Shortcut cards** above the tab bar: Build, Residents (with a head count) and Report (the dashboard).
+- The concept's floor selector (1F–3F) and gem currency are not in the game. Buildings have one floor, and there is no premium currency.
+
 ### Title screen in the Healthcare Empire key-art style
 
 - **Full-bleed key art** (cropped from the concept image) behind the Healthcare EMPIRE logo, tagline and a manager card. The card shows the current chapter and how many of the 7 road-map chapters are won, read from the latest save.

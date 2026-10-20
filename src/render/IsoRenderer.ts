@@ -1,5 +1,5 @@
 import { Application, Container, Graphics, Sprite, Text, type Texture } from 'pixi.js';
-import { DECOR_SPRITE, EQUIP_SPRITE, PERSON_SPRITE_WIDTH, loadSpriteTextures } from './sprites';
+import { DECOR_SPRITE, EQUIP_SPRITE, ROOM_BADGE, PERSON_SPRITE_WIDTH, loadSpriteTextures } from './sprites';
 import { WORLD_MARGIN, drawWorld, worldBounds } from './WorldBackdrop';
 import { EQUIPMENT, ROOMS } from '../data/rooms';
 import { cellIndex } from '../domain/grid';
@@ -39,6 +39,8 @@ export interface RenderInput {
   leftDragPans: boolean;
   /** Sign on the plot for sale next door, or null when there is none. */
   sale: { toX: number; label: string } | null;
+  /** Room name pills on the map (the layers button hides them). Default on. */
+  showLabels?: boolean;
 }
 
 export interface RendererCallbacks {
@@ -96,6 +98,7 @@ export class IsoRenderer {
   private staticLayer = new Container();
   private overlay = new Graphics();
   private labelLayer = new Container();
+  private labelScale = 1;
   private peopleLayer = new Container();
   private peopleShapes = new Graphics();
   private lastPeople = '';
@@ -148,7 +151,10 @@ export class IsoRenderer {
     this.world.addChild(this.backdropLayer, this.staticLayer, this.carsLayer, this.overlay, this.peopleLayer, this.labelLayer);
     this.night.eventMode = 'none';
     this.app.stage.addChild(this.world, this.night);
-    this.app.ticker.add((tk) => this.driveCars(tk.deltaMS));
+    this.app.ticker.add((tk) => {
+      this.driveCars(tk.deltaMS);
+      this.syncLabelScale();
+    });
     this.app.stage.eventMode = 'static';
     this.app.stage.hitArea = this.app.screen;
     this.app.stage.on('pointerdown', (e) => {
@@ -413,6 +419,7 @@ export class IsoRenderer {
     this.input = input;
     if (!this.ready) return;
     this.drawNight(input.game.minute);
+    this.labelLayer.visible = input.showLabels !== false;
     const backdropKey = `${input.game.site.width}x${input.game.site.height}|${input.sale?.label ?? ''}|${this.tex.size}`;
     if (backdropKey !== this.lastBackdrop) {
       this.lastBackdrop = backdropKey;
@@ -584,7 +591,9 @@ export class IsoRenderer {
 
     // label
     const c = cellToWorld(x + w / 2, y + h / 2);
-    this.addLabel(status?.operational ? label : `⚠ ${label}`, c.x, c.y - WALL_H - 8, status?.operational ? wall : 0xc0392b, false);
+    const badge = ROOM_BADGE[room.type];
+    if (status?.operational) this.addBadge(label, badge.glyph, c.x, c.y - WALL_H - 14, badge.color);
+    else this.addBadge(`⚠ ${label}`, null, c.x, c.y - WALL_H - 14, 0xc0392b);
   }
 
   /** Place a sprite with its base at a world point; width in world px. */
@@ -664,6 +673,51 @@ export class IsoRenderer {
       g.poly([c.x, z - hh * 0.0, c.x + hw, z, c.x, z + hh, c.x - hw * 0.0, z]).fill({ color: 0x5aa39a, alpha: 0.9 });
       g.ellipse(c.x - hw * 0.45, z - hh * 0.15, 6, 3.5).fill(0xffffff).stroke({ width: 1, color: 0xcfd6d4 });
     }
+  }
+
+  /** Keep room pills readable when zoomed out: never smaller on screen than at 60% zoom. */
+  private syncLabelScale(): void {
+    const k = Math.max(1, 0.6 / this.world.scale.x);
+    if (Math.abs(k - this.labelScale) < 0.01) return;
+    this.labelScale = k;
+    for (const c of this.labelLayer.children) c.scale.set(k);
+  }
+
+  /** Room name pill: coloured, white-edged, with the room's glyph on the left (concept-art style). */
+  private addBadge(text: string, glyph: string | null, x: number, y: number, color: number): void {
+    const t = new Text({ text, style: { fontFamily: FONT, fontSize: 15, fontWeight: '700', fill: 0xffffff }, resolution: 3 });
+    t.anchor.set(0, 0.5);
+    const tex = glyph ? this.tex.get(glyph) : undefined;
+    const gh = 18;
+    const gw = tex ? (tex.width / tex.height) * gh : 0;
+    const padX = 10;
+    const gap = tex ? 7 : 0;
+    const width = padX * 2 + gw + gap + t.width;
+    const height = Math.max(t.height, gh) + 12;
+    const box = new Container();
+    const bg = new Graphics()
+      .roundRect(-width / 2, -height / 2 + 3, width, height, height / 2)
+      .fill({ color: 0x000000, alpha: 0.22 })
+      .roundRect(-width / 2, -height / 2, width, height, height / 2)
+      .fill(color)
+      .stroke({ width: 2, color: 0xffffff, alpha: 0.9 })
+      .roundRect(-width / 2 + 3, -height / 2 + 2, width - 6, height / 2 - 2, height / 3)
+      .fill({ color: 0xffffff, alpha: 0.14 });
+    box.addChild(bg);
+    let left = -width / 2 + padX;
+    if (tex) {
+      const sp = new Sprite(tex);
+      sp.anchor.set(0, 0.5);
+      sp.scale.set(gh / tex.height);
+      sp.position.set(left, 0);
+      box.addChild(sp);
+      left += gw + gap;
+    }
+    t.position.set(left, 0);
+    box.addChild(t);
+    box.position.set(x, y);
+    box.scale.set(this.labelScale);
+    this.labelLayer.addChild(box);
   }
 
   private addLabel(text: string, x: number, y: number, color: number, small: boolean): void {

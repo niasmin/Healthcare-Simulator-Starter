@@ -10,7 +10,7 @@ export type Tool = { kind: 'select' } | { kind: 'corridor' } | { kind: 'bulldoze
 export type View = 'map' | 'residents' | 'roster' | 'finance';
 export type LeftTab = 'build' | 'hire' | 'admit';
 /** Phone layout: which bottom sheet is open. */
-export type Sheet = 'tools' | 'info' | 'menu' | null;
+export type Sheet = 'tools' | 'info' | 'menu' | 'missions' | 'events' | 'report' | null;
 
 export interface Toast {
   id: number;
@@ -55,6 +55,9 @@ interface UIStore {
   setSaveOpen: (v: boolean) => void;
   chaptersOpen: boolean;
   setChaptersOpen: (v: boolean) => void;
+  /** Room name pills on the map (toggled by the layers button). */
+  showLabels: boolean;
+  setShowLabels: (v: boolean) => void;
   /** The tutorial card is folded into a small chip (remembered per browser). */
   tutorialHidden: boolean;
   setTutorialHidden: (v: boolean) => void;
@@ -99,6 +102,8 @@ export const useGame = create<UIStore>((set, get) => ({
   setLeftTab: (leftTab) => set({ leftTab }),
   sheet: null,
   setSheet: (sheet) => set({ sheet }),
+  showLabels: true,
+  setShowLabels: (showLabels) => set({ showLabels }),
 
   dispatch: (cmd) => {
     const { state, result } = applyCommand(get().game, cmd);

@@ -18,7 +18,7 @@ const GROUP_HEX: Record<CareGroup, number> = { active_aging: 0xc9822b, stroke_re
  * Glue between the React/Zustand UI and the Pixi renderer.
  * Pointer input becomes sim Commands; previews use the same pure validators as the engine.
  */
-export function GameCanvas() {
+export function GameCanvas({ controls = true }: { controls?: boolean } = {}) {
   const t = useT();
   const money = useMoney();
   const hostRef = useRef<HTMLDivElement>(null);
@@ -30,6 +30,7 @@ export function GameCanvas() {
   const hover = useGame((s) => s.hover);
   const drag = useGame((s) => s.drag);
   const selectedRoomId = useGame((s) => s.selectedRoomId);
+  const showLabels = useGame((s) => s.showLabels);
   const summary = useSummary();
 
   // Create the renderer once.
@@ -133,9 +134,17 @@ export function GameCanvas() {
       preview: preview ? { cells: preview.cells, valid: preview.check.ok } : null,
       hoverTint: tool.kind === 'bulldoze' ? 'danger' : 'neutral',
       leftDragPans: tool.kind === 'select',
+      showLabels,
       sale: game.site.width < EXPANDED_WIDTH ? { toX: EXPANDED_WIDTH, label: game.chapter.id >= 3 ? t('world.sale_now', { price: money(LAND_PRICE) }) : t('world.sale_later', { c: 3 }) } : null,
     });
-  }, [game, people, summary, selectedRoomId, hover, preview, tool, t, ready, lang]);
+  }, [game, people, summary, selectedRoomId, hover, preview, tool, t, ready, lang, showLabels]);
+
+  // The phone HUD's "overview map" button recenters through this event.
+  useEffect(() => {
+    const onRecenter = () => rendererRef.current?.recenter();
+    window.addEventListener('he:recenter', onRecenter);
+    return () => window.removeEventListener('he:recenter', onRecenter);
+  }, []);
 
   const coarse = typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches;
   let status: { text: string; tone: 'ok' | 'bad' | 'muted' } | null = showHelp ? { text: t(coarse ? 'canvas.help_touch' : 'canvas.help'), tone: 'muted' } : null;
@@ -153,7 +162,7 @@ export function GameCanvas() {
     <section className="absolute inset-0 overflow-hidden" aria-label="site map">
       <div ref={hostRef} className="absolute inset-0" />
       {!ready && <div className="absolute inset-0 grid place-items-center text-ink-soft">{t('canvas.loading')}</div>}
-      <div className="absolute right-3 top-3 max-lg:top-[4.5rem] flex flex-col gap-1.5">
+      {controls && <div className="absolute right-3 top-3 max-lg:top-[4.5rem] flex flex-col gap-1.5">
         {[
           { label: '+', title: t('canvas.zoom_in'), fn: () => r?.zoomBy(1.2) },
           { label: '−', title: t('canvas.zoom_out'), fn: () => r?.zoomBy(1 / 1.2) },
@@ -170,10 +179,10 @@ export function GameCanvas() {
             {b.label}
           </button>
         ))}
-      </div>
+      </div>}
       {status && (
         <div
-          className={`absolute left-3 bottom-3 right-3 sm:right-auto px-3 py-1.5 rounded-lg text-xs sm:text-sm shadow-sm tabular ${
+          className={`absolute left-3 bottom-3 max-lg:bottom-[4.8rem] right-3 sm:right-auto px-3 py-1.5 rounded-lg text-xs sm:text-sm shadow-sm tabular ${
             status.tone === 'ok' ? 'bg-ok text-white' : status.tone === 'bad' ? 'bg-bad text-white' : 'bg-white/90 text-ink-soft border border-line'
           }`}
         >

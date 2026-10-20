@@ -36,7 +36,7 @@ export function CenterArea({ showTabs = true }: { showTabs?: boolean }) {
         ))}
       </div>
       <div className="relative flex-1 min-h-0">
-        <GameCanvas />
+        <GameCanvas controls={showTabs} />
         {view !== 'map' && (
           <div className="absolute inset-0 z-10 overflow-y-auto scroll-thin bg-[#f3efe6]">{view === 'residents' ? <ResidentsView /> : view === 'roster' ? <RosterView /> : <FinanceView />}</div>
         )}
