@@ -6,17 +6,40 @@ import { MEAL_TIMES, SELF_MEAL_NUTRITION } from '../data/patients';
 import { dailyResidentCosts } from '../sim/systems/billing';
 import { dailyUpkeep } from '../sim/systems/finance';
 import { refreshCandidates } from '../sim/systems/staffing';
-import { DINING_MEAL_HAPPINESS, DINING_MEAL_NUTRITION, LAUNDRY_UPKEEP_PERCENT, NUTRITIONIST_SATISFACTION_PER_DAY, PHARMACY_SUPPLIES_PERCENT, supportDayEnd } from '../sim/systems/support';
+import {
+  DINING_MEAL_HAPPINESS,
+  DINING_MEAL_NUTRITION,
+  LAUNDRY_UPKEEP_PERCENT,
+  NUTRITIONIST_SATISFACTION_PER_DAY,
+  PHARMACY_SUPPLIES_PERCENT,
+  RECEPTION_EXTRA_ENQUIRIES,
+  roomOpen,
+  SECURITY_SATISFACTION_PER_DAY,
+  STORAGE_SUPPLIES_PERCENT,
+  supportDayEnd,
+} from '../sim/systems/support';
 import { needsTick } from '../sim/systems/needs';
 import type { GameState } from '../domain/types';
 import { admit, buildHome, hire, ok, quietEvents } from './helpers';
 
-const SPOT = { pharmacy: { x: 14, y: 11 }, laundry: { x: 16, y: 11 }, dining: { x: 10, y: 13 } };
+const SPOT = { pharmacy: { x: 14, y: 11 }, laundry: { x: 16, y: 11 }, dining: { x: 10, y: 13 }, reception: { x: 0, y: 0 }, storage: { x: 0, y: 0 } };
 const home = (): GameState => {
   const s = quietEvents(buildHome(createInitialState(8)));
   return { ...s, chapter: { id: 2, startDay: 1, result: null, past: [] } };
 };
-const withRoom = (s: GameState, prefab: 'pharmacy' | 'laundry' | 'dining') => ok(s, { type: 'placePrefab', prefab, origin: SPOT[prefab] });
+type Support = keyof typeof SPOT;
+const withRoom = (s: GameState, prefab: Support): GameState => {
+  if (prefab === 'reception' || prefab === 'storage') {
+    // Any free spot next to the corridor will do.
+    for (let y = 0; y < 20; y++)
+      for (let x = 0; x < 20; x++) {
+        const out = applyCommand(s, { type: 'placePrefab', prefab, origin: { x, y } });
+        if (out.result.ok && out.state.site.rooms.some((r) => r.type === (prefab === 'reception' ? 'reception' : 'storage_room') && roomOpen(out.state, r.type))) return out.state;
+      }
+    throw new Error(`no spot for ${prefab}`);
+  }
+  return ok(s, { type: 'placePrefab', prefab, origin: SPOT[prefab] });
+};
 
 describe('support rooms and staff', () => {
   it('support applicants only appear once their room exists (so the campaign is unchanged)', () => {
@@ -94,6 +117,29 @@ describe('support rooms and staff', () => {
     expect(seen).toEqual({ ph: true, nu: true, cg: true });
     // Every meal was served.
     expect(s.tasks.filter((t) => t.kind === 'meal_assist' && t.status === 'missed')).toHaveLength(0);
+  });
+
+  it('reception: a receptionist brings one more enquiry a day, a security guard lifts satisfaction', () => {
+    let s = withRoom(home(), 'reception');
+    expect(refreshCandidates(s).applicants.filter((a) => a.role === 'receptionist' || a.role === 'security').map((a) => a.role).sort()).toEqual(['receptionist', 'security']);
+    const plain = refreshCandidates(s).waitlist.length;
+    [s] = hire(s, 'receptionist', ['morning']);
+    expect(refreshCandidates(s).waitlist.length).toBe(plain + RECEPTION_EXTRA_ENQUIRIES);
+    [s] = admit(s);
+    const r0 = s.residents[0].needs;
+    [s] = hire(s, 'security', ['night']);
+    expect(supportDayEnd(s).residents[0].needs.satisfaction).toBeCloseTo(r0.satisfaction + SECURITY_SATISFACTION_PER_DAY, 2);
+  });
+
+  it('a storage room cuts supplies on its own, on top of the pharmacy', () => {
+    let s = home();
+    [s] = admit(s);
+    const base = dailyResidentCosts(s).supplies;
+    s = withRoom(s, 'storage');
+    expect(dailyResidentCosts(s).supplies).toBe(pctOf(base, STORAGE_SUPPLIES_PERCENT));
+    s = withRoom(s, 'pharmacy');
+    [s] = hire(s, 'pharmacist', ['morning']);
+    expect(dailyResidentCosts(s).supplies).toBe(pctOf(pctOf(base, PHARMACY_SUPPLIES_PERCENT), STORAGE_SUPPLIES_PERCENT));
   });
 
   it('support rooms are optional: nothing in a campaign chapter requires them', () => {

@@ -37,6 +37,8 @@ const SKILL_ROLE: Record<Skill, StaffRole> = {
   airway_care: 'rn',
   consult: 'doctor',
   cleaning: 'cleaner',
+  front_desk: 'receptionist',
+  security: 'security',
 };
 
 /** Preferred answer per event, falling back to the next choice when blocked. */

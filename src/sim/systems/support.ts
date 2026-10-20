@@ -10,6 +10,9 @@ import { makeApplicant } from './staffing';
  * - Dining room: residents who eat on their own get more from each meal together. With a nutritionist
  *   (who also helps at mealtimes), everyone is a little more satisfied each day.
  * - Laundry room + cleaner: in-house laundry and cleaning cut building upkeep and lift residents' mood.
+ * - Reception + receptionist: a staffed front desk turns more calls into enquiries (+1 family a day).
+ * - Reception + security guard: families feel their relatives are safe (satisfaction up a little each day).
+ * - Storage room (no staff): stock bought in bulk cuts daily supplies a little.
  */
 
 export const PHARMACY_SUPPLIES_PERCENT = 90;
@@ -18,8 +21,11 @@ export const DINING_MEAL_HAPPINESS = 2;
 export const NUTRITIONIST_SATISFACTION_PER_DAY = 0.5;
 export const LAUNDRY_UPKEEP_PERCENT = 80;
 export const CLEANER_HAPPINESS_PER_DAY = 1;
+export const RECEPTION_EXTRA_ENQUIRIES = 1;
+export const SECURITY_SATISFACTION_PER_DAY = 0.3;
+export const STORAGE_SUPPLIES_PERCENT = 95;
 
-export const SUPPORT_ROOM: Partial<Record<StaffRole, RoomType>> = { pharmacist: 'pharmacy', nutritionist: 'dining_room', cleaner: 'laundry_room' };
+export const SUPPORT_ROOM: Partial<Record<StaffRole, RoomType>> = { pharmacist: 'pharmacy', nutritionist: 'dining_room', cleaner: 'laundry_room', receptionist: 'reception', security: 'reception' };
 
 export function roomOpen(state: GameState, type: RoomType): boolean {
   const statuses = allRoomStatuses(state.site);
@@ -46,9 +52,9 @@ export function supportApplicants(state: GameState): GameState {
   return s;
 }
 
-/** Midnight: the nutritionist's and the cleaners' daily lift for every resident. */
+/** Midnight: the nutritionist's, the security guard's and the cleaners' daily lift for every resident. */
 export function supportDayEnd(state: GameState): GameState {
-  const sat = supportActive(state, 'nutritionist') && roomOpen(state, 'dining_room') ? NUTRITIONIST_SATISFACTION_PER_DAY : 0;
+  const sat = (supportActive(state, 'nutritionist') ? NUTRITIONIST_SATISFACTION_PER_DAY : 0) + (supportActive(state, 'security') ? SECURITY_SATISFACTION_PER_DAY : 0);
   const happy = supportActive(state, 'cleaner') ? CLEANER_HAPPINESS_PER_DAY : 0;
   if (!sat && !happy) return state;
   return {

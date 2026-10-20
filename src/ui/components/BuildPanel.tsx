@@ -33,6 +33,8 @@ const ROOM_ART: Record<RoomType, string> = {
   pharmacy: 'rm_pharmacy',
   dining_room: 'rm_dining_hall',
   laundry_room: 'rm_laundry',
+  reception: 'rm_reception',
+  storage_room: 'rm_storage',
 };
 
 const SWATCH: Record<RoomType, string> = {
@@ -48,6 +50,8 @@ const SWATCH: Record<RoomType, string> = {
   pharmacy: '#2a7f7f',
   dining_room: '#c9771f',
   laundry_room: '#5f6b78',
+  reception: '#4b4fc4',
+  storage_room: '#8a6a45',
 };
 
 function sameTool(a: Tool, b: Tool) {
