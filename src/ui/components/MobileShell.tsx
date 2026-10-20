@@ -105,7 +105,7 @@ function MobileTopBar({ alertCount, overlay }: { alertCount: number; overlay: bo
           <img src={ownerFace} alt="" className="size-10 -my-1 -ml-0.5 rounded-full border-2 border-white bg-[#cfe6f5] object-cover shrink-0" />
           <span className="pl-1.5 min-w-0 text-left leading-tight">
             <span className="block text-white text-[11px] font-bold whitespace-nowrap">{t('hud.title')}</span>
-            <span className="block text-white/80 text-[10px] tabular truncate">{t('hud.chapter_day', { c: game.chapter.id, d: chapterDay, n: days })}</span>
+            <span className="block text-white/80 text-[10px] tabular truncate">{game.mode === 'sandbox' ? `${t('home.mode_sandbox')} · ${t('top.day', { day: dayOf(game.minute) })}` : t('hud.chapter_day', { c: game.chapter.id, d: chapterDay, n: days })}</span>
             <span className="mt-0.5 block h-1.5 w-20 rounded-full bg-white/20 overflow-hidden" aria-hidden>
               <span className="block h-full bg-[#2bc183]" style={{ width: `${(chapterDay / days) * 100}%` }} />
             </span>
