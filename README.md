@@ -42,6 +42,16 @@ Playable today, as one 210-day campaign with the same business:
 
 Chapters 5–7 (PHC workforce, Neuro Hospital, multi-site empire) come in Phase 6.
 
+### Title screen in the Healthcare Empire key-art style
+
+- **Full-bleed key art** (cropped from the concept image) behind the Healthcare EMPIRE logo, tagline and a manager card. The card shows the current chapter and how many of the 7 road-map chapters are won, read from the latest save.
+- **Status pills** for cash, residents and reputation come from the latest save's metadata. They show “–” when there is no save yet.
+- **Big buttons:** Continue (disabled without a save), New Game (choose the starter campus or an empty lot) and My saves (save slots plus the real cloud-sync status). There is no fake log-in.
+- **Side menus:** Missions opens the chapter road map, Guide opens a 6-step how-to-play, and News lists what is in this version. Shop and Ranking are shown locked (“coming soon”).
+- **Mode tabs:** Campaign is playable. Challenge and Sandbox are locked.
+- **Business cards** (Nursing Home, Tranquila, Home Care, Neuroclinic, Rehabilitation, Staff, Inventory, Management, Achievement) show the chapter that unlocks each one, or a lock when it isn't built yet. Tapping a card opens the road map.
+- Works at phone width: the side menus become one row, the buttons stack, and the cards scroll sideways. Dialogs close with Esc or ✕.
+
 ### Play-screen upgrade: a living town, ready-made rooms and a starter campus
 
 - **The map is a town now.** All of this is drawn by `render/WorldBackdrop.ts`, never the game's random generator, and nothing is saved:

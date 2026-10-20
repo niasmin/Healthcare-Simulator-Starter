@@ -28,6 +28,9 @@ export interface SaveMeta {
   residents: number;
   staff: number;
   reputation: number;
+  /** Running chapter and chapters won (for the title screen's player card). */
+  chapter?: number;
+  chaptersWon?: number;
 }
 
 export interface SaveBlob {
@@ -50,6 +53,8 @@ export function metaOf(state: GameState, slot: SlotId, savedAt: number): SaveMet
     residents: state.residents.length,
     staff: state.employees.length,
     reputation: state.organization.reputation,
+    chapter: state.chapter.id,
+    chaptersWon: [...state.chapter.past, ...(state.chapter.result ? [state.chapter.result] : [])].filter((r) => r.outcome === 'won').length,
   };
 }
 
