@@ -37,6 +37,7 @@ export const PLACEMENT_RATE: Record<StaffRole, number> = {
   cleaner: thb(800),
   receptionist: thb(1_000),
   security: thb(900),
+  accountant: thb(2_000),
 };
 export const CERT_PREMIUM_PERCENT = 25;
 

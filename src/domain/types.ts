@@ -24,7 +24,7 @@ export interface Rect {
   h: number;
 }
 
-export type RoomType = 'ward' | 'nursing_station' | 'therapy' | 'staff_room' | 'villa' | 'homecare_office' | 'training_room' | 'neuro_clinic' | 'stroke_unit' | 'pharmacy' | 'dining_room' | 'laundry_room' | 'reception' | 'storage_room' | 'bathroom';
+export type RoomType = 'ward' | 'nursing_station' | 'therapy' | 'staff_room' | 'villa' | 'homecare_office' | 'training_room' | 'neuro_clinic' | 'stroke_unit' | 'pharmacy' | 'dining_room' | 'laundry_room' | 'reception' | 'storage_room' | 'bathroom' | 'accounting_office';
 
 export type EquipmentId =
   | 'care_bed'
@@ -49,7 +49,8 @@ export type EquipmentId =
   | 'washer'
   | 'reception_desk'
   | 'storage_rack'
-  | 'bath_set';
+  | 'bath_set'
+  | 'office_desk';
 
 export interface Room {
   id: string;
@@ -185,13 +186,13 @@ export interface PersonName {
   gender?: 'f' | 'm';
 }
 
-export type StaffRole = 'rn' | 'pn' | 'caregiver' | 'pt' | 'ot' | 'doctor' | 'pharmacist' | 'nutritionist' | 'cleaner' | 'receptionist' | 'security';
+export type StaffRole = 'rn' | 'pn' | 'caregiver' | 'pt' | 'ot' | 'doctor' | 'pharmacist' | 'nutritionist' | 'cleaner' | 'receptionist' | 'security' | 'accountant';
 
 /**
  * Abstract qualifications. Clinical work is modelled only as "who is allowed
  * to do which kind of task" — never as treatment advice.
  */
-export type Skill = 'assessment' | 'vital_signs' | 'med_round' | 'personal_care' | 'feeding' | 'mobility' | 'activity' | 'tube_feeding' | 'airway_care' | 'consult' | 'cleaning' | 'front_desk' | 'security';
+export type Skill = 'assessment' | 'vital_signs' | 'med_round' | 'personal_care' | 'feeding' | 'mobility' | 'activity' | 'tube_feeding' | 'airway_care' | 'consult' | 'cleaning' | 'front_desk' | 'security' | 'bookkeeping';
 
 export type ShiftSlot = 'morning' | 'afternoon' | 'night';
 
@@ -300,6 +301,15 @@ export interface CareTask {
   assigneeId: string | null;
   finishAt: SimMinute | null;
 }
+
+/** One profession's care work over a period. */
+export interface RoleWork {
+  done: number;
+  missed: number;
+  /** Minutes spent on care tasks. */
+  minutes: number;
+}
+export type RolePerf = Partial<Record<StaffRole, RoleWork>>;
 
 export interface DayStats {
   day: number;
@@ -585,7 +595,7 @@ export interface ChapterState {
 export type GameMode = 'campaign' | 'sandbox' | 'challenge';
 export type ChallengeId = 'tight_budget' | 'bad_name' | 'big_start';
 /** Shop upgrades: permanent, bought once. */
-export type UpgradeId = 'online_marketing' | 'staff_welfare' | 'central_kitchen' | 'family_app' | 'laundry_supply' | 'smart_call';
+export type UpgradeId = 'online_marketing' | 'staff_welfare' | 'central_kitchen' | 'family_app' | 'laundry_supply' | 'smart_call' | 'solar_roof' | 'ehr_system' | 'family_lounge' | 'training_scholarship';
 
 /** Autopilot switches (sim/autopilot.ts). Missing in older saves = all off. */
 export interface AutoSettings {
@@ -644,6 +654,10 @@ export interface GameState {
   today: { done: number; missed: number };
   /** Closed days, oldest first (kept for the last 60 days). */
   history: DayStats[];
+  /** Care work per profession today: tasks done and missed, minutes spent (older saves: absent). */
+  perfToday?: RolePerf;
+  /** The same for the last 7 closed days, oldest first. */
+  perfDays?: RolePerf[];
   // Phase 3
   priceLevel: PriceLevel;
   invoices: Invoice[];

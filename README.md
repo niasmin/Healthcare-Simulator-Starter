@@ -94,7 +94,11 @@ The shop (the floating Shop button on the phone map, 🛒 in the desktop top bar
 | 🍲 Central kitchen | ฿250,000 | 1 | Food costs −25% |
 | 📱 Family app | ฿180,000 | 2 | +0.2 reputation a day while satisfaction is 60+ |
 | 📦 Supply stock system | ฿300,000 | 2 | Daily supplies −20% |
+| 🛋️ Family lounge | ฿220,000 | 1 | Family satisfaction +0.3 a day |
+| ☀️ Solar roof | ฿400,000 | 2 | Daily building upkeep −15% |
+| 💻 Electronic records | ฿320,000 | 2 | Medication rounds and vital-sign checks take 20% less time |
 | 🔔 Smart call system | ฿350,000 | 3 | Routine care may start 30 minutes later before it counts as missed |
+| 🎓 Staff scholarship fund | ฿250,000 | 5 | Training courses cost 30% less |
 
 The sandbox can buy everything from day 1. The scripted player never buys upgrades, so the campaign balance figures are unchanged.
 
@@ -111,7 +115,7 @@ The sandbox can buy everything from day 1. The scripted player never buys upgrad
 
 ### Support rooms and staff (optional)
 
-Six optional support rooms can be built (the pharmacy from chapter 2, the rest from day 1). Staffed rooms unlock their support roles on the job board, and an applicant of a role only appears once its room exists. They are optional: the campaign can be won without them, and the scripted player never builds them.
+Seven optional support rooms can be built (the pharmacy and the accounting office from chapter 2, the rest from day 1). Staffed rooms unlock their support roles on the job board, and an applicant of a role only appears once its room exists. They are optional: the campaign can be won without them, and the scripted player never builds them.
 
 | Room | Equipment | Staff | Effect (while the room is open and someone of that role has a shift) |
 |---|---|---|---|
@@ -122,6 +126,7 @@ Six optional support rooms can be built (the pharmacy from chapter 2, the rest f
 | | | Security guard | Family satisfaction +0.3 a day |
 | Storage room (2×2) | Storage rack | none | Daily supplies cost 95% (on top of the pharmacy and the shop's supply stock system) |
 | Bath & hygiene (2×2) | Bath set (shower chair, grab rails) | none | Personal care takes a third less time (30 → 20 min) |
+| Accounting office (2×2) | Office desk (1–3) | Accountant (bookkeeping, ฿30,000/month) | Every invoice is paid the day it is issued; daily food, supplies and upkeep cost 97% |
 
 Support staff only do their own skill, and they never count as the "narrowest" colleague when nurses and caregivers decide whether to hold back for a task only they can do. Values are fictional game balancing.
 
@@ -184,6 +189,8 @@ Results:
 - **Residents by building:** the residents page has one section per ward or villa, with its name and how full it is. When there are villas, there are tabs for all, wards and villas, so it is easy to see who lives where and to discharge from a particular building.
 - **Staff by profession:** the staff list is grouped by profession, the costliest group first, with each group's headcount and monthly payroll; within a group the highest wage comes first.
 - **Price level:** the finance page adds an 🤖 Automatic choice next to value, standard and premium. It switches on automatic pricing and shows the level chosen today. Picking a level by hand switches it off.
+- **Job descriptions:** every profession has a one-line description of its duties, shown on each applicant card and under each group in the staff list.
+- **Performance by profession:** the roster page ends with a table for the last 7 closed days: headcount, care tasks done and missed, success rate, time spent on tasks and payroll per task done. A missed task counts against the profession that owns that work (vital signs against PNs, personal care against caregivers). Support professions show whether they are helping (their room is open and they have a shift).
 - **Hire button:** on the phone, the bottom bar has Build, Hire (with the number of applicants), Residents and Report.
 
 ### More land
@@ -613,7 +620,7 @@ src/
   - Food, supplies, upkeep and payroll are each charged once per day.
   - An event's cost is charged once, and a resolved event can't be resolved again.
 
-## Tests (225 passing)
+## Tests (234 passing)
 
 | File | Covers |
 |---|---|
@@ -634,6 +641,7 @@ src/
 | `land.test.ts` | Three plots sold in order for their prices, each from its chapter, keeping every room and corridor tile; then already done; locked by chapter and by cash; a room can be built on the newest plot; the autopilot's land purchase runs a corridor into the new plot so a villa can open there |
 | `supabase.test.ts` | A save round-trips through `game_saves` rows: one row per part, each under the size check, keyed by the player's id; another player sees none of it; removal deletes every part; off without the build settings; Supabase auth messages map to the reasons the sign-in window explains |
 | `buildings.test.ts` | Wards and villas are numbered by age, one-of-a-kind rooms are not; renaming trims, caps at 30 characters, and an empty name brings the default back; the staff list groups by profession, costliest first, highest wage first |
+| `accounting.test.ts` | An accountant with a shift cuts daily costs by 3% and has invoices paid the day they are issued, without changing the random sequence; the four new shop items are priced and labelled, and the solar roof, scholarship fund and electronic records have their effects; every role has a job description; tasks done, minutes and missed work are counted per profession and closed into a 7-day report; older saves without the report still play |
 | `shop.test.ts` | Upgrades are bought once, for their price, from their chapter (all at once in the sandbox); the central kitchen and laundry cut food and supplies by their percentages; staff welfare adds morale; online marketing adds an enquiry; the family app lifts reputation while residents are content; the smart call system keeps late routine care pending 30 minutes longer |
 | `modes.test.ts` | Campaign games are unchanged; sandbox books ฿50M as capital, unlocks every room, has no tutorial steps and is never judged after 70 days; each challenge opens with its own cash, reputation or chapter; each challenge is won by the scripted player and ends without a next chapter |
 | `chapter7.test.ts` | **Full 390-day campaign:** all 7 chapters won on schedule and solvent, ledger reconciles; one branch of each kind, each manager of the right role and off the roster; branch invoices exact; network occupancy ≥ 70%. **Opening:** locked before chapter 7; manager role checked; full opening cost charged; managers can’t take shifts or a second branch; cap of 5. **Running:** good branches fill and bill daily, poor ones empty, a poor name at headquarters stops growth; certificates raise the quality target; a lost manager leaves the branch leaderless until one is appointed; support visits lift quality, cost money and have a cooldown; closing refunds 30% and frees the manager; busy clinic branches refer to the stroke unit. Guide order; v9→v10 migration |

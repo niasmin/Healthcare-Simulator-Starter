@@ -1,3 +1,5 @@
+import { hasUpgrade, SOLAR_UPKEEP_PERCENT } from '../../data/shop';
+import { ACCOUNTANT_COST_PERCENT } from './support';
 import { LAUNDRY_UPKEEP_PERCENT, supportActive } from './support';
 import { pctOf } from '../../domain/money';
 import { CORRIDOR_UPKEEP_PER_TILE, ROOMS } from '../../data/rooms';
@@ -17,8 +19,11 @@ export function dailyUpkeep(state: GameState): Satang {
   total += DECOR_UPKEEP * state.site.decor.length;
   // Home Care vans cost fuel and insurance every day.
   total += VAN_COST_PER_DAY * state.site.rooms.reduce((a, r) => a + (r.equipment.care_van ?? 0), 0);
-  // In-house laundry and cleaning staff cut the bill.
-  return supportActive(state, 'cleaner') ? pctOf(total, LAUNDRY_UPKEEP_PERCENT) : total;
+  // In-house laundry and cleaning staff, solar panels and the accountant's checks cut the bill.
+  if (supportActive(state, 'cleaner')) total = pctOf(total, LAUNDRY_UPKEEP_PERCENT);
+  if (hasUpgrade(state, 'solar_roof')) total = pctOf(total, SOLAR_UPKEEP_PERCENT);
+  if (supportActive(state, 'accountant')) total = pctOf(total, ACCOUNTANT_COST_PERCENT);
+  return total;
 }
 
 /** Runs once at each midnight. One upkeep entry per day, referenced by day number. */

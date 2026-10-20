@@ -4,7 +4,7 @@ import { ROLES, ROLE_ORDER, SHIFT_SLOTS, SLOT_ORDER, SUPPORT_ROLES } from '../..
 import { SUPPORT_ROOM } from '../../sim/systems/support';
 import { slotAt } from '../../domain/rules/shifts';
 import type { Employee, ShiftSlot, StaffRole } from '../../domain/types';
-import { rosterView, staffActivity } from '../../sim/selectors';
+import { rolePerformance, rosterView, staffActivity } from '../../sim/selectors';
 import { formatClock } from '../../sim/systems/time';
 import { useIsMobile, useMoney, useT } from '../hooks';
 import { useGame } from '../store';
@@ -318,6 +318,9 @@ export function RosterView() {
                         {t('roster.group_payroll', { amount: money(g.payroll) })}
                       </span>
                     </div>
+                    <p className="mt-0.5 text-[11px] font-normal text-ink-soft leading-snug">
+                      {t('roster.jd')}: {t(`role.${g.role}.jd`)}
+                    </p>
                   </th>
                 </tr>
                 {g.staff.map((e) => (
@@ -328,6 +331,55 @@ export function RosterView() {
           </table>
         )}
       </section>
+
+      <PerformanceReport />
     </div>
+  );
+}
+
+/** Care work per profession over the last week, with what each support role adds. */
+function PerformanceReport() {
+  const t = useT();
+  const money = useMoney();
+  const game = useGame((s) => s.game);
+  const rows = useMemo(() => rolePerformance(game), [game]);
+  if (!rows.length) return null;
+  const empty = !rows[0].days;
+  return (
+    <section className="rounded-2xl bg-white border border-line p-3 overflow-x-auto" data-testid="perf-report">
+      <h2 className="font-bold text-base">{t('perf.title')}</h2>
+      <p className="text-[11px] text-ink-soft mb-2">{empty ? t('perf.empty') : t('perf.hint')}</p>
+      <table className="w-full min-w-[560px] text-left text-xs tabular">
+        <thead>
+          <tr className="text-[11px] text-ink-soft">
+            <th className="font-medium py-1">{t('perf.role')}</th>
+            <th className="font-medium text-right">{t('perf.people')}</th>
+            <th className="font-medium text-right">{t('perf.done')}</th>
+            <th className="font-medium text-right">{t('perf.missed')}</th>
+            <th className="font-medium text-right">{t('perf.rate')}</th>
+            <th className="font-medium text-right">{t('perf.busy')}</th>
+            <th className="font-medium text-right">{t('perf.cost_per_task')}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.role} className="border-t border-line/60">
+              <td className="py-1.5">
+                <RoleChip role={r.role} label={t(`role.${r.role}.short`)} />
+                {r.support !== null && (
+                  <span className={`ml-1.5 text-[10px] ${r.support ? 'text-ok' : 'text-ink-soft'}`}>{r.support ? t('perf.support_on') : t('perf.support_off')}</span>
+                )}
+              </td>
+              <td className="text-right">{r.people}</td>
+              <td className="text-right">{r.done}</td>
+              <td className={`text-right ${r.missed ? 'text-bad font-semibold' : ''}`}>{r.missed}</td>
+              <td className={`text-right ${r.rate !== null && r.rate < 90 ? 'text-warn font-semibold' : ''}`}>{r.rate === null ? '–' : `${r.rate}%`}</td>
+              <td className="text-right">{t('perf.hours', { h: Math.round(r.minutes / 6) / 10 })}</td>
+              <td className="text-right">{r.costPerTask === null ? '–' : money(r.costPerTask)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </section>
   );
 }

@@ -39,6 +39,7 @@ const SKILL_ROLE: Record<Skill, StaffRole> = {
   cleaning: 'cleaner',
   front_desk: 'receptionist',
   security: 'security',
+  bookkeeping: 'accountant',
 };
 
 /** Preferred answer per event, falling back to the next choice when blocked. */

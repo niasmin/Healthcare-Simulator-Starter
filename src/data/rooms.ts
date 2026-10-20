@@ -38,6 +38,7 @@ export const EQUIPMENT: Record<EquipmentId, EquipmentDef> = {
   reception_desk: { id: 'reception_desk', costSatang: thb(30_000), color: 0xe9c48f },
   storage_rack: { id: 'storage_rack', costSatang: thb(12_000), color: 0xb08a5a },
   bath_set: { id: 'bath_set', costSatang: thb(28_000), color: 0xdfeff5 },
+  office_desk: { id: 'office_desk', costSatang: thb(18_000), color: 0xc9a77c },
 };
 
 export interface EquipmentSlot {
@@ -301,11 +302,25 @@ export const ROOMS: Record<RoomType, RoomDef> = {
     floorColor: 0xdcebf1,
     wallColor: 0x3f8fae,
   },
+  // The accounting office, where the accountant works.
+  accounting_office: {
+    type: 'accounting_office',
+    minSide: 2,
+    minArea: 4,
+    maxArea: 9,
+    baseCostSatang: thb(60_000),
+    costPerTileSatang: thb(10_000),
+    upkeepPerTileSatang: thb(15),
+    equipment: [{ id: 'office_desk', required: 1, max: () => 3 }],
+    floorColor: 0xece6da,
+    wallColor: 0x3c6e47,
+    unlockChapter: 2,
+  },
 };
 
 
 
-export const ROOM_TYPES: RoomType[] = ['ward', 'nursing_station', 'therapy', 'staff_room', 'villa', 'homecare_office', 'training_room', 'neuro_clinic', 'stroke_unit', 'pharmacy', 'dining_room', 'laundry_room', 'reception', 'storage_room', 'bathroom'];
+export const ROOM_TYPES: RoomType[] = ['ward', 'nursing_station', 'therapy', 'staff_room', 'villa', 'homecare_office', 'training_room', 'neuro_clinic', 'stroke_unit', 'pharmacy', 'dining_room', 'laundry_room', 'reception', 'storage_room', 'bathroom', 'accounting_office'];
 /** Rooms whose care beds count as resident capacity. */
 export const BED_ROOMS: RoomType[] = ['ward', 'villa'];
 
