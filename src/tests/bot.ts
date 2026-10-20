@@ -5,7 +5,7 @@ import { EVENT_DEFS } from '../data/events';
 import { dailyRunningCost, nextBillingDay, rosterView } from '../sim/selectors';
 import { dayOf } from '../sim/systems/time';
 import { SLOT_ORDER } from '../data/staff';
-import type { CourseId, GameState, Rect, ShiftSlot, Skill, StaffRole } from '../domain/types';
+import type { BranchKind, CourseId, GameState, Rect, ShiftSlot, Skill, StaffRole } from '../domain/types';
 import { EQUIPMENT, TILES_PER_BED, roomConstructionCost } from '../data/rooms';
 import { chapterDef, EXPANDED_WIDTH, LAND_PRICE } from '../data/chapters';
 import { DECOR, MAX_APPEAL, gardenAppeal } from '../data/decor';
@@ -14,6 +14,7 @@ import { thb } from '../domain/money';
 import { buildHome } from './helpers';
 import { prefabCost, prefabDef } from '../data/prefabs';
 import { freeStrokeBeds } from '../sim/systems/hospital';
+import { BRANCHES, SUPPORT_COST } from '../data/network';
 import { COURSES } from '../data/workforce';
 import { certifiedCount, isCertified, placementBlocker, trainingBlocker, trainingSeats } from '../sim/systems/workforce';
 
@@ -44,6 +45,12 @@ const EVENT_PREFS: Record<string, string[]> = {
   referral: ['accept_beds', 'decline'],
   family_visit: ['standard', 'special', 'postpone'],
 };
+
+/**
+ * Cash kept on top of the running costs until billing day. Chapter 3 doubles it: buying land and villas
+ * while families now and then leave (with a refund of their unused days) is the tightest stretch.
+ */
+const defaultReserve = (s: GameState) => (s.chapter.id === 3 ? thb(100_000) : thb(50_000));
 
 export interface BotOptions {
   /** Stop admitting once this many residents live in the home. */
@@ -163,12 +170,12 @@ function homeCare(s: GameState, reserve: number): GameState {
 export const TRAINING_ROOM = { x: 30, y: 11 };
 /** Contracts the bot runs at once, and the most extra staff it keeps for placements. */
 const MAX_CONTRACTS = 4;
-const MAX_POOL = 7;
+const MAX_POOL = 9;
 
 /** Staff kept off the roster for training and placements: certified, in class, or placed. */
 function reserved(s: GameState, id: string): boolean {
   const e = s.employees.find((x) => x.id === id);
-  return !!e && (!!e.placement || isCertified(e) || s.workforce.training.some((t) => t.employeeId === id));
+  return !!e && (!!e.placement || !!e.branch || isCertified(e) || s.workforce.training.some((t) => t.employeeId === id));
 }
 
 /** Chapter 5: open a training room, certify a pool of extra staff, and place them with partners. */
@@ -197,8 +204,10 @@ function workforce(s: GameState, reserve: number): GameState {
   // Work towards the certification target with the pool: caregivers first, then practical nurses.
   if (certifiedCount(s) + s.workforce.training.length < (def.targetCertified ?? 0) && s.workforce.training.length < trainingSeats(s)) {
     const caregivers = s.employees.filter((e) => e.role === 'caregiver' && isCertified(e)).length;
-    if (caregivers < 4) train('caregiver', 'care_cert');
-    else train('pn', 'airway_cert');
+    const before = s.workforce.training.length;
+    if (caregivers >= 4) train('pn', 'airway_cert');
+    // Caregivers first; and if no practical nurse can be trained, another caregiver instead.
+    if (s.workforce.training.length === before) train('caregiver', 'care_cert');
   }
   return s;
 }
@@ -220,7 +229,33 @@ function hospital(s: GameState, reserve: number): GameState {
   return s;
 }
 
-/** Visits one van can make in a morning (appointments 08:00–13:00, 100 minutes each). */
+/** Chapter 7: branches in order of cost, each with a newly hired manager; support visits keep quality up. */
+const BRANCH_PLAN: Array<[BranchKind, StaffRole]> = [
+  ['homecare', 'pn'],
+  ['nursing', 'rn'],
+  ['clinic', 'doctor'],
+];
+function network(s: GameState, reserve: number): GameState {
+  for (const [kind, role] of BRANCH_PLAN) {
+    if (s.network.branches.some((b) => b.kind === kind)) continue;
+    if (s.organization.cashSatang < BRANCHES[kind].capexSatang + runwayNeed(s, reserve)) break;
+    let manager: string | null;
+    [s, manager] = hireRole(s, role);
+    if (manager) s = tryCmd(s, { type: 'openBranch', kind, managerId: manager });
+    break;
+  }
+  for (const b of s.network.branches) {
+    if (!b.managerId) {
+      let manager: string | null;
+      [s, manager] = hireRole(s, BRANCHES[b.kind].managers[0]);
+      if (manager) s = tryCmd(s, { type: 'assignBranchManager', branchId: b.id, managerId: manager });
+    }
+    if (b.quality < 72 && s.organization.cashSatang > SUPPORT_COST + runwayNeed(s, reserve)) s = tryCmd(s, { type: 'supportBranch', branchId: b.id });
+  }
+  return s;
+}
+
+/** Visits one van can make in a morning (appointments 09:00–13:10, 100 minutes each). */
 const VISITS_PER_VAN = 4;
 
 function tryCmd(s: GameState, cmd: Command): GameState {
@@ -248,14 +283,15 @@ export function botTurn(state: GameState, opts: BotOptions = {}): GameState {
   const max = opts.maxResidents ?? Infinity;
   if (opts.campaign && s.chapter.result?.outcome === 'won') s = tryCmd(s, { type: 'startChapter' });
   if (s.chapter.id >= 2) {
-    s = expand(s, opts.reserve ?? thb(50_000), opts.eager ?? false);
+    s = expand(s, opts.reserve ?? defaultReserve(s), opts.eager ?? false);
     const def = chapterDef(s.chapter.id);
     if (def.targetRn && s.employees.filter((e) => e.role === 'rn').length < def.targetRn) s = cover(s, 'rn', 'night');
   }
-  if (s.chapter.id >= 3) s = tranquila(s, opts.reserve ?? thb(50_000));
-  if (s.chapter.id >= 4) s = homeCare(s, opts.reserve ?? thb(50_000));
-  if (s.chapter.id >= 5) s = workforce(s, opts.reserve ?? thb(50_000));
-  if (s.chapter.id >= 6) s = hospital(s, opts.reserve ?? thb(50_000));
+  if (s.chapter.id >= 3) s = tranquila(s, opts.reserve ?? defaultReserve(s));
+  if (s.chapter.id >= 4) s = homeCare(s, opts.reserve ?? defaultReserve(s));
+  if (s.chapter.id >= 5) s = workforce(s, opts.reserve ?? defaultReserve(s));
+  if (s.chapter.id >= 6) s = hospital(s, opts.reserve ?? defaultReserve(s));
+  if (s.chapter.id >= 7) s = network(s, opts.reserve ?? defaultReserve(s));
   if (s.events.active) {
     for (const id of EVENT_PREFS[s.events.active.defId]) {
       if (!EVENT_DEFS[s.events.active.defId].choices.some((c) => c.id === id) || choiceBlocker(s, id)) continue;

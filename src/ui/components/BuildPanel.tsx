@@ -17,6 +17,7 @@ import { useGame, type LeftTab, type Tool } from '../store';
 import { Avatar, GROUP_COLOR, RoleChip, StatBar, useName } from './people';
 import { WorkforcePanel } from './WorkforcePanel';
 import { HospitalPanel } from './HospitalPanel';
+import { NetworkPanel } from './NetworkPanel';
 
 /** Room pictures from the Game Assets Pack. */
 const ROOM_ART: Record<RoomType, string> = {
@@ -364,14 +365,16 @@ export function LeftPanel() {
   const t = useT();
   const tab = useGame((s) => s.leftTab);
   const setTab = useGame((s) => s.setLeftTab);
+  const network = useGame((s) => s.game.chapter.id >= 7 || s.game.network.branches.length > 0);
   const tabs: { id: LeftTab; label: string }[] = [
     { id: 'build', label: t('tab.build') },
     { id: 'hire', label: t('tab.hire') },
     { id: 'admit', label: t('tab.admit') },
+    ...(network ? [{ id: 'network' as const, label: t('tab.network') }] : []),
   ];
   return (
     <aside className="panel flex flex-col min-h-0 overflow-hidden">
-      <div className="flex border-b border-line text-xs whitespace-nowrap" role="tablist">
+      <div className={`flex border-b border-line whitespace-nowrap ${tabs.length > 3 ? "text-[11px] gap-1 px-1" : "text-xs"}`} role="tablist">
         {tabs.map((x) => (
           <button
             key={x.id}
@@ -380,7 +383,7 @@ export function LeftPanel() {
             data-tour={`tab-${x.id}`}
             aria-selected={tab === x.id}
             onClick={() => setTab(x.id)}
-            className={`flex-1 px-2 py-2.5 text-center border-b-2 ${tab === x.id ? 'font-semibold border-teal text-teal' : 'border-transparent text-ink-soft hover:text-ink'}`}
+            className={`flex-1 min-w-0 px-1 py-2.5 text-center border-b-2 ${tab === x.id ? 'font-semibold border-teal text-teal' : 'border-transparent text-ink-soft hover:text-ink'}`}
           >
             {x.label}
           </button>
@@ -390,6 +393,7 @@ export function LeftPanel() {
         {tab === 'build' && <BuildTools />}
         {tab === 'hire' && <HireList />}
         {tab === 'admit' && <AdmitList />}
+        {tab === 'network' && <NetworkPanel />}
       </div>
     </aside>
   );

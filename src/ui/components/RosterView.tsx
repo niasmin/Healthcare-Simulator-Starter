@@ -80,6 +80,9 @@ function StaffRow({ e }: { e: Employee }) {
   } else if (act.kind === 'placed') {
     status = `🤝 ${t('staff.placed')}`;
     tone = 'text-teal';
+  } else if (act.kind === 'branch') {
+    status = `🏢 ${t('staff.branch')}`;
+    tone = 'text-teal';
   } else if (act.kind === 'hospital') {
     status = `🧠 ${t(`staff.h_${act.task}`)}`;
     tone = 'text-teal';

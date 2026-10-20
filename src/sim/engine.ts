@@ -8,7 +8,7 @@ import { SHIFT_SLOTS } from '../data/staff';
 import { freeBeds, parseBedId, residentsInRoom } from '../domain/rules/beds';
 import { roomStatus } from '../domain/rules/rooms';
 import { validateShift } from '../domain/rules/shifts';
-import type { Cell, CommandResult, CourseId, DayStats, DecorType, EquipmentId, GameSpeed, GameState, PriceLevel, Rect, Resident, Room, RoomType, ShiftSlot } from '../domain/types';
+import type { BranchKind, Cell, CommandResult, CourseId, DayStats, DecorType, EquipmentId, GameSpeed, GameState, PriceLevel, Rect, Resident, Room, RoomType, ShiftSlot } from '../domain/types';
 import { dayInMonth, monthOfDay, PRICE_LEVELS } from '../data/finance';
 import { billAdmission, billFinal, billMonth, chargeDailyResidentCosts, collectPayments, refundUnusedDays } from './systems/billing';
 import { eventCheck, eventExpiryTick, expireReferrals, resolveEvent } from './systems/events';
@@ -26,6 +26,7 @@ import { EXPANDED_WIDTH, LAND_PRICE } from '../data/chapters';
 import { prefabCost, prefabDef, prefabRect } from '../data/prefabs';
 import { GROUP_WARD_EQUIPMENT } from '../data/patients';
 import { admitInpatient, hospitalDayEnd, hospitalTick } from './systems/hospital';
+import { assignManager, closeBranch, networkDayEnd, openBranch, supportBranch } from './systems/network';
 import { acceptOffer, endContract, startTraining, workforceDayEnd, workforceTick } from './systems/workforce';
 
 /**
@@ -59,7 +60,11 @@ export type Command =
   | { type: 'startTraining'; employeeId: string; course: CourseId }
   | { type: 'acceptOffer'; offerId: string; employeeId: string }
   | { type: 'endContract'; contractId: string }
-  | { type: 'admitInpatient'; referralId: string };
+  | { type: 'admitInpatient'; referralId: string }
+  | { type: 'openBranch'; kind: BranchKind; managerId: string }
+  | { type: 'assignBranchManager'; branchId: string; managerId: string }
+  | { type: 'supportBranch'; branchId: string }
+  | { type: 'closeBranch'; branchId: string };
 
 export interface CommandOutcome {
   state: GameState;
@@ -339,6 +344,26 @@ export function applyCommand(state: GameState, cmd: Command): CommandOutcome {
       return 'reason' in out ? fail(state, out.reason) : { state: out.state, result: { ok: true, id: out.id } };
     }
 
+    case 'openBranch': {
+      const out = openBranch(state, cmd.kind, cmd.managerId);
+      return 'reason' in out ? fail(state, out.reason) : { state: out.state, result: { ok: true, id: out.id } };
+    }
+
+    case 'assignBranchManager': {
+      const next = assignManager(state, cmd.branchId, cmd.managerId);
+      return typeof next === 'string' ? fail(state, next) : { state: next, result: { ok: true } };
+    }
+
+    case 'supportBranch': {
+      const next = supportBranch(state, cmd.branchId);
+      return typeof next === 'string' ? fail(state, next) : { state: next, result: { ok: true } };
+    }
+
+    case 'closeBranch': {
+      const next = closeBranch(state, cmd.branchId);
+      return next ? { state: next, result: { ok: true } } : fail(state, 'not_found');
+    }
+
     case 'startChapter': {
       const next = startNextChapter(state);
       return next ? { state: next, result: { ok: true } } : fail(state, 'chapter_locked');
@@ -449,6 +474,7 @@ export function step(state: GameState): GameState {
         s = homecareDayEnd(s, closingDay, ev.at);
         s = workforceDayEnd(s, closingDay);
         s = hospitalDayEnd(s, closingDay, ev.at);
+        s = networkDayEnd(s, closingDay);
         s = closeDay(s);
         s = residentDepartures(s);
         s = judgeChapter(s, closingDay);

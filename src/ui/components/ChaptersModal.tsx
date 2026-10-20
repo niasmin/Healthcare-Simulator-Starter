@@ -58,6 +58,7 @@ export function ChaptersModal({ onClose }: { onClose: () => void }) {
                       {def.targetPremium && <li>{t('chapters.t.premium', { n: def.targetPremium, s: def.targetPremiumSat ?? 0, a: def.targetAppeal ?? 0 })}</li>}
                       {def.targetClients && <li>{t('chapters.t.clients', { n: def.targetClients, p: Math.round((def.targetVisitRate ?? 0) * 100) })}</li>}
                       {def.targetCertified && <li>{t('chapters.t.workforce', { n: def.targetCertified, c: def.targetContracts ?? 0 })}</li>}
+                      {def.targetBranches && <li>{t('chapters.t.network', { n: def.targetBranches, q: def.targetNetworkQuality ?? 0, o: Math.round((def.targetNetworkOccupancy ?? 0) * 100) })}</li>}
                       {def.targetConsults && <li>{t('chapters.t.hospital', { n: def.targetConsults, p: Math.round((def.targetConsultRate ?? 0) * 100), d: def.targetDischarges ?? 0 })}</li>}
                       <li>{t('chapters.t.profit', { q: def.targetQuality })}</li>
                     </ul>

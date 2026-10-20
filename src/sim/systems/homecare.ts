@@ -17,8 +17,11 @@ import { dayOf } from './time';
  * whose satisfaction falls below the churn line cancels. All values are fictional game balancing.
  */
 
-/** Appointment times, handed out in turn so visits spread over the morning shift (08:00–13:00). */
-export const VISIT_SLOTS = [8 * 60, 9 * 60, 10 * 60, 11 * 60, 12 * 60, 13 * 60];
+/**
+ * Appointment times, handed out in turn so visits spread over the morning shift (09:00–13:10). They start
+ * after the breakfast rush, when morning care and meals no longer hold every pair of hands.
+ */
+export const VISIT_SLOTS = [9 * 60, 9 * 60 + 50, 10 * 60 + 40, 11 * 60 + 30, 12 * 60 + 20, 13 * 60 + 10];
 /** Daily running cost per van (fuel, insurance). */
 export const VAN_COST_PER_DAY = 30_000;
 export const VISIT_SKILL: Record<VisitPlan, Skill> = { caregiver: 'personal_care', nurse: 'vital_signs' };
@@ -145,9 +148,18 @@ export function homecareTick(state: GameState): GameState {
   let free = vansAvailable(state) - visits.filter((v) => v.status === 'in_progress').length;
   for (const v of visits.filter((x) => x.status === 'pending' && x.dueAt <= now).sort((a, b) => a.dueAt - b.dueAt || (a.id < b.id ? -1 : 1))) {
     if (free <= 0) break;
-    const e = [...employees.values()]
+    const candidates = [...employees.values()]
       .filter((x) => !x.taskId && x.busyUntil <= now && x.energy >= EXHAUSTED_ENERGY && x.skills.includes(v.skill) && isOnShift(state, x.id, now))
-      .sort(staffOrder)[0];
+      .sort(staffOrder);
+    // As with in-house care: someone whose other skills are needed before they'd be back stays in, unless
+    // the visit is about to be missed. (Stops PNs leaving on a personal-care visit during the 08:00 vital signs.)
+    const urgent = now >= v.dueAt + VISIT_GRACE - 30;
+    // The narrowest qualified colleague on shift (busy or not) sets which skills are scarce.
+    const qualified = [...employees.values()].filter((x) => x.skills.includes(v.skill) && isOnShift(state, x.id, now));
+    const narrow = qualified.reduce<Employee | null>((a, x) => (!a || x.skills.length < a.skills.length ? x : a), null);
+    const narrowest = narrow?.skills.length ?? 0;
+    const neededIn = (x: Employee) => state.tasks.some((t) => t.status === 'pending' && t.dueAt <= now + v.duration && x.skills.includes(t.skill) && !narrow?.skills.includes(t.skill));
+    const e = urgent ? candidates[0] : candidates.find((x) => x.skills.length === narrowest || !neededIn(x));
     if (!e) continue;
     v.status = 'in_progress';
     v.assigneeId = e.id;

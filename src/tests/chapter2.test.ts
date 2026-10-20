@@ -86,7 +86,7 @@ describe('chapter rules', () => {
     expect(next.chapter.past).toHaveLength(1);
     for (const g of PROGRAMMES) expect(next.waitlist.some((c) => c.group === g)).toBe(true);
     expect(applyCommand(next, { type: 'startChapter' }).result.ok).toBe(false);
-    expect(CHAPTERS).toHaveLength(6);
+    expect(CHAPTERS).toHaveLength(7);
   });
 
   it('dementia needs a secured ward; others fill ordinary wards first', () => {

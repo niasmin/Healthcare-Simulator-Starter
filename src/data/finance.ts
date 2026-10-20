@@ -38,7 +38,7 @@ export const WAITLIST_ARRIVALS: Record<PriceLevel, [number, number]> = { value: 
 export const PRICE_SATISFACTION_DRIFT: Record<PriceLevel, number> = { value: 0.02, standard: 0, premium: -0.06 };
 
 /** Billable services, charged per completed session on the next monthly invoice. */
-export const SERVICE_PRICE: Record<Exclude<RevenueStream, 'room_care' | 'homecare' | 'workforce' | 'hospital'>, number> = {
+export const SERVICE_PRICE: Record<Exclude<RevenueStream, 'room_care' | 'homecare' | 'workforce' | 'hospital' | 'network'>, number> = {
   therapy: thb(300),
   activity: thb(100),
   special: thb(3_000),

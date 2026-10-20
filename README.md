@@ -27,11 +27,11 @@ Add `?debug` to the URL to expose `window.__HE__` (store + renderer) for automat
 | **3** | Pricing, monthly invoices and payments, running costs, Financial Dashboard, 4 events, title screen, character portraits | ✅ Done |
 | **4** | Save/load, guided tutorial, 30-day chapter goal with win/lose verdict, three scripted events, balancing | ✅ Done (**MVP complete**) |
 | **5** | Chapter campaign; Ch. 2 nursing center with specialised programmes; Ch. 3 premium villas (Tranquila); Ch. 4 Home Care | ✅ Done |
-| 6 | Ch. 5 workforce (training + B2B placements) ✅; Ch. 6 neuro hospital (OPD + stroke unit) ✅; Ch. 7 multi-site | 🚧 In progress |
+| 6 | Ch. 5 workforce (training + B2B placements), Ch. 6 neuro hospital (OPD + stroke unit), Ch. 7 branch network | ✅ Done (all 7 chapters playable) |
 
 ## What you can play now
 
-Playable today, as one 330-day campaign with the same business:
+Playable today, as one 390-day campaign with the same business:
 
 | Chapter | Days |
 |---|---|
@@ -41,8 +41,37 @@ Playable today, as one 330-day campaign with the same business:
 | 4. Home Care | 151–210 |
 | 5. Healthcare Workforce | 211–270 |
 | 6. Neuro Hospital | 271–330 |
+| 7. Healthcare Empire (branch network) | 331–390 |
 
-Chapter 7 (multi-site empire) comes later in Phase 6.
+After chapter 7 the game continues as a sandbox.
+
+### Phase 6, part 3: Chapter 7 (Healthcare Empire, the branch network)
+
+- **Branches** are run from headquarters at portfolio level (capacity, occupancy, quality), not as separate maps. A new **Network** tab is the multi-site dashboard. All figures are fictional.
+
+  | Branch | Opening cost | Capacity | Revenue | Running cost | Manager |
+  |---|---|---|---|---|---|
+  | Nursing home | ฿1.8M | 20 beds | ฿1,200 per bed-day | ฿6,000/day + ฿450 per bed-day | RN |
+  | Home Care | ฿600k | 15 clients | ฿950 per client-day | ฿2,500/day + ฿350 per client-day | PN or RN |
+  | Neuro clinic | ฿1.2M | 30 visits/day | ฿1,000 per visit | ฿9,000/day + ฿200 per visit | Doctor |
+
+  At most 5 branches.
+- **Manager:** every branch needs one, moved from headquarters' staff. The manager leaves the roster for good: no shifts, no courses, no placements. If the manager leaves the company, the branch is leaderless until a new one is appointed.
+- **Quality** moves 20% of the gap toward a target each day.
+  - The target starts at 55: +10 for a certified manager, +5 for a manager with good morale, +5 for a training room at headquarters, +5 for a reputation of 80+. A branch without a manager targets 30.
+  - A **support visit** (฿50,000) adds +10 at once, at most once every 7 days.
+- **Occupancy:** a branch grows by 8% of its capacity a day while its quality is 60+ and headquarters' reputation is 50+. It shrinks by 5% a day while quality is below 50.
+- **Billing:** each branch bills its day on a `branch` invoice and pays its running costs at midnight.
+- **Clinic referrals:** a full clinic branch refers a patient to headquarters' stroke unit on about 30% of days.
+- **Closing** a branch refunds 30% of its opening cost and frees the manager.
+- **Targets:** 60 days; 3 branches of all 3 kinds; average branch quality of 70; network occupancy of 70%; headquarters stays at 36 beds / 30 residents, quality 75 and a profit. Winning chapter 7 completes the road map.
+- **Balance fixes from the merge with main's care consequences:**
+  - Home visits are now booked 09:00–13:10, after the breakfast rush, instead of 08:00–13:00.
+  - A visit no longer takes a nurse away while nurse-only care is due, unless the visit is about to be missed.
+  - The staffing advice adds a deadline check, so a long task (a home visit) can no longer hide a short rush.
+  - Together these cut missed care in a large campus from about 70 to about 15 tasks a day, so reputation holds.
+  - The scripted player wins all 7 chapters on 3 of 4 seeds. On the fourth it misses chapter 3's premium target (3 of 4) because families now and then leave.
+- Save schema 10 (a v9 save gains an empty network).
 
 ### Phase 6, part 2: Chapter 6 (Neuro Hospital)
 
@@ -137,7 +166,7 @@ All hospital work is abstract: a consultation, a nursing round and a doctor's ro
   - **To win:** 4 premium residents in villas, their average satisfaction at least 78, garden appeal at least 20, at least 30 residents and 36 beds, an operating profit, quality at least 75, and cash never below zero.
 - **Chapter 4: Home Care** (60 days).
   - **Home Care centre** (new room): needs a coordination desk and at least one **care van** (฿180,000, ฿300 a day to run).
-  - **Clients:** enquiries arrive daily once the centre is open. Each accepted client gets one daily appointment between 08:00 and 13:00; appointments are handed out so they spread over the morning.
+  - **Clients:** enquiries arrive daily once the centre is open. Each accepted client gets one daily appointment between 09:00 and 13:10, after the breakfast rush; appointments are handed out so they spread over the morning.
   - **Visits:** a caregiver visit (personal care, ฿900) or a nurse visit (vital signs, ฿1,500) takes a qualified, on-shift employee and a free van out of the building for 100 minutes, travel included. Staff on a visit leave the map, and the staff table shows "🚐 out on a home visit".
   - **Rules and billing:** a visit not started within 90 minutes is missed. Each done visit adds 3 satisfaction and each missed one takes 15; below 35, the family cancels. Completed visits are billed per client at midnight.
   - **Staffing advice** now counts home visits in the morning shift.
@@ -410,7 +439,7 @@ src/
   - Food, supplies, upkeep and payroll are each charged once per day.
   - An event's cost is charged once, and a resolved event can't be resolved again.
 
-## Tests (164 passing)
+## Tests (175 passing)
 
 | File | Covers |
 |---|---|
@@ -426,6 +455,7 @@ src/
 | `decor.test.ts` | Decor placed on an empty tile and charged once; can't overlap rooms, corridor, entrance or decor, and blocks building over it; demolish refunds half; appeal is capped and makes residents happier; schema-3 saves migrate to schema 4 |
 | `chapter.test.ts` | **30-day playthrough** by a scripted sensible player using only public commands and the real applicant and waiting-list pools: wins chapter 1 with cash positive every day; every invariant holds (ledger, unique beds, no overlapping shifts, no care without the skill); roster ready and >95% of tasks done; the three scripted events fire on their days; the same seed plays byte-identically; the verdict pauses the game and survives a save. **Balance:** a full home wins on more seeds, a 40% empty home and an overstaffed home fail on targets. **Verdict rules:** bankrupt at the first negative midnight, decided once and never changed; nothing decided before day 30; a migrated save past day 30 is judged at the next midnight. **Tutorial:** step order, derived from state, a goal and a how-to hint in Thai and English for every step. **Staffing advice:** rush-hour windows, RN covering PN work, one OT for ten sessions |
 | `chapter2.test.ts` | **90-day campaign** by the scripted player: wins Chapter 1, starts Chapter 2 on day 31 and wins it on day 90 with every target; dementia residents only in secured wards; airway care only by RNs and tube feeding only by RNs/PNs; an RN on the night roster; >93% of tasks done; byte-identical rerun; a reckless builder's lowest cash falls far below the careful one, with at least one bankruptcy; a second full team fails the chapter. **Rules:** the next chapter only after a win, with one candidate per programme; secured-ward admission; RN-only airway care missed with only a PN on nights; programme fees; schema-5 migration; Thai and English text for every Chapter 2 step |
+| `chapter7.test.ts` | **Full 390-day campaign:** all 7 chapters won on schedule and solvent, ledger reconciles; one branch of each kind, each manager of the right role and off the roster; branch invoices exact; network occupancy ≥ 70%. **Opening:** locked before chapter 7; manager role checked; full opening cost charged; managers can’t take shifts or a second branch; cap of 5. **Running:** good branches fill and bill daily, poor ones empty, a poor name at headquarters stops growth; certificates raise the quality target; a lost manager leaves the branch leaderless until one is appointed; support visits lift quality, cost money and have a cooldown; closing refunds 30% and frees the manager; busy clinic branches refer to the stroke unit. Guide order; v9→v10 migration |
 | `chapter6.test.ts` | **Full 330-day campaign:** chapters 1–6 all won on schedule and solvent, ledger reconciles; OPD and IPD invoices are exact; inpatients only in unique stroke-unit beds, which don’t count as home beds; doctors only do doctors’ work. **Clinic:** locked before chapter 6; 6 bookings per desk from the next day and only with a doctor (4 below reputation 60); one doctor with two desks sees some patients and the rest leave; never more consultations at once than desks. **Stroke unit:** admission plans every round; full beds refuse; staffed stays go home as planned and bill their days, unstaffed ones end complicated; unserved referrals cost reputation. Guide order; v8→v9 migration |
 | `chapter5.test.ts` | **Full 270-day campaign:** chapters 1–5 all won on schedule and solvent, ledger reconciles, at least 6 certified staff, b2b invoices are quantity × rate, and placed staff hold no shifts. **Training:** needs a room, the right role and a free seat; the cost is charged; class is taken in the shift, in the room; passing adds the certificate and qualification; staff without shifts attend 08:00–16:00. **Placements:** role and certificate checks; placed staff leave the roster and can’t get shifts or courses; 07:00–15:00 away, billed per day, released at the end; ending early or dismissal costs reputation; requests only from chapter 5 with a room, and they expire. Guide order; v7→v8 save migration |
 | `chapter34.test.ts` | **Full 210-day campaign** by the careful scripted player: chapters 1–4 all won on schedule and solvent, ledger reconciles; premium residents only in villas; visits only by qualified staff, billed per visit, and staff on a visit leave the map. **Chapter 3 rules:** land bought once, from chapter 3, keeping every corridor tile; villas locked before chapter 3 and premium-only; a garden keeps premium families content. **Chapter 4 rules:** clients need a centre with a van; one van takes one visit at a time and done visits bill at midnight; missed visits lead to cancellation; visits need the skill and a shift; schema-6 migration; Thai and English text for every step |
@@ -466,7 +496,8 @@ A browser playtest (Playwright, run outside the repo) drove the production build
 ## Known limitations
 
 - On-screen pointers (the coral ring and suggested tiles) cover Chapter 1; later chapters guide with text and the "Show me" button.
-- Chapters 1–6 are playable. After the Chapter 6 verdict the game continues as a sandbox, and chapter 7 stays locked.
+- All 7 chapters are playable. After the Chapter 7 verdict the game continues as a sandbox. Challenge and sandbox modes and the shop on the title screen are still locked.
+- Branches are portfolio-level numbers, not separate maps you can build on.
 - Daycare (the second half of the concept art's Chapter 4) isn't modelled yet. Home visits have no travel map; travel is folded into the 100-minute visit.
 - The bought lot is 32×20. Multi-site work (Phase 6) will add separate sites.
 - Chapter 2 is easy on profit once the home is full; its real challenge is cash flow during expansion. Later chapters should add new cost pressure.

@@ -67,6 +67,7 @@ export function trainingBlocker(state: GameState, employeeId: string, course: Co
   if (!def.roles.includes(e.role)) return 'course_not_allowed';
   if (e.certs?.includes(course) || (def.skill && e.skills.includes(def.skill))) return 'already_certified';
   if (e.placement) return 'employee_placed';
+  if (e.branch) return 'employee_branch';
   if (isTraining(state, e.id)) return 'employee_busy';
   if (state.workforce.training.length >= trainingSeats(state)) return 'no_seat';
   if (state.organization.cashSatang < def.costSatang) return 'insufficient_funds';
@@ -93,6 +94,7 @@ export function placementBlocker(state: GameState, offerId: string, employeeId: 
   if (e.role !== o.role) return 'role_mismatch';
   if (o.cert && !e.certs?.includes(o.cert)) return 'needs_cert';
   if (e.placement) return 'employee_placed';
+  if (e.branch) return 'employee_branch';
   if (isTraining(state, e.id)) return 'employee_busy';
   return null;
 }

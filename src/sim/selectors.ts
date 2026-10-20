@@ -6,6 +6,7 @@ import { dailyResidentCosts } from './systems/billing';
 import { VISIT_DURATION, VISIT_GRACE, VISIT_SKILL, hasHomecareOffice, visitRate } from './systems/homecare';
 import { clinicDesks, consultRate, consultsSince, hasDoctor, hospitalTaskOf, slotsPerDesk, smoothDischarges, strokeBeds } from './systems/hospital';
 import { CONSULT_GRACE, CONSULT_MINUTES, DOCTOR_ROUND, DOCTOR_ROUND_GRACE, DOCTOR_ROUND_MINUTES, NURSE_ROUNDS, NURSE_ROUND_MINUTES, ROUND_GRACE } from '../data/hospital';
+import { networkStats } from './systems/network';
 import { certifiedCount, contractsCompleted, hasTrainingRoom, isInClass, isPlacedAway } from './systems/workforce';
 import { gardenAppeal } from '../data/decor';
 import { carePlanSchedule, TASK_KINDS } from '../data/patients';
@@ -45,7 +46,7 @@ export function summarize(state: GameState): SiteSummary {
       operationalByType[room.type]++;
     }
   }
-  const spentByCategory: Record<LedgerCategory, Satang> = { capital: 0, construction: 0, equipment: 0, refund: 0, upkeep: 0, payroll: 0, revenue: 0, fee_refund: 0, food: 0, supplies: 0, event: 0, training: 0 };
+  const spentByCategory: Record<LedgerCategory, Satang> = { capital: 0, construction: 0, equipment: 0, refund: 0, upkeep: 0, payroll: 0, revenue: 0, fee_refund: 0, food: 0, supplies: 0, event: 0, training: 0, branch: 0 };
   for (const e of state.ledger) spentByCategory[e.category] += e.amountSatang;
   return {
     statuses,
@@ -64,7 +65,7 @@ export function summarize(state: GameState): SiteSummary {
 export type GuideAction =
   | { kind: 'tool'; tool: 'corridor' | RoomType }
   | { kind: 'select'; roomType: RoomType }
-  | { kind: 'tab'; tab: 'hire' | 'admit' }
+  | { kind: 'tab'; tab: 'hire' | 'admit' | 'network' }
   | { kind: 'view'; view: 'residents' | 'roster' | 'finance' }
   | { kind: 'speed' }
   | { kind: 'land' }
@@ -149,6 +150,25 @@ export function buildObjectives(state: GameState, summary: SiteSummary = summari
       step('hc_roster', state.homecare.clients.length > 0 && rosterReady, { kind: 'view', view: 'roster' }, { key: 'goal.roster' }),
       step('hc_clients', state.homecare.clients.length >= n, { kind: 'tab', tab: 'admit' }, { params: { n }, progress: capped(state.homecare.clients.length, n) }),
       step('hc_rate', rate !== null && rate >= (def.targetVisitRate ?? 0) && state.homecare.history.length >= 7, { kind: 'view', view: 'roster' }, { params: { n: Math.round((def.targetVisitRate ?? 0) * 100) } }),
+      chapterStep(state, def),
+    ];
+  }
+
+  if (def.id === 7) {
+    const bs = state.network.branches;
+    const has = (k: string) => bs.some((b) => b.kind === k);
+    const st = networkStats(state);
+    const n = def.targetBranches ?? 0;
+    const q = def.targetNetworkQuality ?? 0;
+    const occ = Math.round((def.targetNetworkOccupancy ?? 0) * 100);
+    return [
+      step('br_nursing', has('nursing'), { kind: 'tab', tab: 'network' }),
+      step('br_homecare', has('homecare'), { kind: 'tab', tab: 'network' }),
+      step('br_clinic', has('clinic'), { kind: 'tab', tab: 'network' }),
+      step('br_roster', bs.length > 0 && rosterReady, { kind: 'view', view: 'roster' }, { key: 'goal.roster' }),
+      step('br_count', bs.length >= n, { kind: 'tab', tab: 'network' }, { params: { n }, progress: capped(bs.length, n) }),
+      step('br_quality', (st.quality ?? 0) >= q, { kind: 'tab', tab: 'network' }, { params: { n: q }, progress: capped(st.quality ?? 0, q) }),
+      step('br_occupancy', Math.round((st.occupancy ?? 0) * 100) >= occ, { kind: 'tab', tab: 'network' }, { params: { n: occ }, progress: capped(Math.round((st.occupancy ?? 0) * 100), occ) }),
       chapterStep(state, def),
     ];
   }
@@ -304,6 +324,16 @@ function peopleFor(tasks: PlannedTask[], shiftLength: number): number {
       need = Math.max(need, Math.ceil(work / (span * PRODUCTIVE_SHARE) - 1e-9));
     }
   }
+  // Deadline check: work that both falls due at or after `a` and must be finished by `d` has to fit
+  // between them. (Without it, one long task with a late finish — a home visit — hides a short rush.)
+  const deadline = (t: PlannedTask) => Math.min(t.at + t.grace + t.duration, shiftLength);
+  const deadlines = [...new Set(tasks.map(deadline))].sort((x, y) => x - y);
+  for (const a of times)
+    for (const d of deadlines) {
+      if (d <= a) continue;
+      const work = tasks.reduce((w, t) => (t.at >= a && deadline(t) <= d ? w + t.duration : w), 0);
+      if (work) need = Math.max(need, Math.ceil(work / ((d - a) * PRODUCTIVE_SHARE) - 1e-9));
+    }
   return need;
 }
 
@@ -413,9 +443,11 @@ export type StaffActivity =
   | { kind: 'away'; clientId: string }
   | { kind: 'placed'; contractId: string }
   | { kind: 'training' }
+  | { kind: 'branch'; branchId: string }
   | { kind: 'hospital'; task: import('../domain/types').HospitalTask['kind']; patientId: string };
 
 export function staffActivity(state: GameState, e: Employee): StaffActivity {
+  if (e.branch) return { kind: 'branch', branchId: e.branch };
   if (e.taskId) {
     const t = state.tasks.find((x) => x.id === e.taskId);
     if (t) return { kind: 'busy', taskKind: t.kind, residentId: t.residentId };
@@ -456,7 +488,7 @@ export function peopleMarkers(state: GameState): Array<{ key: string; kind: 'res
   for (const e of state.employees) {
     const act = staffActivity(state, e);
     // Off duty, out on a home visit, or working at a partner: not in the building.
-    if (act.kind === 'off' || act.kind === 'away' || act.kind === 'placed') continue;
+    if (act.kind === 'off' || act.kind === 'away' || act.kind === 'placed' || act.kind === 'branch') continue;
     if (act.kind === 'hospital') {
       const loc = act.task === 'consult' ? undefined : inpatientBed.get(act.patientId);
       if (loc) out.push({ key: e.id, kind: 'staff', roomId: loc.roomId, bed: loc.index, role: e.role });
@@ -483,7 +515,7 @@ export function peopleMarkers(state: GameState): Array<{ key: string; kind: 'res
 // Phase 3: finance view (pure)
 // ---------------------------------------------------------------------------
 
-export const OPEX_CATEGORIES: LedgerCategory[] = ['payroll', 'upkeep', 'food', 'supplies', 'event', 'training'];
+export const OPEX_CATEGORIES: LedgerCategory[] = ['payroll', 'upkeep', 'food', 'supplies', 'event', 'training', 'branch'];
 export const CAPEX_CATEGORIES: LedgerCategory[] = ['construction', 'equipment', 'refund'];
 
 /** Entries posted exactly at midnight belong to the day that just closed. */
@@ -549,8 +581,8 @@ export function financeView(state: GameState, period: 'month' | 'all'): FinanceV
     }
   }
 
-  const streams: RevenueStream[] = ['room_care', 'therapy', 'activity', 'special', 'homecare', 'workforce', 'hospital'];
-  const mixMap: Record<RevenueStream, Satang> = { room_care: 0, therapy: 0, activity: 0, special: 0, homecare: 0, workforce: 0, hospital: 0 };
+  const streams: RevenueStream[] = ['room_care', 'therapy', 'activity', 'special', 'homecare', 'workforce', 'hospital', 'network'];
+  const mixMap: Record<RevenueStream, Satang> = { room_care: 0, therapy: 0, activity: 0, special: 0, homecare: 0, workforce: 0, hospital: 0, network: 0 };
   for (const inv of state.invoices) {
     if (inv.status !== 'paid' || inv.paidAt === null) continue;
     const paidDay = dayOf(inv.paidAt % 1440 === 0 ? inv.paidAt - 1 : inv.paidAt);
