@@ -13,6 +13,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.118.0",
     "dexie": "^4.4.6",
     "pixi.js": "^8.22.0",
     "react": "^19.3.1",
