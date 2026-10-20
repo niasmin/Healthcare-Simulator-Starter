@@ -1,12 +1,13 @@
 import { EVENT_DEFS } from '../data/events';
-import { prefabCost, prefabDef, prefabRect } from '../data/prefabs';
+import { prefabCost, prefabDef } from '../data/prefabs';
 import { thb } from '../domain/money';
-import { cellIndex, inBounds, rectInBounds, rectsOverlap } from '../domain/grid';
-import { allRoomStatuses } from '../domain/rules/rooms';
 import { wageFor } from '../data/staff';
 import { freeBeds } from '../domain/rules/beds';
-import type { AutoSettings, CommandResult, EventDefId, GameState } from '../domain/types';
-import type { Command } from './engine';
+import type { AutoSettings, EventDefId, GameState, ShiftSlot, StaffRole } from '../domain/types';
+import { buildSomewhere, tryCmd, type Apply } from './autoBuild';
+import { advanceChapter, campaignTurn, heldForWorkforce } from './autoCampaign';
+import { chapterDef } from '../data/chapters';
+import { SKILL_OWNER } from './selectors';
 import { log } from './helpers';
 import { dailyRunningCost, rosterView } from './selectors';
 import { choiceBlocker } from './systems/events';
@@ -24,8 +25,8 @@ import { choiceBlocker } from './systems/events';
  *   families, only where a corridor already reaches and only with a month's running costs to spare.
  */
 
-export const AUTO_KEYS = ['events', 'admit', 'carePlan', 'staff', 'build'] as const;
-export const AUTO_OFF: Required<AutoSettings> = { events: false, admit: false, carePlan: false, staff: false, build: false };
+export const AUTO_KEYS = ['events', 'admit', 'carePlan', 'staff', 'build', 'chapters'] as const;
+export const AUTO_OFF: Required<AutoSettings> = { events: false, admit: false, carePlan: false, staff: false, build: false, chapters: false };
 /** Building keeps this much in the bank on top of 30 days of running costs. */
 export const BUILD_RESERVE = thb(200_000);
 /** Building happens once a day, at 08:00. */
@@ -40,15 +41,9 @@ export const AUTO_CHOICES: Record<EventDefId, string[]> = {
   referral: ['accept_beds', 'decline'],
 };
 
-type Apply = (state: GameState, cmd: Command) => { state: GameState; result: CommandResult };
 
 export function autoSettings(state: GameState): Required<AutoSettings> {
   return { ...AUTO_OFF, ...state.auto };
-}
-
-function tryCmd(state: GameState, apply: Apply, cmd: Command): [GameState, boolean] {
-  const out = apply(state, cmd);
-  return out.result.ok ? [out.state, true] : [state, false];
 }
 
 function answerEvent(state: GameState, apply: Apply): GameState {
@@ -62,8 +57,10 @@ function answerEvent(state: GameState, apply: Apply): GameState {
 
 function admitAll(state: GameState, apply: Apply): GameState {
   let s = state;
-  // Urgent referrals first, then the longest waiting.
-  const queue = [...s.waitlist].sort((a, b) => (a.referralDeadline ?? Infinity) - (b.referralDeadline ?? Infinity));
+  // Urgent referrals first, then a chapter programme nobody is in yet, then the longest waiting.
+  const programmes = chapterDef(s.chapter.id).programmes ?? [];
+  const missing = (g: string) => programmes.includes(g as never) && !s.residents.some((r) => r.group === g);
+  const queue = [...s.waitlist].sort((a, b) => (a.referralDeadline ?? Infinity) - (b.referralDeadline ?? Infinity) || Number(missing(b.group)) - Number(missing(a.group)));
   for (const c of queue) if (freeBeds(s, c.group, !!c.premium).length) [s] = tryCmd(s, apply, { type: 'admitResident', candidateId: c.id });
   for (const r of [...s.hospital.referrals]) {
     let ok: boolean;
@@ -83,10 +80,18 @@ function planAll(state: GameState, apply: Apply): GameState {
 function staffAll(state: GameState, apply: Apply): GameState {
   if (!state.residents.length && !state.hospital.inpatients.length) return state;
   let s = state;
-  for (const cell of rosterView(s).cells) {
-    for (let gap = cell.need - cell.staff.length; gap > 0; gap--) {
+  // Gaps: the RN each day shift needs, skills nobody on the shift has, then each role's headcount.
+  const view = rosterView(s);
+  const gaps: Array<{ role: StaffRole; slot: ShiftSlot; n: number }> = [];
+  for (const sum of view.slots) {
+    if (sum.missingRn && !view.cells.some((c) => c.slot === sum.slot && c.role === 'rn' && c.need > c.staff.length)) gaps.push({ role: 'rn', slot: sum.slot, n: 1 });
+    for (const k of sum.missingSkills) if (!view.cells.some((c) => c.slot === sum.slot && c.role === SKILL_OWNER[k] && c.need > c.staff.length)) gaps.push({ role: SKILL_OWNER[k], slot: sum.slot, n: 1 });
+  }
+  for (const c of view.cells) if (c.need > c.staff.length) gaps.push({ role: c.role, slot: c.slot, n: c.need - c.staff.length });
+  for (const cell of gaps) {
+    for (let gap = cell.n; gap > 0; gap--) {
       const shifted = new Set(s.shifts.map((x) => x.employeeId));
-      const idle = s.employees.find((e) => e.role === cell.role && !shifted.has(e.id) && !e.placement && !e.branch);
+      const idle = s.employees.find((e) => e.role === cell.role && !shifted.has(e.id) && !heldForWorkforce(s, e.id));
       let id = idle?.id;
       if (!id) {
         const c = s.applicants.find((a) => a.role === cell.role);
@@ -118,38 +123,6 @@ export function nextBuild(state: GameState): string | null {
   return null;
 }
 
-/**
- * The best spot for a ready-made room: the nearest to the entrance where it fits next to an
- * existing corridor and opens straight away. Returns the state with the room built, or null.
- */
-export function buildSomewhere(state: GameState, apply: Apply, prefab: string): GameState | null {
-  const def = prefabDef(prefab);
-  if (!def) return null;
-  const { site } = state;
-  const spots: Array<{ x: number; y: number; rotated: boolean; d: number }> = [];
-  for (let y = 0; y < site.height; y++)
-    for (let x = 0; x < site.width; x++)
-      for (const rotated of def.w === def.h ? [false] : [false, true]) {
-        const r = prefabRect(def, { x, y }, rotated);
-        if (!rectInBounds(r, site.width, site.height) || site.rooms.some((o) => rectsOverlap(o.rect, r))) continue;
-        // Some corridor tile must touch the room's side, or it could never open.
-        let touches = false;
-        for (let i = r.x; i < r.x + r.w && !touches; i++)
-          for (const j of [r.y - 1, r.y + r.h]) if (inBounds(i, j, site.width, site.height) && site.corridor[cellIndex(i, j, site.width)]) touches = true;
-        for (let j = r.y; j < r.y + r.h && !touches; j++)
-          for (const i of [r.x - 1, r.x + r.w]) if (inBounds(i, j, site.width, site.height) && site.corridor[cellIndex(i, j, site.width)]) touches = true;
-        if (!touches) continue;
-        spots.push({ x, y, rotated, d: Math.abs(x + r.w / 2 - site.entrance.x) + Math.abs(y + r.h / 2 - site.entrance.y) });
-      }
-  spots.sort((a, b) => a.d - b.d || a.y - b.y || a.x - b.x || Number(a.rotated) - Number(b.rotated));
-  for (const p of spots) {
-    const out = apply(state, { type: 'placePrefab', prefab, origin: { x: p.x, y: p.y }, rotated: p.rotated });
-    if (!out.result.ok || !out.result.id) continue;
-    if (allRoomStatuses(out.state.site).get(out.result.id)?.operational) return out.state;
-  }
-  return null;
-}
-
 function buildNext(state: GameState, apply: Apply): GameState {
   const prefab = nextBuild(state);
   const def = prefab ? prefabDef(prefab) : undefined;
@@ -157,17 +130,22 @@ function buildNext(state: GameState, apply: Apply): GameState {
   // Only with a month of running costs (and a reserve) still in the bank afterwards.
   if (state.organization.cashSatang - prefabCost(def) < 30 * dailyRunningCost(state) + BUILD_RESERVE) return state;
   const built = buildSomewhere(state, apply, prefab);
-  return built ? log(built, 'good', 'auto.log.build', { prefab }) : state;
+  return built ? log(built.state, 'good', 'auto.log.build', { prefab }) : state;
 }
 
-/** Run the switched-on helpers. Events every tick (so nothing waits); the rest once an hour. */
-export function autopilot(state: GameState, apply: Apply): GameState {
+/**
+ * Run the switched-on helpers. Events every tick (so nothing waits); the rest once an hour.
+ * `speed` is the game speed before this tick, restored when a chapter verdict is followed straight on.
+ */
+export function autopilot(state: GameState, apply: Apply, speed: GameState['speed'] = state.speed): GameState {
   const a = state.auto;
   if (!a) return state;
   let s = state;
   if (a.events) s = answerEvent(s, apply);
+  if (a.chapters && s.chapter.result) s = advanceChapter(s, apply, speed);
   if (s.minute % 60 !== 0) return s;
   if (a.build && s.minute % (24 * 60) === BUILD_MINUTE) s = buildNext(s, apply);
+  if (a.chapters && (s.minute % (24 * 60) === 7 * 60 || s.minute % (24 * 60) === 15 * 60)) s = campaignTurn(s, apply);
   if (a.staff) s = staffAll(s, apply);
   if (a.admit) s = admitAll(s, apply);
   if (a.carePlan) s = planAll(s, apply);

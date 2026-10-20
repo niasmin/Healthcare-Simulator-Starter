@@ -7,6 +7,8 @@ import type { GameState } from '../domain/types';
 import { post } from '../sim/helpers';
 import { thb } from '../domain/money';
 import { buildHome, ok, quietEvents } from './helpers';
+import { buyLand } from '../sim/autoCampaign';
+import { buildSomewhere } from '../sim/autoBuild';
 
 const inChapter = (c: number): GameState => {
   // Extra capital booked through the ledger so every plot is affordable.
@@ -47,5 +49,23 @@ describe('buying more land', () => {
     s = ok(s, { type: 'paintCorridor', rect: { x: 14, y: 10, w: 40, h: 1 } });
     s = ok(s, { type: 'placePrefab', prefab: 'storage', origin: { x: 50, y: 11 } });
     expect(s.site.rooms.some((r) => r.type === 'storage_room' && r.rect.x === 50)).toBe(true);
+  });
+
+  it('the autopilot buys the next plot with a corridor running into it, so rooms can be built there', () => {
+    const s = inChapter(5);
+    const g = buyLand(s, applyCommand);
+    expect(g.site.width).toBe(LAND_PLOTS[0].width);
+    // The new corridor reaches into the new plot.
+    const east = Array.from({ length: g.site.height }, (_, y) => g.site.corridor[cellIndex(LAND_PLOTS[0].width - 2, y, g.site.width)]).some((v) => v === 1);
+    expect(east).toBe(true);
+    // Fill the old lot's spots, then a villa still finds a working spot on the new land.
+    let t = g;
+    for (let i = 0; i < 12; i++) {
+      const b = buildSomewhere(t, applyCommand, 'villa');
+      if (!b) break;
+      t = b.state;
+    }
+    expect(t.site.rooms.some((r) => r.type === 'villa' && r.rect.x >= 20)).toBe(true);
+    expect(reconcile(t).ok).toBe(true);
   });
 });

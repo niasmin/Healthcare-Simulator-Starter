@@ -593,6 +593,8 @@ export interface AutoSettings {
   staff: boolean;
   /** Added later: missing in earlier saves = off. */
   build?: boolean;
+  /** Play every chapter: its goals, then straight on to the next (or again after a loss). */
+  chapters?: boolean;
 }
 
 export interface GameState {

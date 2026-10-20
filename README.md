@@ -89,7 +89,7 @@ Support staff only do their own skill, and they never count as the "narrowest" c
 
 ### Autopilot: let the home run itself
 
-The 🤖 Autopilot button (top bar; a floating button on the phone map) opens five switches. Everything they do goes through the same public commands a player uses, so every rule and invariant still holds. All are off by default, and the scripted player never uses them.
+The 🤖 Autopilot button (top bar; a floating button on the phone map) opens six switches. Everything they do goes through the same public commands a player uses, so every rule and invariant still holds. All are off by default, and the scripted player never uses them.
 
 | Switch | What it does |
 |---|---|
@@ -98,12 +98,19 @@ The 🤖 Autopilot button (top bar; a floating button on the phone map) opens fi
 | Write care plans | Every resident without a care plan gets one (needs an RN on the staff) |
 | Hire and roster to the advice | Fills each gap in the roster advice with someone who has no shift yet, or hires an applicant. It never hires into debt and never dismisses anyone |
 | Build ready-made rooms | At most one room a day, at 08:00. It builds whichever of these comes first: a basic room that is missing (ward, nursing station, staff room, therapy); another 10-bed ward when every bed is taken and 3+ families wait; a villa for waiting premium families (chapter 3+). The room goes next to an existing corridor, as near the entrance as it fits and opens. It only builds while 30 days of running costs plus ฿200,000 stay in the bank |
+| Play every chapter | Works on the current chapter's goals twice a day, with no fixed coordinates (rooms go wherever they fit and open):<br>• **Ch. 2:** specialised fittings in one ward, wards up to 30 beds, RNs to 3.<br>• **Ch. 3:** villas and a garden; when the lot is full it buys the next plot and runs a corridor into it.<br>• **Ch. 4:** the Home Care centre, a van per four clients, clients the vans can serve.<br>• **Ch. 5:** the training room, a certified pool, placements.<br>• **Ch. 6:** the clinic and stroke unit.<br>• **Ch. 7:** one branch of each kind with support visits.<br>A won chapter leads straight into the next at the same speed; a failed one is played again |
 
-The autopilot never buys land, lays corridors, buys upgrades or dismisses anyone.
+The autopilot never buys upgrades or dismisses anyone. It buys land and lays corridors only with "Play every chapter" on.
 
 Results:
 - **Built 10-bed home, first four switches on:** it fills up, keeps about 98% or more of care done and stays profitable for 60 days on every seed tested.
 - **Starter campus, all five switches on:** it builds three wards and the therapy room, reaches 30 residents and wins chapter 1 on its own. Over 90 days on seeds 1, 3 and 8, cash never fell below ฿440,000.
+- **All six switches, 390 days with no input:**
+  - Seed 3 wins all seven chapters.
+  - Seed 1 wins chapters 1–6 and loses chapter 7.
+  - Seed 8 loses chapter 2 once, plays it again and wins chapters 2–6.
+  - Cash stays positive throughout and the ledger reconciles on every seed.
+  - No single tick takes more than about 40 ms.
 
 ### More land
 
@@ -529,7 +536,7 @@ src/
   - Food, supplies, upkeep and payroll are each charged once per day.
   - An event's cost is charged once, and a resolved event can't be resolved again.
 
-## Tests (206 passing)
+## Tests (209 passing)
 
 | File | Covers |
 |---|---|
@@ -546,8 +553,8 @@ src/
 | `chapter.test.ts` | **30-day playthrough** by a scripted sensible player using only public commands and the real applicant and waiting-list pools: wins chapter 1 with cash positive every day; every invariant holds (ledger, unique beds, no overlapping shifts, no care without the skill); roster ready and >95% of tasks done; the three scripted events fire on their days; the same seed plays byte-identically; the verdict pauses the game and survives a save. **Balance:** a full home wins on more seeds, a 40% empty home and an overstaffed home fail on targets. **Verdict rules:** bankrupt at the first negative midnight, decided once and never changed; nothing decided before day 30; a migrated save past day 30 is judged at the next midnight. **Tutorial:** step order, derived from state, a goal and a how-to hint in Thai and English for every step. **Staffing advice:** rush-hour windows, RN covering PN work, one OT for ten sessions |
 | `chapter2.test.ts` | **90-day campaign** by the scripted player: wins Chapter 1, starts Chapter 2 on day 31 and wins it on day 90 with every target; dementia residents only in secured wards; airway care only by RNs and tube feeding only by RNs/PNs; an RN on the night roster; >93% of tasks done; byte-identical rerun; a reckless builder's lowest cash falls far below the careful one, with at least one bankruptcy; a second full team fails the chapter. **Rules:** the next chapter only after a win, with one candidate per programme; secured-ward admission; RN-only airway care missed with only a PN on nights; programme fees; schema-5 migration; Thai and English text for every Chapter 2 step |
 | `support.test.ts` | Support applicants appear only once their room exists; pharmacy supply cut; dining meal bonuses; nutritionist and cleaner daily lift; laundry upkeep cut; a receptionist adds an enquiry and a security guard lifts satisfaction; the storage room cuts supplies on top of the pharmacy; the bath & hygiene room shortens personal care; pharmacists take med rounds and nutritionists meals, with no missed meals; support rooms are optional |
-| `autopilot.test.ts` | Off by default and switched by command; with all switches on, a built home runs 30 days on its own (8+ residents, every one with a plan, an RN hired, >90% of care done, cash positive, ledger and unique beds intact); from the starter campus it builds every basic room, staffs and fills the home and wins chapter 1 solvent; it builds only what is missing or needed and never without money to spare; events answered at once without pausing, accepting the staff request; nothing happens with it off |
-| `land.test.ts` | Three plots sold in order for their prices, each from its chapter, keeping every room and corridor tile; then already done; locked by chapter and by cash; a room can be built on the newest plot |
+| `autopilot.test.ts` | Off by default and switched by command; with all switches on, a built home runs 30 days on its own (8+ residents, every one with a plan, an RN hired, >90% of care done, cash positive, ledger and unique beds intact); from the starter campus it builds every basic room, staffs and fills the home and wins chapter 1 solvent; it builds only what is missing or needed and never without money to spare; "play every chapter" wins chapters 1–3 back to back unattended and carries straight on into chapter 4; after a verdict it starts the next chapter on a win or replays on a loss, at the speed before; events answered at once without pausing, accepting the staff request; nothing happens with it off |
+| `land.test.ts` | Three plots sold in order for their prices, each from its chapter, keeping every room and corridor tile; then already done; locked by chapter and by cash; a room can be built on the newest plot; the autopilot's land purchase runs a corridor into the new plot so a villa can open there |
 | `shop.test.ts` | Upgrades are bought once, for their price, from their chapter (all at once in the sandbox); the central kitchen and laundry cut food and supplies by their percentages; staff welfare adds morale; online marketing adds an enquiry; the family app lifts reputation while residents are content; the smart call system keeps late routine care pending 30 minutes longer |
 | `modes.test.ts` | Campaign games are unchanged; sandbox books ฿50M as capital, unlocks every room, has no tutorial steps and is never judged after 70 days; each challenge opens with its own cash, reputation or chapter; each challenge is won by the scripted player and ends without a next chapter |
 | `chapter7.test.ts` | **Full 390-day campaign:** all 7 chapters won on schedule and solvent, ledger reconciles; one branch of each kind, each manager of the right role and off the roster; branch invoices exact; network occupancy ≥ 70%. **Opening:** locked before chapter 7; manager role checked; full opening cost charged; managers can’t take shifts or a second branch; cap of 5. **Running:** good branches fill and bill daily, poor ones empty, a poor name at headquarters stops growth; certificates raise the quality target; a lost manager leaves the branch leaderless until one is appointed; support visits lift quality, cost money and have a cooldown; closing refunds 30% and frees the manager; busy clinic branches refer to the stroke unit. Guide order; v9→v10 migration |
