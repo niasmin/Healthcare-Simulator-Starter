@@ -1,4 +1,4 @@
-import { PHARMACY_SUPPLIES_PERCENT, roomOpen, STORAGE_SUPPLIES_PERCENT, supportActive } from './support';
+import { ACCOUNTANT_COST_PERCENT, PHARMACY_SUPPLIES_PERCENT, roomOpen, STORAGE_SUPPLIES_PERCENT, supportActive } from './support';
 import {
   dayInMonth,
   DAYS_PER_MONTH,
@@ -49,6 +49,9 @@ export function issue(state: GameState, resident: Pick<Resident, 'id' | 'name'>,
   let id: string, delay: number;
   [s, id] = allocId(s, 'inv');
   [s, delay] = randInt(s, PAYMENT_DELAY_DAYS[0], PAYMENT_DELAY_DAYS[1]);
+  // An accountant chases every invoice on the day it goes out (the roll above still happens, so the
+  // random sequence is the same with or without one).
+  if (supportActive(s, 'accountant')) delay = 0;
   const inv: Invoice = {
     id,
     kind,
@@ -148,9 +151,11 @@ export function dailyResidentCosts(state: GameState): { food: number; supplies: 
   let cut = hasUpgrade(state, 'laundry_supply') ? pctOf(supplies, LAUNDRY_SUPPLIES_PERCENT) : supplies;
   if (supportActive(state, 'pharmacist')) cut = pctOf(cut, PHARMACY_SUPPLIES_PERCENT);
   if (roomOpen(state, 'storage_room')) cut = pctOf(cut, STORAGE_SUPPLIES_PERCENT);
+  const kitchen = hasUpgrade(state, 'central_kitchen') ? pctOf(food, KITCHEN_FOOD_PERCENT) : food;
+  const books = supportActive(state, 'accountant');
   return {
-    food: hasUpgrade(state, 'central_kitchen') ? pctOf(food, KITCHEN_FOOD_PERCENT) : food,
-    supplies: cut,
+    food: books ? pctOf(kitchen, ACCOUNTANT_COST_PERCENT) : kitchen,
+    supplies: books ? pctOf(cut, ACCOUNTANT_COST_PERCENT) : cut,
   };
 }
 

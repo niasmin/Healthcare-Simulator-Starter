@@ -1,5 +1,7 @@
 import { CERT_PREMIUM_PERCENT, COURSES, MAX_OFFERS, OFFER_CERT, OFFER_DAYS, OFFER_ROLES, PARTNERS, PLACEMENT_DAYS, PLACEMENT_MINUTES, PLACEMENT_RATE, PLACEMENT_START } from '../../data/workforce';
 import { monthOfDay } from '../../data/finance';
+import { hasUpgrade, SCHOLARSHIP_COURSE_PERCENT } from '../../data/shop';
+import { pctOf } from '../../domain/money';
 import { allRoomStatuses } from '../../domain/rules/rooms';
 import { isOnShift } from '../../domain/rules/shifts';
 import type { CourseId, Employee, GameState, InvoiceLine, ReasonCode, StaffRole, TrainingSession, WorkforceContract, WorkforceOffer, WorkforceState } from '../../domain/types';
@@ -70,8 +72,14 @@ export function trainingBlocker(state: GameState, employeeId: string, course: Co
   if (e.branch) return 'employee_branch';
   if (isTraining(state, e.id)) return 'employee_busy';
   if (state.workforce.training.length >= trainingSeats(state)) return 'no_seat';
-  if (state.organization.cashSatang < def.costSatang) return 'insufficient_funds';
+  if (state.organization.cashSatang < courseCost(state, course)) return 'insufficient_funds';
   return null;
+}
+
+/** What a course costs this home (a scholarship fund from the shop pays part of it). */
+export function courseCost(state: GameState, course: CourseId): number {
+  const full = COURSES[course].costSatang;
+  return hasUpgrade(state, 'training_scholarship') ? pctOf(full, SCHOLARSHIP_COURSE_PERCENT) : full;
 }
 
 export function startTraining(state: GameState, employeeId: string, course: CourseId): { state: GameState; id: string } | { reason: ReasonCode } {
@@ -82,7 +90,7 @@ export function startTraining(state: GameState, employeeId: string, course: Cour
   let [s, id] = allocId(state, 'train');
   const session: TrainingSession = { id, employeeId, course, remaining: def.minutes };
   s = { ...s, workforce: { ...s.workforce, training: [...s.workforce.training, session] } };
-  s = post(s, -def.costSatang, 'training', 'ledger.training', { ref: id, memoParams: { course } });
+  s = post(s, -courseCost(state, course), 'training', 'ledger.training', { ref: id, memoParams: { course } });
   return { state: log(s, 'info', 'log.training_started', { name: e.name.th, nameEn: e.name.en, course }), id };
 }
 

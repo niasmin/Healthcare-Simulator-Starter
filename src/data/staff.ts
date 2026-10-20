@@ -103,11 +103,20 @@ export const ROLES: Record<StaffRole, RoleDef> = {
     color: 0x24344d,
     cssColor: '#24344d',
   },
+  // Accounting office: on-time fee collection and an eye on daily costs.
+  accountant: {
+    role: 'accountant',
+    skills: ['bookkeeping'],
+    baseWageSatang: thb(30_000),
+    wagePerYearSatang: thb(900),
+    color: 0x3c6e47,
+    cssColor: '#3c6e47',
+  },
 };
 
-export const ROLE_ORDER: StaffRole[] = ['doctor', 'rn', 'pn', 'caregiver', 'pt', 'ot', 'pharmacist', 'nutritionist', 'cleaner', 'receptionist', 'security'];
+export const ROLE_ORDER: StaffRole[] = ['doctor', 'rn', 'pn', 'caregiver', 'pt', 'ot', 'pharmacist', 'nutritionist', 'cleaner', 'receptionist', 'security', 'accountant'];
 /** Support roles: optional, offered only once their room exists, never required by the roster advice. */
-export const SUPPORT_ROLES: StaffRole[] = ['pharmacist', 'nutritionist', 'cleaner', 'receptionist', 'security'];
+export const SUPPORT_ROLES: StaffRole[] = ['pharmacist', 'nutritionist', 'cleaner', 'receptionist', 'security', 'accountant'];
 
 export function wageFor(role: StaffRole, experienceYears: number): number {
   const d = ROLES[role];
@@ -148,3 +157,21 @@ export const STAFF_NAMES: PersonName[] = [
   { th: 'มยุรี', en: 'Mayuree' },
   { th: 'ภานุ', en: 'Phanu' },
 ];
+
+/** Which role is the natural owner of each skill (for staffing recommendations). */
+export const SKILL_OWNER: Record<Skill, StaffRole> = {
+  assessment: 'rn',
+  vital_signs: 'pn',
+  med_round: 'pn',
+  personal_care: 'caregiver',
+  feeding: 'caregiver',
+  mobility: 'pt',
+  activity: 'ot',
+  tube_feeding: 'pn',
+  airway_care: 'rn',
+  consult: 'doctor',
+  cleaning: 'cleaner',
+  front_desk: 'receptionist',
+  security: 'security',
+  bookkeeping: 'accountant',
+};

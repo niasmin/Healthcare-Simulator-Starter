@@ -471,6 +471,9 @@ function residentDepartures(state: GameState): GameState {
   return s;
 }
 
+/** Days kept for the per-profession performance report. */
+export const PERF_DAYS = 7;
+
 function closeDay(state: GameState): GameState {
   const beds = summarizeBeds(state);
   const n = state.residents.length;
@@ -496,7 +499,7 @@ function closeDay(state: GameState): GameState {
     const app = hasUpgrade(state, 'family_app') && sat >= FAMILY_APP_SATISFACTION_LINE ? FAMILY_APP_REPUTATION : 0;
     reputation = Math.max(0, Math.min(100, Math.round((reputation + (sat - 60) / 15 - missedPenalty + app) * 10) / 10));
   }
-  return { ...state, history, today: { done: 0, missed: 0 }, organization: { ...state.organization, reputation } };
+  return { ...state, history, today: { done: 0, missed: 0 }, perfToday: {}, perfDays: [...(state.perfDays ?? []), state.perfToday ?? {}].slice(-PERF_DAYS), organization: { ...state.organization, reputation } };
 }
 
 /** Advance the simulation by exactly one 10-minute tick. Pure and deterministic. */

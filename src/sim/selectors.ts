@@ -1,7 +1,8 @@
 import { chapterDef, EXPANDED_WIDTH, type ChapterDef } from '../data/chapters';
 import { allRoomStatuses, type RoomStatus } from '../domain/rules/rooms';
 import type { GameState, LedgerCategory, Room, RoomType, Satang } from '../domain/types';
-import { dailyPayroll, dailyUpkeep } from './systems/finance';
+import { dailyPayroll, dailyUpkeep, dailyWage } from './systems/finance';
+import { supportActive } from './systems/support';
 import { dailyResidentCosts } from './systems/billing';
 import { VISIT_DURATION, VISIT_GRACE, VISIT_SKILL, hasHomecareOffice, visitRate } from './systems/homecare';
 import { clinicDesks, consultRate, consultsSince, hasDoctor, hospitalTaskOf, slotsPerDesk, smoothDischarges, strokeBeds } from './systems/hospital';
@@ -10,7 +11,7 @@ import { networkStats } from './systems/network';
 import { certifiedCount, contractsCompleted, hasTrainingRoom, isInClass, isPlacedAway } from './systems/workforce';
 import { gardenAppeal } from '../data/decor';
 import { carePlanSchedule, TASK_KINDS } from '../data/patients';
-import { ROLE_ORDER, SHIFT_SLOTS, SLOT_ORDER } from '../data/staff';
+import { ROLE_ORDER, SHIFT_SLOTS, SKILL_OWNER, SLOT_ORDER, SUPPORT_ROLES } from '../data/staff';
 import { inWindow, isOnShift, shiftMinutes } from '../domain/rules/shifts';
 import { MINUTES_PER_DAY, START_MINUTE } from './constants';
 import type { CareGroup, Employee, ShiftSlot, Skill, StaffRole } from '../domain/types';
@@ -36,7 +37,7 @@ export function summarize(state: GameState): SiteSummary {
   let roomsOperational = 0;
   let bedsInstalled = 0;
   let bedsOperational = 0;
-  const operationalByType: Record<RoomType, number> = { ward: 0, nursing_station: 0, therapy: 0, staff_room: 0, villa: 0, homecare_office: 0, training_room: 0, neuro_clinic: 0, stroke_unit: 0, pharmacy: 0, dining_room: 0, laundry_room: 0, reception: 0, storage_room: 0, bathroom: 0 };
+  const operationalByType: Record<RoomType, number> = { ward: 0, nursing_station: 0, therapy: 0, staff_room: 0, villa: 0, homecare_office: 0, training_room: 0, neuro_clinic: 0, stroke_unit: 0, pharmacy: 0, dining_room: 0, laundry_room: 0, reception: 0, storage_room: 0, bathroom: 0, accounting_office: 0 };
   for (const room of state.site.rooms) {
     const st = statuses.get(room.id)!;
     bedsInstalled += st.installedBeds;
@@ -236,22 +237,7 @@ export function buildObjectives(state: GameState, summary: SiteSummary = summari
 // Phase 2 selectors (pure; the UI renders these, the sim never stores them)
 // ---------------------------------------------------------------------------
 
-/** Which role is the natural owner of each skill (for staffing recommendations). */
-export const SKILL_OWNER: Record<Skill, StaffRole> = {
-  assessment: 'rn',
-  vital_signs: 'pn',
-  med_round: 'pn',
-  personal_care: 'caregiver',
-  feeding: 'caregiver',
-  mobility: 'pt',
-  activity: 'ot',
-  tube_feeding: 'pn',
-  airway_care: 'rn',
-  consult: 'doctor',
-  cleaning: 'cleaner',
-  front_desk: 'receptionist',
-  security: 'security',
-};
+export { SKILL_OWNER };
 
 /** Share of staffed time that is productive, used for recommendations (80%). */
 const PRODUCTIVE_SHARE = 1;
@@ -354,7 +340,7 @@ export function roleNeeds(demand: SlotDemand, shiftLength: number, rnOnDuty: boo
   const pn = Math.max(0, peopleFor(of('rn', 'pn'), shiftLength) - rn);
   // Caregiver work is planned for caregivers alone: in a rush, nurses' time goes to nurse-only work.
   const caregiver = peopleFor(of('caregiver'), shiftLength);
-  return { doctor: peopleFor(of('doctor'), shiftLength), rn, pn, caregiver, pt: peopleFor(of('pt'), shiftLength), ot: peopleFor(of('ot'), shiftLength), pharmacist: 0, nutritionist: 0, cleaner: 0, receptionist: 0, security: 0 };
+  return { doctor: peopleFor(of('doctor'), shiftLength), rn, pn, caregiver, pt: peopleFor(of('pt'), shiftLength), ot: peopleFor(of('ot'), shiftLength), pharmacist: 0, nutritionist: 0, cleaner: 0, receptionist: 0, security: 0, accountant: 0 };
 }
 
 export interface RosterCell {
@@ -659,4 +645,51 @@ export function roomNumber(site: GameState['site'], room: Room): number | null {
   const numbered = room.type === 'ward' || room.type === 'villa';
   if (!numbered && same.length < 2) return null;
   return same.findIndex((r) => r.id === room.id) + 1;
+}
+
+// ---------------------------------------------------------------------------
+// Performance by profession
+// ---------------------------------------------------------------------------
+
+export interface RoleReport {
+  role: StaffRole;
+  people: number;
+  done: number;
+  missed: number;
+  /** Share of this profession's tasks done, 0..100 (null with no tasks). */
+  rate: number | null;
+  minutes: number;
+  /** Payroll over the period divided by tasks done (null with none done). */
+  costPerTask: Satang | null;
+  /** Support professions: whether their room and shift make them count today. */
+  support: boolean | null;
+  days: number;
+}
+
+/** Care work per profession over the closed days kept (up to 7), for every role on the staff or with work. */
+export function rolePerformance(state: GameState): RoleReport[] {
+  const days = state.perfDays ?? [];
+  const out: RoleReport[] = [];
+  for (const role of ROLE_ORDER) {
+    const staff = state.employees.filter((e) => e.role === role);
+    let done = 0, missed = 0, minutes = 0;
+    for (const d of days) {
+      const w = d[role];
+      if (w) (done += w.done), (missed += w.missed), (minutes += w.minutes);
+    }
+    if (!staff.length && !done && !missed) continue;
+    const payroll = staff.reduce((a, e) => a + dailyWage(e.wageMonthlySatang), 0) * days.length;
+    out.push({
+      role,
+      people: staff.length,
+      done,
+      missed,
+      rate: done + missed ? Math.round((done / (done + missed)) * 100) : null,
+      minutes,
+      costPerTask: done ? Math.round(payroll / done) : null,
+      support: SUPPORT_ROLES.includes(role) ? supportActive(state, role) : null,
+      days: days.length,
+    });
+  }
+  return out;
 }

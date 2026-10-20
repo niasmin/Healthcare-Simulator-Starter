@@ -36,6 +36,7 @@ const ROOM_ART: Record<RoomType, string> = {
   reception: 'rm_reception',
   storage_room: 'rm_storage',
   bathroom: 'rm_bath',
+  accounting_office: 'rm_reception',
 };
 
 const SWATCH: Record<RoomType, string> = {
@@ -54,6 +55,7 @@ const SWATCH: Record<RoomType, string> = {
   reception: '#4b4fc4',
   storage_room: '#8a6a45',
   bathroom: '#3f8fae',
+  accounting_office: '#3c6e47',
 };
 
 function sameTool(a: Tool, b: Tool) {
@@ -256,6 +258,7 @@ function HireList() {
               </span>
             ))}
           </div>
+          <p className="text-[11px] text-ink-soft leading-snug">{t(`role.${a.role}.jd`)}</p>
         </div>
       ))}
       <p className="text-[11px] text-ink-soft/80 leading-snug">{t('hire.note')}</p>

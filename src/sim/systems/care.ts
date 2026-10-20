@@ -1,10 +1,10 @@
-import { SUPPORT_ROLES } from '../../data/staff';
-import { hasUpgrade, SMART_CALL_EXTRA_GRACE } from '../../data/shop';
+import { SKILL_OWNER, SUPPORT_ROLES } from '../../data/staff';
+import { EHR_TASK_PERCENT, hasUpgrade, SMART_CALL_EXTRA_GRACE } from '../../data/shop';
 import { carePlanSchedule, TASK_KINDS } from '../../data/patients';
 import { parseBedId } from '../../domain/rules/beds';
 import { allRoomStatuses } from '../../domain/rules/rooms';
 import { isOnShift } from '../../domain/rules/shifts';
-import type { CareTask, Employee, GameState, Resident } from '../../domain/types';
+import type { CareTask, Employee, GameState, Resident, RolePerf, RoleWork, StaffRole } from '../../domain/types';
 import { MINUTES_PER_DAY } from '../constants';
 import { allocId } from '../helpers';
 import { applyNeedDelta } from './needs';
@@ -80,6 +80,11 @@ export function careTick(state: GameState): GameState {
   const employees = new Map(state.employees.map((e) => [e.id, e]));
   let { done, missed } = state.today;
   let changed = false;
+  const perf: RolePerf = { ...state.perfToday };
+  const work = (role: StaffRole, k: keyof RoleWork, n = 1) => {
+    const w = perf[role] ?? { done: 0, missed: 0, minutes: 0 };
+    perf[role] = { ...w, [k]: w[k] + n };
+  };
 
   const statuses = allRoomStatuses(state.site);
 
@@ -89,6 +94,7 @@ export function careTick(state: GameState): GameState {
 
   const tasks = state.tasks.map((t) => ({ ...t }));
   const smartCall = hasUpgrade(state, 'smart_call');
+  const ehr = hasUpgrade(state, 'ehr_system');
   const billable: Array<[string, 'therapy' | 'activity']> = [];
 
   // 1. Finish in-progress tasks.
@@ -107,6 +113,7 @@ export function careTick(state: GameState): GameState {
     }
     if (t.assigneeId) {
       const e = employees.get(t.assigneeId);
+      if (e) work(e.role, 'done');
       if (e && e.taskId === t.id) employees.set(e.id, { ...e, taskId: null });
     }
   }
@@ -117,6 +124,7 @@ export function careTick(state: GameState): GameState {
     if (t.status !== 'pending' || now <= t.dueAt + TASK_KINDS[t.kind].grace + (smartCall ? SMART_CALL_EXTRA_GRACE : 0)) continue;
     t.status = 'missed';
     missed++;
+    work(SKILL_OWNER[t.skill], 'missed');
     changed = true;
     const r = residents.get(t.residentId);
     if (r) residents.set(r.id, { ...r, needs: applyNeedDelta(r.needs, TASK_KINDS[t.kind].missPenalty) });
@@ -143,12 +151,15 @@ export function careTick(state: GameState): GameState {
       const narrowSkills = new Set<string>(narrowest?.skills ?? []);
       const e = urgent ? candidates[0] : candidates.find((c) => c.skills.length === narrowest?.skills.length || !reservedFor(c, t, tasks, now, narrowSkills));
       if (!e) continue;
-      const base = bathroom && t.kind === 'personal_care' ? Math.round((t.duration * BATHROOM_CARE_PERCENT) / 100) : t.duration;
+      let base = bathroom && t.kind === 'personal_care' ? Math.round((t.duration * BATHROOM_CARE_PERCENT) / 100) : t.duration;
+      // Electronic records: medication and vital-sign checks are quicker.
+      if (ehr && (t.kind === 'med_round' || t.kind === 'vital_signs')) base = Math.round((base * EHR_TASK_PERCENT) / 100);
       const duration = e.energy < 30 ? Math.round(base * 1.5) : base;
       t.status = 'in_progress';
       t.assigneeId = e.id;
       t.finishAt = now + duration;
       employees.set(e.id, { ...e, taskId: t.id, busyUntil: now + duration });
+      work(e.role, 'minutes', duration);
       changed = true;
     }
   }
@@ -160,6 +171,7 @@ export function careTick(state: GameState): GameState {
     residents: state.residents.map((r) => residents.get(r.id)!),
     employees: state.employees.map((e) => employees.get(e.id)!),
     today: { done, missed },
+    perfToday: perf,
   };
   for (const [rid, stream] of billable) out = recordService(out, rid, stream);
   return out;
