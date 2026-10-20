@@ -85,6 +85,8 @@ export type LedgerCategory =
   | 'upkeep'
   | 'payroll'
   | 'revenue'
+  /** Prepaid room & care handed back for days not used after a resident leaves (negative revenue). */
+  | 'fee_refund'
   | 'food'
   | 'supplies'
   | 'event';

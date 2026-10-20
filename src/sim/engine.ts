@@ -10,10 +10,10 @@ import { roomStatus } from '../domain/rules/rooms';
 import { validateShift } from '../domain/rules/shifts';
 import type { Cell, CommandResult, DayStats, DecorType, EquipmentId, GameSpeed, GameState, PriceLevel, Rect, Resident, Room, RoomType, ShiftSlot } from '../domain/types';
 import { dayInMonth, monthOfDay, PRICE_LEVELS } from '../data/finance';
-import { billAdmission, billFinal, billMonth, chargeDailyResidentCosts, collectPayments } from './systems/billing';
+import { billAdmission, billFinal, billMonth, chargeDailyResidentCosts, collectPayments, refundUnusedDays } from './systems/billing';
 import { eventCheck, eventExpiryTick, expireReferrals, resolveEvent } from './systems/events';
 import { MINUTES_PER_DAY } from './constants';
-import { allocId, log, post } from './helpers';
+import { allocId, log, post, randInt } from './helpers';
 import { careTick, generateAllTasksForDay, generateTasksForDay, pruneTasks } from './systems/care';
 import { chargeDailyPayroll, chargeDailyUpkeep } from './systems/finance';
 import { needsTick, wellbeing } from './systems/needs';
@@ -212,14 +212,7 @@ export function applyCommand(state: GameState, cmd: Command): CommandOutcome {
     case 'dischargeResident': {
       const r = state.residents.find((x) => x.id === cmd.residentId);
       if (!r) return fail(state, 'not_found');
-      const busy = new Set(state.tasks.filter((t) => t.residentId === r.id && t.status === 'in_progress').map((t) => t.assigneeId));
-      let s: GameState = {
-        ...state,
-        residents: state.residents.filter((x) => x.id !== r.id),
-        tasks: state.tasks.filter((t) => t.residentId !== r.id || t.status === 'done' || t.status === 'missed'),
-        employees: state.employees.map((e) => (busy.has(e.id) ? { ...e, taskId: null, busyUntil: state.minute } : e)),
-      };
-      s = billFinal(s, r);
+      let s = removeResident(state, r);
       s = log(s, 'info', 'log.discharged', { name: r.name.th, nameEn: r.name.en });
       return { state: s, result: { ok: true } };
     }
@@ -259,6 +252,57 @@ export function applyCommand(state: GameState, cmd: Command): CommandOutcome {
   }
 }
 
+/** Move a resident out: free their bed and pending care, release busy staff, issue the final bill. */
+function removeResident(state: GameState, r: Resident): GameState {
+  const busy = new Set(state.tasks.filter((t) => t.residentId === r.id && t.status === 'in_progress').map((t) => t.assigneeId));
+  const s: GameState = {
+    ...state,
+    residents: state.residents.filter((x) => x.id !== r.id),
+    tasks: state.tasks.filter((t) => t.residentId !== r.id || t.status === 'done' || t.status === 'missed'),
+    employees: state.employees.map((e) => (busy.has(e.id) ? { ...e, taskId: null, busyUntil: state.minute } : e)),
+  };
+  return refundUnusedDays(billFinal(s, r), r);
+}
+
+/** Each missed care task costs this much reputation at day end (capped per day). */
+export const MISSED_TASK_REP = 0.08;
+export const MAX_MISSED_REP_PENALTY = 3;
+/** Below this satisfaction a family may move their relative out. */
+export const WITHDRAW_SATISFACTION = 40;
+/** Daily chance (percent) per point of satisfaction below the threshold. */
+export const WITHDRAW_CHANCE_PER_POINT = 1.5;
+export const withdrawChance = (satisfaction: number) => Math.min(60, Math.ceil((WITHDRAW_SATISFACTION - satisfaction) * WITHDRAW_CHANCE_PER_POINT));
+
+/** Ordinary turnover: after this many days, a family may take their relative home (per-mille per day). */
+export const NATURAL_LEAVE_AFTER_DAYS = 7;
+export const NATURAL_LEAVE_PER_MILLE = 4;
+
+/**
+ * Residents leave at day end (one seeded roll each):
+ * - families of very unhappy residents move them elsewhere (costs reputation);
+ * - otherwise, after a settling-in week, a family occasionally takes their relative home.
+ * Turnover means beds must be refilled, which is where reputation (enquiries) matters.
+ */
+function residentDepartures(state: GameState): GameState {
+  let s = state;
+  for (const r of state.residents) {
+    const unhappy = r.needs.satisfaction < WITHDRAW_SATISFACTION;
+    const settled = state.minute - r.admittedAt >= NATURAL_LEAVE_AFTER_DAYS * MINUTES_PER_DAY;
+    if (!unhappy && !settled) continue;
+    let roll: number;
+    [s, roll] = randInt(s, 1, 1000);
+    if (unhappy && roll <= withdrawChance(r.needs.satisfaction) * 10) {
+      s = removeResident(s, r);
+      s = { ...s, organization: { ...s.organization, reputation: Math.max(0, Math.round((s.organization.reputation - 2) * 10) / 10) } };
+      s = log(s, 'warn', 'log.withdrawn', { name: r.name.th, nameEn: r.name.en });
+    } else if (settled && roll > 1000 - NATURAL_LEAVE_PER_MILLE) {
+      s = removeResident(s, r);
+      s = log(s, 'info', 'log.went_home', { name: r.name.th, nameEn: r.name.en });
+    }
+  }
+  return s;
+}
+
 function closeDay(state: GameState): GameState {
   const beds = summarizeBeds(state);
   const n = state.residents.length;
@@ -275,11 +319,12 @@ function closeDay(state: GameState): GameState {
     satisfaction: sat,
   };
   const history = [...state.history, stat].slice(-60);
-  // Reputation drifts with resident satisfaction (Phase 3 will add events and reviews).
+  // Reputation drifts with resident satisfaction, and missed care is noticed by families.
   let reputation = state.organization.reputation;
   if (n) {
     const sat = state.residents.reduce((a, r) => a + r.needs.satisfaction, 0) / n;
-    reputation = Math.max(0, Math.min(100, Math.round((reputation + (sat - 60) / 15) * 10) / 10));
+    const missedPenalty = Math.min(MAX_MISSED_REP_PENALTY, state.today.missed * MISSED_TASK_REP);
+    reputation = Math.max(0, Math.min(100, Math.round((reputation + (sat - 60) / 15 - missedPenalty) * 10) / 10));
   }
   return { ...state, history, today: { done: 0, missed: 0 }, organization: { ...state.organization, reputation } };
 }
@@ -298,6 +343,7 @@ export function step(state: GameState): GameState {
         s = collectPayments(s, closingDay);
         s = expireReferrals(s, closingDay);
         s = closeDay(s);
+        s = residentDepartures(s);
         s = judgeChapter(s, closingDay);
         // The new day starts: bill the month in advance on its first day.
         const newDay = closingDay + 1;

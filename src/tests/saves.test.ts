@@ -12,7 +12,11 @@ import { admit, buildHome, hire, ok } from './helpers';
 function midGame(): GameState {
   let s = buildHome(createInitialState(21));
   [s] = hire(s, 'rn', ['morning']);
+  [s] = hire(s, 'rn', ['afternoon']);
+  [s] = hire(s, 'caregiver', ['morning']);
   [s] = hire(s, 'caregiver', ['afternoon']);
+  [s] = hire(s, 'caregiver', ['night']);
+  [s] = hire(s, 'pt', ['morning']);
   for (let i = 0; i < 3; i++) {
     let id: string;
     [s, id] = admit(s);
