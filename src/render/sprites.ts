@@ -1,4 +1,4 @@
-import { Texture } from 'pixi.js';
+import type { Texture } from 'pixi.js';
 import type { DecorType, EquipmentId, RoomType, StaffRole } from '../domain/types';
 
 /** Sprite art cut from the project's Game Assets Pack (fictional, owned by the project). */
@@ -75,6 +75,8 @@ export const DECOR_SPRITE: Record<DecorType, { name: string; width: number }> = 
 
 /** Decode every sprite once and turn it into a Pixi texture. Missing or failed images are skipped. */
 export async function loadSpriteTextures(): Promise<Map<string, Texture>> {
+  // Pixi loads with the map, so the title screen and menus never wait for it.
+  const { Texture } = await import('pixi.js');
   const out = new Map<string, Texture>();
   await Promise.all(
     Object.entries({ ...urls, ...glyphs }).map(async ([path, url]) => {

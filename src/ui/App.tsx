@@ -1,3 +1,5 @@
+import { useSound } from './sound';
+import { useTelemetry } from './telemetry';
 import { useAlerts } from './alerts';
 import { ShopModal } from './components/ShopModal';
 import { AutoModal, AwayProgress, AwayReportModal } from './components/AutoModal';
@@ -22,6 +24,8 @@ import { useGame } from './store';
 export function App() {
   useGameLoop();
   useAlerts();
+  useSound();
+  useTelemetry();
   useKeyboard();
   const lang = useGame((s) => s.lang);
   const mobile = useIsMobile();

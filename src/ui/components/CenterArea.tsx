@@ -1,6 +1,9 @@
 import { useT } from '../hooks';
 import { useGame, type View } from '../store';
-import { GameCanvas } from './GameCanvas';
+import { lazy, Suspense } from 'react';
+
+// The map (and Pixi with it) loads separately, after the title screen and panels are up.
+const GameCanvas = lazy(() => import('./GameCanvas').then((m) => ({ default: m.GameCanvas })));
 import { ResidentsView } from './ResidentsView';
 import { RosterView } from './RosterView';
 import { FinanceView } from './FinanceView';
@@ -37,7 +40,9 @@ export function CenterArea({ showTabs = true }: { showTabs?: boolean }) {
         ))}
       </div>
       <div className="relative flex-1 min-h-0">
-        <GameCanvas controls={showTabs} />
+        <Suspense fallback={<div className="absolute inset-0 grid place-items-center text-ink-soft text-sm">…</div>}>
+          <GameCanvas controls={showTabs} />
+        </Suspense>
         {view !== 'map' && (
           <div className="absolute inset-0 z-10 overflow-y-auto scroll-thin bg-[#f3efe6]">{view === 'residents' ? <ResidentsView /> : view === 'roster' ? <RosterView /> : <FinanceView />}</div>
         )}

@@ -75,6 +75,13 @@ interface UIStore {
   /** Alerts for low cash and decisions waiting (remembered per browser). */
   alertsOn: boolean;
   setAlertsOn: (v: boolean) => void;
+  /** Sound effects (default on), the music loop (default off), anonymous play statistics (default on). */
+  sfxOn: boolean;
+  setSfxOn: (v: boolean) => void;
+  musicOn: boolean;
+  setMusicOn: (v: boolean) => void;
+  statsOn: boolean;
+  setStatsOn: (v: boolean) => void;
   /** Catch-up in progress, in ticks. */
   away: { done: number; total: number } | null;
   awayReport: AwayReport | null;
@@ -98,13 +105,24 @@ function initialLang(): Lang {
   return 'th';
 }
 
-/** A per-browser on/off preference that defaults to on. */
-function initialFlag(key: string): boolean {
+/** A per-browser on/off preference (on unless stored otherwise, or the given default). */
+function initialFlag(key: string, fallback = true): boolean {
   try {
-    return localStorage.getItem(key) !== '0';
+    const v = localStorage.getItem(key);
+    return v === null ? fallback : v !== '0';
   } catch {
-    return true;
+    return fallback;
   }
+}
+
+/** Store a preference and hand the value back. */
+function remember(key: string, v: boolean): boolean {
+  try {
+    localStorage.setItem(key, v ? '1' : '0');
+  } catch {
+    /* storage unavailable */
+  }
+  return v;
 }
 
 function initialAwayPlay(): boolean {
@@ -151,6 +169,12 @@ export const useGame = create<UIStore>((set, get) => ({
     }
     set({ awayPlay });
   },
+  sfxOn: initialFlag('he.sfx'),
+  setSfxOn: (sfxOn) => set({ sfxOn: remember('he.sfx', sfxOn) }),
+  musicOn: initialFlag('he.music', false),
+  setMusicOn: (musicOn) => set({ musicOn: remember('he.music', musicOn) }),
+  statsOn: initialFlag('he.stats'),
+  setStatsOn: (statsOn) => set({ statsOn: remember('he.stats', statsOn) }),
   alertsOn: initialFlag('he.alerts'),
   setAlertsOn: (alertsOn) => {
     try {

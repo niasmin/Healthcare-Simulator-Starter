@@ -1,3 +1,4 @@
+import { MuteButton } from './Prefs';
 import { useAutoOn } from './AutoModal';
 import { useEffect, useState } from 'react';
 import type { GameSpeed } from '../../domain/types';
@@ -128,6 +129,7 @@ export function TopBar() {
         >
           💾 {t('save.open')}
         </button>
+        <MuteButton />
         <button
           type="button"
           onClick={() => setLang(lang === 'th' ? 'en' : 'th')}

@@ -34,6 +34,23 @@ One-time setup:
   - In Supabase Auth → URL Configuration, add the two site URLs above as redirect URLs so the email links come back to the game.
   - Inside the Claude artifact, the artifact's own per-person storage is used instead.
 
+### Launch polish
+
+- **Faster start:** the map renderer (Pixi, about 570 KB) is a separate chunk, loaded with the map. The title screen and menus don't wait for it, and the title screen is ready in under a second on a local preview.
+- **Sound:** small effects synthesized with WebAudio, so there are no audio files to download. They play for building, hiring and admissions, payments, events, chapter wins and losses, and refused actions. There is also an optional soft music loop.
+  - Effects are on by default and music is off; both are remembered per browser.
+  - Toggles live in Settings (title screen), the phone menu, and 🔊 in the desktop top bar.
+  - Nothing plays before the first tap, or while time away is being caught up.
+- **Installable app (PWA):** a web manifest, app icons (the nurse character on the game's teal) and a service worker.
+  - The page is network-first, so a new deploy shows up at once. Hashed build files are cache-first, so the installed app opens offline.
+  - The worker is registered only on the deployed HTTPS site, never in development or inside the Claude artifact.
+- **Share preview:** Open Graph and Twitter tags with a 1200×630 image (the key art with the logo).
+- **Anonymous play statistics** (on by default, can be switched off in Settings):
+  - The site records games started, tutorial steps reached, chapter verdicts with the targets missed, autopilot switches, and a ping every 5 minutes of play (chapter and day).
+  - Events go in batches to Supabase's `public.game_events`. Players can insert only their own rows and nobody can read them through the API; the owner reads them in the dashboard.
+  - No names, emails or game content are stored.
+  - Nothing is sent from the Claude artifact.
+
 ## Milestone status
 
 | Phase | Scope | Status |
