@@ -123,6 +123,9 @@ Results:
   - Seed 8 loses chapter 2 once, plays it again and wins chapters 2–6.
   - Cash stays positive throughout and the ledger reconciles on every seed.
   - No single tick takes more than about 40 ms.
+- **Every switch on (shop included), 390 days with no input:**
+  - Seeds 1 and 3 win all seven chapters and buy all six upgrades.
+  - Seed 8 replays chapter 2 once, then wins through chapter 6.
 
 ### More land
 
