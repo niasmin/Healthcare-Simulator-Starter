@@ -98,7 +98,7 @@ export function billFinal(state: GameState, resident: Resident): GameState {
   return s;
 }
 
-export function recordService(state: GameState, residentId: string, stream: Exclude<RevenueStream, 'room_care' | 'homecare' | 'workforce'>, n = 1): GameState {
+export function recordService(state: GameState, residentId: string, stream: Exclude<RevenueStream, 'room_care' | 'homecare' | 'workforce' | 'hospital'>, n = 1): GameState {
   const cur = state.unbilled[residentId] ?? EMPTY;
   return { ...state, unbilled: { ...state.unbilled, [residentId]: { ...cur, [stream]: cur[stream] + n } } };
 }

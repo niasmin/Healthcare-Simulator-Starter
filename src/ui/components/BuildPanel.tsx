@@ -16,6 +16,7 @@ import { useMoney, useT } from '../hooks';
 import { useGame, type LeftTab, type Tool } from '../store';
 import { Avatar, GROUP_COLOR, RoleChip, StatBar, useName } from './people';
 import { WorkforcePanel } from './WorkforcePanel';
+import { HospitalPanel } from './HospitalPanel';
 
 /** Room pictures from the Game Assets Pack. */
 const ROOM_ART: Record<RoomType, string> = {
@@ -26,6 +27,8 @@ const ROOM_ART: Record<RoomType, string> = {
   villa: 'rm_villa',
   homecare_office: 'rm_homecare',
   training_room: 'rm_station',
+  neuro_clinic: 'rm_station',
+  stroke_unit: 'rm_standard',
 };
 
 const SWATCH: Record<RoomType, string> = {
@@ -36,6 +39,8 @@ const SWATCH: Record<RoomType, string> = {
   villa: '#b08850',
   homecare_office: '#3f7f9a',
   training_room: '#2f7d8c',
+  neuro_clinic: '#3b5ba5',
+  stroke_unit: '#7a4fa0',
 };
 
 function sameTool(a: Tool, b: Tool) {
@@ -292,6 +297,7 @@ function AdmitList() {
         </div>
       ))}
       <p className="text-[11px] text-ink-soft/80 leading-snug">{t('admit.note')}</p>
+      {(game.chapter.id >= 6 || game.hospital.inpatients.length > 0) && <HospitalPanel />}
       {(game.chapter.id >= 4 || game.homecare.clients.length > 0) && <HomeCareList />}
     </>
   );

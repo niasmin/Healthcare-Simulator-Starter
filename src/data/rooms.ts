@@ -29,6 +29,9 @@ export const EQUIPMENT: Record<EquipmentId, EquipmentDef> = {
   care_van: { id: 'care_van', costSatang: thb(180_000), color: 0xf4f6f8 },
   training_manikin: { id: 'training_manikin', costSatang: thb(25_000), color: 0xe9c9a8 },
   whiteboard: { id: 'whiteboard', costSatang: thb(8_000), color: 0xf7f7f2 },
+  exam_desk: { id: 'exam_desk', costSatang: thb(45_000), color: 0xdfe6ee },
+  waiting_chairs: { id: 'waiting_chairs', costSatang: thb(10_000), color: 0x6d8fb3 },
+  vital_monitor: { id: 'vital_monitor', costSatang: thb(40_000), color: 0x3d4b5c },
 };
 
 export interface EquipmentSlot {
@@ -177,11 +180,46 @@ export const ROOMS: Record<RoomType, RoomDef> = {
     wallColor: 0x2f7d8c,
     unlockChapter: 5,
   },
+  // Chapter 6: the outpatient clinic. Each examination desk sees one patient at a time.
+  neuro_clinic: {
+    type: 'neuro_clinic',
+    minSide: 2,
+    minArea: 6,
+    maxArea: 16,
+    baseCostSatang: thb(120_000),
+    costPerTileSatang: thb(15_000),
+    upkeepPerTileSatang: thb(35),
+    equipment: [
+      { id: 'waiting_chairs', required: 1, max: () => 1 },
+      { id: 'exam_desk', required: 1, max: (r) => Math.max(1, Math.floor(rectArea(r) / 4)) },
+    ],
+    floorColor: 0xdde7f3,
+    wallColor: 0x3b5ba5,
+    unlockChapter: 6,
+  },
+  // Chapter 6: short-stay beds for clinic patients referred for observation and early rehabilitation.
+  stroke_unit: {
+    type: 'stroke_unit',
+    minSide: 2,
+    minArea: 6,
+    maxArea: 20,
+    baseCostSatang: thb(150_000),
+    costPerTileSatang: thb(15_000),
+    upkeepPerTileSatang: thb(40),
+    equipment: [
+      { id: 'care_bed', required: 1, max: (r) => Math.floor(rectArea(r) / TILES_PER_BED) },
+      { id: 'call_system', required: 1, max: () => 1 },
+      { id: 'vital_monitor', required: 1, max: () => 1 },
+    ],
+    floorColor: 0xe6dff0,
+    wallColor: 0x7a4fa0,
+    unlockChapter: 6,
+  },
 };
 
 
 
-export const ROOM_TYPES: RoomType[] = ['ward', 'nursing_station', 'therapy', 'staff_room', 'villa', 'homecare_office', 'training_room'];
+export const ROOM_TYPES: RoomType[] = ['ward', 'nursing_station', 'therapy', 'staff_room', 'villa', 'homecare_office', 'training_room', 'neuro_clinic', 'stroke_unit'];
 /** Rooms whose care beds count as resident capacity. */
 export const BED_ROOMS: RoomType[] = ['ward', 'villa'];
 

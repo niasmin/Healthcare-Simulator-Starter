@@ -114,6 +114,8 @@ export function refreshCandidates(state: GameState): GameState {
     [s, role] = randomRole(s);
     s = makeApplicant(s, role);
   }
+  // From Chapter 6 a neurologist is always among the applicants.
+  if (s.chapter.id >= 6 && !s.applicants.some((a) => a.role === 'doctor')) s = makeApplicant(s, 'doctor');
   const [lo, hi] = WAITLIST_ARRIVALS[s.priceLevel];
   let add: number;
   [s, add] = randInt(s, lo, hi);
@@ -179,9 +181,11 @@ export function staffMoraleDaily(state: GameState): GameState {
 export function removeEmployee(state: GameState, employeeId: string): GameState {
   const tasks = state.tasks.map((t) => (t.assigneeId === employeeId && t.status === 'in_progress' ? { ...t, status: 'pending' as const, assigneeId: null, finishAt: null } : t));
   const visits = state.homecare.visits.map((v) => (v.assigneeId === employeeId && v.status === 'in_progress' ? { ...v, status: 'pending' as const, assigneeId: null, finishAt: null } : v));
+  const htasks = state.hospital.tasks.map((t) => (t.assigneeId === employeeId && t.status === 'in_progress' ? { ...t, status: 'pending' as const, assigneeId: null, finishAt: null } : t));
   return {
     ...state,
     tasks,
+    hospital: { ...state.hospital, tasks: htasks },
     homecare: { ...state.homecare, visits },
     employees: state.employees.filter((x) => x.id !== employeeId),
     shifts: state.shifts.filter((x) => x.employeeId !== employeeId),

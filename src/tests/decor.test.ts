@@ -2,7 +2,7 @@ import { advance, applyCommand } from '../sim/engine';
 import { createInitialState } from '../sim/state';
 import { reconcile } from '../domain/rules/ledger';
 import { DECOR, gardenAppeal, MAX_APPEAL } from '../data/decor';
-import { validate } from '../storage/format';
+import { CURRENT_SCHEMA, validate } from '../storage/format';
 import { TICKS_PER_DAY } from '../sim/constants';
 import type { GameState } from '../domain/types';
 import { admit, buildHome, ok, quietEvents } from './helpers';
@@ -62,7 +62,7 @@ describe('garden decorations', () => {
     const res = validate(v3);
     expect(res.ok).toBe(true);
     if (res.ok) {
-      expect(res.state.schemaVersion).toBe(8);
+      expect(res.state.schemaVersion).toBe(CURRENT_SCHEMA);
       expect(res.state.site.decor).toEqual([]);
       expect(res.state.chapter).toEqual({ id: 1, startDay: 1, result: null, past: [] });
     }

@@ -7,13 +7,14 @@ import { seedToState } from './rng';
 import { seedCandidates } from './systems/staffing';
 import { emptyHomecare } from './systems/homecare';
 import { emptyWorkforce } from './systems/workforce';
+import { emptyHospital } from './systems/hospital';
 
 export function createInitialState(seed: number = STARTER_SCENARIO.defaultSeed, scenario: ScenarioDef = STARTER_SCENARIO): GameState {
   const { gridWidth: width, gridHeight: height, entrance } = scenario;
   const corridor = new Array<number>(width * height).fill(0);
   corridor[cellIndex(entrance.x, entrance.y, width)] = 1;
   const base: GameState = {
-    schemaVersion: 8,
+    schemaVersion: 9,
     seed,
     rngState: seedToState(seed),
     minute: START_MINUTE,
@@ -50,6 +51,7 @@ export function createInitialState(seed: number = STARTER_SCENARIO.defaultSeed, 
     chapter: { id: 1, startDay: 1, result: null, past: [] },
     homecare: emptyHomecare(),
     workforce: emptyWorkforce(),
+    hospital: emptyHospital(),
   };
   return seedCandidates(post(base, scenario.startingCashSatang, 'capital', 'ledger.capital'));
 }

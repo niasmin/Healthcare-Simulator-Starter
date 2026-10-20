@@ -3,6 +3,7 @@ import type { ChapterResult, GameState } from '../domain/types';
 import { ROLES } from '../data/staff';
 import { emptyHomecare } from '../sim/systems/homecare';
 import { emptyWorkforce } from '../sim/systems/workforce';
+import { emptyHospital } from '../sim/systems/hospital';
 import { dayOf } from '../sim/systems/time';
 
 /**
@@ -12,7 +13,7 @@ import { dayOf } from '../sim/systems/time';
  * CompressionStream, so even long games stay far below storage limits.
  */
 export const SAVE_FORMAT = 1;
-export const CURRENT_SCHEMA = 8;
+export const CURRENT_SCHEMA = 9;
 
 export type SlotId = 'auto' | 'slot1' | 'slot2' | 'slot3';
 export const SLOTS: SlotId[] = ['auto', 'slot1', 'slot2', 'slot3'];
@@ -136,6 +137,10 @@ export function migrate(state: GameState): GameState {
   if (s.schemaVersion === 7) {
     // v8 adds the Chapter 5 workforce: training, partner offers and placements.
     s = { ...s, schemaVersion: 8, workforce: emptyWorkforce() };
+  }
+  if (s.schemaVersion === 8) {
+    // v9 adds the Chapter 6 neuro hospital: clinic work, referrals and stroke-unit inpatients.
+    s = { ...s, schemaVersion: 9, hospital: emptyHospital() };
   }
   return s as GameState;
 }

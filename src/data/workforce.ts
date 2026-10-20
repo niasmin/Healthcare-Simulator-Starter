@@ -31,6 +31,7 @@ export const PLACEMENT_RATE: Record<StaffRole, number> = {
   rn: thb(2_600),
   pt: thb(2_300),
   ot: thb(2_100),
+  doctor: thb(9_000),
 };
 export const CERT_PREMIUM_PERCENT = 25;
 

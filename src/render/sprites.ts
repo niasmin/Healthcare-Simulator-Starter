@@ -33,10 +33,12 @@ export const ROOM_BADGE: Record<RoomType, { glyph: string; color: number }> = {
   villa: { glyph: 'g_bed', color: 0xc7862a },
   homecare_office: { glyph: 'g_doc', color: 0x56606d },
   training_room: { glyph: 'g_doc', color: 0x1f8a9a },
+  neuro_clinic: { glyph: 'g_nurse', color: 0x3b5ba5 },
+  stroke_unit: { glyph: 'g_bed', color: 0x7a4fa0 },
 };
 
 /** Full-body chibi sprite per staff role (from the character sheet). RN and PN share the nurse uniform. */
-export const STAFF_SPRITE: Record<StaffRole, string> = { rn: 'ch_nurse', pn: 'ch_nurse', caregiver: 'ch_caregiver', pt: 'ch_pt', ot: 'ch_ot' };
+export const STAFF_SPRITE: Record<StaffRole, string> = { rn: 'ch_nurse', pn: 'ch_nurse', caregiver: 'ch_caregiver', pt: 'ch_pt', ot: 'ch_ot', doctor: 'ch_owner_m' };
 /** Map width of a standing character, in world px. */
 export const PERSON_SPRITE_WIDTH = 24;
 

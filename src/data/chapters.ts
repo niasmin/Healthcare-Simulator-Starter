@@ -3,7 +3,7 @@ import type { CareGroup } from '../domain/types';
 
 /**
  * Campaign chapters (concept-art road map). Each one is judged once by the engine when its last day
- * closes. Targets are FICTIONAL game balancing. Chapters 6–7 are listed in the UI but not playable yet.
+ * closes. Targets are FICTIONAL game balancing. Chapter 7 is listed in the UI but not playable yet.
  */
 export interface ChapterDef {
   id: number;
@@ -29,6 +29,10 @@ export interface ChapterDef {
   /** Chapter 5: staff holding at least one training certificate, and placement contracts completed in the chapter. */
   targetCertified?: number;
   targetContracts?: number;
+  /** Chapter 6: consultations completed in the chapter, the 7-day consultation rate, and smooth stroke-unit discharges. */
+  targetConsults?: number;
+  targetConsultRate?: number;
+  targetDischarges?: number;
 }
 
 export const BASIC_GROUPS: CareGroup[] = ['active_aging', 'stroke_rehab', 'bedridden'];
@@ -44,6 +48,8 @@ export const CHAPTERS: ChapterDef[] = [
   { id: 4, days: 60, targetBeds: 36, targetResidents: 30, targetQuality: 75, targetClients: 12, targetVisitRate: 0.9, groups: [...BASIC_GROUPS, ...BASIC_GROUPS, ...PROGRAMMES] },
   // Healthcare Workforce: a training centre certifies staff, and partner organisations hire them by the day.
   { id: 5, days: 60, targetBeds: 36, targetResidents: 30, targetQuality: 75, targetCertified: 6, targetContracts: 6, groups: [...BASIC_GROUPS, ...BASIC_GROUPS, ...PROGRAMMES] },
+  // Neuro Hospital: an outpatient clinic with a neurologist, and a short-stay stroke unit it refers to.
+  { id: 6, days: 60, targetBeds: 36, targetResidents: 30, targetQuality: 75, targetConsults: 500, targetConsultRate: 0.9, targetDischarges: 25, groups: [...BASIC_GROUPS, ...BASIC_GROUPS, ...PROGRAMMES] },
 ];
 
 /** Share of new waiting-list candidates who want a villa, once villas are unlocked (Chapter 3+). */

@@ -6,6 +6,8 @@ import { entryDay, totalsOf } from '../selectors';
 import { makeResidentCandidate } from './staffing';
 import { visitRate } from './homecare';
 import { certifiedCount, contractsCompleted } from './workforce';
+import { consultRate, consultsSince, smoothDischarges } from './hospital';
+import { makeApplicant } from './staffing';
 import { gardenAppeal } from '../../data/decor';
 import { dayOf } from './time';
 
@@ -83,6 +85,19 @@ export function chapterChecks(state: GameState, def: ChapterDef = chapterDef(sta
     const n = contractsCompleted(state, start);
     checks.push({ id: 'contracts', have: n, need: def.targetContracts, ok: n >= def.targetContracts });
   }
+  if (def.targetConsults) {
+    const n = consultsSince(state, start);
+    checks.push({ id: 'opd_visits', have: n, need: def.targetConsults, ok: n >= def.targetConsults });
+  }
+  if (def.targetConsultRate) {
+    const pct = Math.round((consultRate(state) ?? 0) * 100);
+    const need = Math.round(def.targetConsultRate * 100);
+    checks.push({ id: 'opd_rate', have: pct, need, ok: pct >= need });
+  }
+  if (def.targetDischarges) {
+    const n = smoothDischarges(state, start);
+    checks.push({ id: 'discharges', have: n, need: def.targetDischarges, ok: n >= def.targetDischarges });
+  }
   checks.push({ id: 'cashflow', have: net, need: 1, ok: net > 0 }, { id: 'quality', have: quality, need: def.targetQuality, ok: quality >= def.targetQuality });
   return checks;
 }
@@ -123,5 +138,7 @@ export function startNextChapter(state: GameState): GameState | null {
   for (const group of chapterDef(next).programmes ?? []) s = makeResidentCandidate(s, { group });
   // Villa families are already asking when Tranquila opens.
   if (chapterDef(next).targetPremium) for (const group of ['active_aging', 'stroke_rehab', 'active_aging'] as const) s = makeResidentCandidate(s, { group, premium: true });
+  // The neuro hospital needs a neurologist: two apply as the chapter opens.
+  if (chapterDef(next).targetConsults) for (let i = 0; i < 2; i++) s = makeApplicant(s, 'doctor');
   return log(s, 'good', 'chapter.log.started', { c: next });
 }

@@ -31,7 +31,7 @@ const CARDS: Array<{ id: string; chapter: number | null }> = [
   { id: "achievement", chapter: 1 },
 ];
 /** Chapters playable in this version. */
-const PLAYABLE = 5;
+const PLAYABLE = 6;
 
 type Panel = "new" | "help" | "news" | "settings" | null;
 const glyphs = import.meta.glob("../../assets/title/w_*.png", {

@@ -11,7 +11,7 @@ const faces = import.meta.glob('../assets/faces/*.png', { eager: true, import: '
 export type Mood = 'default' | 'smile' | 'happy' | 'surprise' | 'sad';
 type FaceSet = 'owner_f' | 'owner_m' | 'nurse' | 'caregiver' | 'pt' | 'ot' | 'resident';
 
-const ROLE_FACE: Record<StaffRole, FaceSet> = { rn: 'nurse', pn: 'nurse', caregiver: 'caregiver', pt: 'pt', ot: 'ot' };
+const ROLE_FACE: Record<StaffRole, FaceSet> = { rn: 'nurse', pn: 'nurse', caregiver: 'caregiver', pt: 'pt', ot: 'ot', doctor: 'owner_m' };
 
 function face(set: FaceSet, mood: Mood): string {
   return faces[`../assets/faces/${set}_${mood}.png`];

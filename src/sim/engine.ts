@@ -25,6 +25,7 @@ import { admitClient, dischargeClient, hasHomecareOffice, homecareDayEnd, homeca
 import { EXPANDED_WIDTH, LAND_PRICE } from '../data/chapters';
 import { prefabCost, prefabDef, prefabRect } from '../data/prefabs';
 import { GROUP_WARD_EQUIPMENT } from '../data/patients';
+import { admitInpatient, hospitalDayEnd, hospitalTick } from './systems/hospital';
 import { acceptOffer, endContract, startTraining, workforceDayEnd, workforceTick } from './systems/workforce';
 
 /**
@@ -57,7 +58,8 @@ export type Command =
   | { type: 'dischargeClient'; clientId: string }
   | { type: 'startTraining'; employeeId: string; course: CourseId }
   | { type: 'acceptOffer'; offerId: string; employeeId: string }
-  | { type: 'endContract'; contractId: string };
+  | { type: 'endContract'; contractId: string }
+  | { type: 'admitInpatient'; referralId: string };
 
 export interface CommandOutcome {
   state: GameState;
@@ -339,6 +341,11 @@ export function applyCommand(state: GameState, cmd: Command): CommandOutcome {
       return next ? { state: next, result: { ok: true } } : fail(state, 'not_found');
     }
 
+    case 'admitInpatient': {
+      const out = admitInpatient(state, cmd.referralId);
+      return 'reason' in out ? fail(state, out.reason) : { state: out.state, result: { ok: true, id: out.id } };
+    }
+
     case 'startChapter': {
       const next = startNextChapter(state);
       return next ? { state: next, result: { ok: true } } : fail(state, 'chapter_locked');
@@ -396,6 +403,7 @@ export function step(state: GameState): GameState {
         s = expireReferrals(s, closingDay);
         s = homecareDayEnd(s, closingDay, ev.at);
         s = workforceDayEnd(s, closingDay);
+        s = hospitalDayEnd(s, closingDay, ev.at);
         s = closeDay(s);
         s = judgeChapter(s, closingDay);
         // The new day starts: bill the month in advance on its first day.
@@ -418,6 +426,7 @@ export function step(state: GameState): GameState {
   s = eventExpiryTick(s);
   // Home visits are booked appointments, so they claim staff before in-house tasks.
   s = homecareTick(s);
+  s = hospitalTick(s);
   // Placements and classes take their people before in-house tasks are handed out.
   s = workforceTick(s);
   s = careTick(s);

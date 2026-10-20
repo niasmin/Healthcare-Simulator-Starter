@@ -13,6 +13,7 @@ import { monthlyFee } from '../data/finance';
 import { thb } from '../domain/money';
 import { buildHome } from './helpers';
 import { prefabCost, prefabDef } from '../data/prefabs';
+import { freeStrokeBeds } from '../sim/systems/hospital';
 import { COURSES } from '../data/workforce';
 import { certifiedCount, isCertified, placementBlocker, trainingBlocker, trainingSeats } from '../sim/systems/workforce';
 
@@ -33,6 +34,7 @@ const SKILL_ROLE: Record<Skill, StaffRole> = {
   activity: 'ot',
   tube_feeding: 'pn',
   airway_care: 'rn',
+  consult: 'doctor',
 };
 
 /** Preferred answer per event, falling back to the next choice when blocked. */
@@ -201,6 +203,23 @@ function workforce(s: GameState, reserve: number): GameState {
   return s;
 }
 
+/** Chapter 6: the clinic opens onto the row-10 corridor; the stroke unit sits beside the spine. */
+export const HOSPITAL = { clinic: { x: 14, y: 11 }, stroke: { x: 10, y: 13 } };
+
+/** Chapter 6: build the clinic, then the stroke unit, and admit every referral a bed allows. */
+function hospital(s: GameState, reserve: number): GameState {
+  for (const [type, prefab, origin] of [['neuro_clinic', 'clinic', HOSPITAL.clinic], ['stroke_unit', 'stroke', HOSPITAL.stroke]] as const) {
+    if (s.site.rooms.some((r) => r.type === type)) continue;
+    if (s.organization.cashSatang < prefabCost(prefabDef(prefab)!) + runwayNeed(s, reserve)) return s;
+    s = tryCmd(s, { type: 'placePrefab', prefab, origin });
+  }
+  for (const r of [...s.hospital.referrals]) {
+    if (!freeStrokeBeds(s).length) break;
+    s = tryCmd(s, { type: 'admitInpatient', referralId: r.id });
+  }
+  return s;
+}
+
 /** Visits one van can make in a morning (appointments 08:00–13:00, 100 minutes each). */
 const VISITS_PER_VAN = 4;
 
@@ -236,6 +255,7 @@ export function botTurn(state: GameState, opts: BotOptions = {}): GameState {
   if (s.chapter.id >= 3) s = tranquila(s, opts.reserve ?? thb(50_000));
   if (s.chapter.id >= 4) s = homeCare(s, opts.reserve ?? thb(50_000));
   if (s.chapter.id >= 5) s = workforce(s, opts.reserve ?? thb(50_000));
+  if (s.chapter.id >= 6) s = hospital(s, opts.reserve ?? thb(50_000));
   if (s.events.active) {
     for (const id of EVENT_PREFS[s.events.active.defId]) {
       if (!EVENT_DEFS[s.events.active.defId].choices.some((c) => c.id === id) || choiceBlocker(s, id)) continue;

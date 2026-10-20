@@ -27,11 +27,11 @@ Add `?debug` to the URL to expose `window.__HE__` (store + renderer) for automat
 | **3** | Pricing, monthly invoices and payments, running costs, Financial Dashboard, 4 events, title screen, character portraits | ✅ Done |
 | **4** | Save/load, guided tutorial, 30-day chapter goal with win/lose verdict, three scripted events, balancing | ✅ Done (**MVP complete**) |
 | **5** | Chapter campaign; Ch. 2 nursing center with specialised programmes; Ch. 3 premium villas (Tranquila); Ch. 4 Home Care | ✅ Done |
-| 6 | Ch. 5 workforce (training + B2B placements) ✅; Ch. 6 hospital, Ch. 7 multi-site | 🚧 In progress |
+| 6 | Ch. 5 workforce (training + B2B placements) ✅; Ch. 6 neuro hospital (OPD + stroke unit) ✅; Ch. 7 multi-site | 🚧 In progress |
 
 ## What you can play now
 
-Playable today, as one 270-day campaign with the same business:
+Playable today, as one 330-day campaign with the same business:
 
 | Chapter | Days |
 |---|---|
@@ -40,8 +40,32 @@ Playable today, as one 270-day campaign with the same business:
 | 3. Tranquila Senior Living | 91–150 |
 | 4. Home Care | 151–210 |
 | 5. Healthcare Workforce | 211–270 |
+| 6. Neuro Hospital | 271–330 |
 
-Chapters 6–7 (Neuro Hospital, multi-site empire) come later in Phase 6.
+Chapter 7 (multi-site empire) comes later in Phase 6.
+
+### Phase 6, part 2: Chapter 6 (Neuro Hospital)
+
+All hospital work is abstract: a consultation, a nursing round and a doctor's round, each tied to the qualification it needs. None of it is medical advice, and all fees are fictional.
+
+- **Neurologist** (new role; ฿75,000/month + ฿2,500 per year of experience; qualification "consultation").
+  - Doctors do only doctors' work, never general care.
+  - Two apply when the chapter opens, and from then on one is always in the applicant pool.
+  - The portrait and map figure reuse the man-in-a-suit character until doctor art is supplied.
+- **Neuro clinic (OPD)**, unlocks in chapter 6, ready-made 4×3 with 2 examination desks.
+  - Bookings: each desk takes 6 appointments a day between 09:00 and 14:10 (only 4 while reputation is below 60). Bookings start the day after a doctor is on the staff.
+  - Consultations: a free doctor on shift sees each patient at a free desk, 30 minutes each.
+  - Missed appointments: patients wait 60 minutes past their time, then leave.
+  - Billing: consultations go on one daily OPD invoice at ฿1,200 each.
+- **Stroke unit (IPD)**, ready-made 4×3 with 6 beds, a call bell and a vital-signs monitor. Its beds do not count as home beds.
+  - Referrals: about 1 in 5 consultations ends in a referral, which waits 2 days for a bed. A referral that finds no bed costs −0.5 reputation.
+  - The stay: 5–8 days. Inpatients get a nursing round every 4 hours (PN/RN, nights included) and a doctor's round every morning.
+  - Billing: ฿5,500 per day, invoiced at discharge, plus ฿600/day in supplies.
+  - Outcome: more than 2 missed rounds makes the stay "complicated" (−1 reputation). Otherwise the patient goes home as planned (+0.5). Half of those families then ask for a place in the home's rehab ward, which adds a waiting-list candidate.
+- **Roster** advice includes clinic bookings and rounds for every stroke-unit bed, with a Doctor row. Inpatients lie in their beds on the map, and doctors appear at the clinic or at the bedside.
+- **Targets:** 60 days; 500 outpatients seen in the chapter; 90% of appointments seen over the last 7 days; 25 inpatients home as planned; the home stays at 36 beds / 30 residents, quality 75 and a profit. The scripted player wins on 3 seeds (708 consultations, about 49 smooth discharges).
+- **Admit tab:** a hospital panel with today's clinic numbers, referrals with an Admit button, and inpatients with their day and rounds.
+- Save schema 9 (a v8 save gains an empty hospital).
 
 ### Phase 6, part 1: Chapter 5 (Healthcare Workforce)
 
@@ -378,7 +402,7 @@ src/
   - Food, supplies, upkeep and payroll are each charged once per day.
   - An event's cost is charged once, and a resolved event can't be resolved again.
 
-## Tests (134 passing)
+## Tests (146 passing)
 
 | File | Covers |
 |---|---|
@@ -394,6 +418,7 @@ src/
 | `decor.test.ts` | Decor placed on an empty tile and charged once; can't overlap rooms, corridor, entrance or decor, and blocks building over it; demolish refunds half; appeal is capped and makes residents happier; schema-3 saves migrate to schema 4 |
 | `chapter.test.ts` | **30-day playthrough** by a scripted sensible player using only public commands and the real applicant and waiting-list pools: wins chapter 1 with cash positive every day; every invariant holds (ledger, unique beds, no overlapping shifts, no care without the skill); roster ready and >95% of tasks done; the three scripted events fire on their days; the same seed plays byte-identically; the verdict pauses the game and survives a save. **Balance:** a full home wins on more seeds, a 40% empty home and an overstaffed home fail on targets. **Verdict rules:** bankrupt at the first negative midnight, decided once and never changed; nothing decided before day 30; a migrated save past day 30 is judged at the next midnight. **Tutorial:** step order, derived from state, a goal and a how-to hint in Thai and English for every step. **Staffing advice:** rush-hour windows, RN covering PN work, one OT for ten sessions |
 | `chapter2.test.ts` | **90-day campaign** by the scripted player: wins Chapter 1, starts Chapter 2 on day 31 and wins it on day 90 with every target; dementia residents only in secured wards; airway care only by RNs and tube feeding only by RNs/PNs; an RN on the night roster; >93% of tasks done; byte-identical rerun; a reckless builder's lowest cash falls far below the careful one, with at least one bankruptcy; a second full team fails the chapter. **Rules:** the next chapter only after a win, with one candidate per programme; secured-ward admission; RN-only airway care missed with only a PN on nights; programme fees; schema-5 migration; Thai and English text for every Chapter 2 step |
+| `chapter6.test.ts` | **Full 330-day campaign:** chapters 1–6 all won on schedule and solvent, ledger reconciles; OPD and IPD invoices are exact; inpatients only in unique stroke-unit beds, which don’t count as home beds; doctors only do doctors’ work. **Clinic:** locked before chapter 6; 6 bookings per desk from the next day and only with a doctor (4 below reputation 60); one doctor with two desks sees some patients and the rest leave; never more consultations at once than desks. **Stroke unit:** admission plans every round; full beds refuse; staffed stays go home as planned and bill their days, unstaffed ones end complicated; unserved referrals cost reputation. Guide order; v8→v9 migration |
 | `chapter5.test.ts` | **Full 270-day campaign:** chapters 1–5 all won on schedule and solvent, ledger reconciles, at least 6 certified staff, b2b invoices are quantity × rate, and placed staff hold no shifts. **Training:** needs a room, the right role and a free seat; the cost is charged; class is taken in the shift, in the room; passing adds the certificate and qualification; staff without shifts attend 08:00–16:00. **Placements:** role and certificate checks; placed staff leave the roster and can’t get shifts or courses; 07:00–15:00 away, billed per day, released at the end; ending early or dismissal costs reputation; requests only from chapter 5 with a room, and they expire. Guide order; v7→v8 save migration |
 | `chapter34.test.ts` | **Full 210-day campaign** by the careful scripted player: chapters 1–4 all won on schedule and solvent, ledger reconciles; premium residents only in villas; visits only by qualified staff, billed per visit, and staff on a visit leave the map. **Chapter 3 rules:** land bought once, from chapter 3, keeping every corridor tile; villas locked before chapter 3 and premium-only; a garden keeps premium families content. **Chapter 4 rules:** clients need a centre with a van; one van takes one visit at a time and done visits bill at midnight; missed visits lead to cancellation; visits need the skill and a shift; schema-6 migration; Thai and English text for every step |
 | `prefabs.test.ts` | Ready-made rooms place the room and equipment in one command for exactly the hand-built price; all or nothing on overlap or short cash; rotation; chapter locks; labels. Starter campus: built and paid from capital, tutorial skips straight to the ward step, deterministic; the empty template changes nothing. Retrying a failed chapter restarts its days with the same business and is refused otherwise |

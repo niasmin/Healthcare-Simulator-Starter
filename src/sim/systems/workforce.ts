@@ -101,7 +101,8 @@ export function placementBlocker(state: GameState, offerId: string, employeeId: 
 function releaseWork(state: GameState, employeeId: string): GameState {
   const tasks = state.tasks.map((t) => (t.assigneeId === employeeId && t.status === 'in_progress' ? { ...t, status: 'pending' as const, assigneeId: null, finishAt: null } : t));
   const visits = state.homecare.visits.map((v) => (v.assigneeId === employeeId && v.status === 'in_progress' ? { ...v, status: 'pending' as const, assigneeId: null, finishAt: null } : v));
-  return { ...state, tasks, homecare: { ...state.homecare, visits } };
+  const htasks = state.hospital.tasks.map((t) => (t.assigneeId === employeeId && t.status === 'in_progress' ? { ...t, status: 'pending' as const, assigneeId: null, finishAt: null } : t));
+  return { ...state, tasks, homecare: { ...state.homecare, visits }, hospital: { ...state.hospital, tasks: htasks } };
 }
 
 export function acceptOffer(state: GameState, offerId: string, employeeId: string): { state: GameState; id: string } | { reason: ReasonCode } {

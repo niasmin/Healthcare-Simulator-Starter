@@ -4,6 +4,8 @@ import type { GameState, LedgerCategory, RoomType, Satang } from '../domain/type
 import { dailyPayroll, dailyUpkeep } from './systems/finance';
 import { dailyResidentCosts } from './systems/billing';
 import { VISIT_DURATION, VISIT_GRACE, VISIT_SKILL, hasHomecareOffice, visitRate } from './systems/homecare';
+import { clinicDesks, consultRate, consultsSince, hasDoctor, hospitalTaskOf, slotsPerDesk, smoothDischarges, strokeBeds } from './systems/hospital';
+import { CONSULT_GRACE, CONSULT_MINUTES, DOCTOR_ROUND, DOCTOR_ROUND_GRACE, DOCTOR_ROUND_MINUTES, NURSE_ROUNDS, NURSE_ROUND_MINUTES, ROUND_GRACE } from '../data/hospital';
 import { certifiedCount, contractsCompleted, hasTrainingRoom, isInClass, isPlacedAway } from './systems/workforce';
 import { gardenAppeal } from '../data/decor';
 import { carePlanSchedule, TASK_KINDS } from '../data/patients';
@@ -33,7 +35,7 @@ export function summarize(state: GameState): SiteSummary {
   let roomsOperational = 0;
   let bedsInstalled = 0;
   let bedsOperational = 0;
-  const operationalByType: Record<RoomType, number> = { ward: 0, nursing_station: 0, therapy: 0, staff_room: 0, villa: 0, homecare_office: 0, training_room: 0 };
+  const operationalByType: Record<RoomType, number> = { ward: 0, nursing_station: 0, therapy: 0, staff_room: 0, villa: 0, homecare_office: 0, training_room: 0, neuro_clinic: 0, stroke_unit: 0 };
   for (const room of state.site.rooms) {
     const st = statuses.get(room.id)!;
     bedsInstalled += st.installedBeds;
@@ -151,6 +153,27 @@ export function buildObjectives(state: GameState, summary: SiteSummary = summari
     ];
   }
 
+  if (def.id === 6) {
+    const n = def.targetConsults ?? 0;
+    const m = def.targetDischarges ?? 0;
+    const consults = consultsSince(state, state.chapter.startDay);
+    const smooth = smoothDischarges(state, state.chapter.startDay);
+    const rate = consultRate(state);
+    const strokeOpen = state.site.rooms.some((r) => r.type === 'stroke_unit' && summary.statuses.get(r.id)?.operational);
+    return [
+      step('doctor', hasDoctor(state), { kind: 'tab', tab: 'hire' }),
+      step('clinic', clinicDesks(state) > 0, { kind: 'tool', tool: 'neuro_clinic' }),
+      step('opd_first', consults > 0, { kind: 'view', view: 'roster' }),
+      step('stroke_unit', strokeOpen, { kind: 'tool', tool: 'stroke_unit' }),
+      step('ipd_first', state.hospital.inpatients.length > 0 || state.hospital.discharged.length > 0, { kind: 'tab', tab: 'admit' }),
+      step('roster6', strokeOpen && rosterReady, { kind: 'view', view: 'roster' }, { key: 'goal.roster' }),
+      step('opd_visits', consults >= n, { kind: 'view', view: 'roster' }, { params: { n }, progress: capped(consults, n) }),
+      step('opd_rate', rate !== null && rate >= (def.targetConsultRate ?? 0) && state.hospital.history.length >= 7, { kind: 'view', view: 'roster' }, { params: { n: Math.round((def.targetConsultRate ?? 0) * 100) } }),
+      step('discharges', smooth >= m, { kind: 'tab', tab: 'admit' }, { params: { n: m }, progress: capped(smooth, m) }),
+      chapterStep(state, def),
+    ];
+  }
+
   if (def.id === 5) {
     const certified = certifiedCount(state);
     const done = contractsCompleted(state, state.chapter.startDay);
@@ -202,6 +225,7 @@ const SKILL_OWNER: Record<Skill, StaffRole> = {
   activity: 'ot',
   tube_feeding: 'pn',
   airway_care: 'rn',
+  consult: 'doctor',
 };
 
 /** Share of staffed time that is productive, used for recommendations (80%). */
@@ -244,6 +268,18 @@ export function slotDemand(state: GameState): Record<ShiftSlot, SlotDemand> {
     out[slot].bySkill[skill] = (out[slot].bySkill[skill] ?? 0) + VISIT_DURATION;
     out[slot].tasks.push({ at: (mod - SHIFT_SLOTS[slot].start + MINUTES_PER_DAY) % MINUTES_PER_DAY, duration: VISIT_DURATION, grace: VISIT_GRACE, skill });
   }
+  // The neuro hospital (Chapter 6): booked consultations, and rounds for every stroke-unit bed.
+  const add = (mod: number, duration: number, grace: number, skill: Skill) => {
+    const slot = SLOT_ORDER.find((sl) => inWindow(mod, SHIFT_SLOTS[sl].start, SHIFT_SLOTS[sl].end))!;
+    out[slot].minutes += duration;
+    out[slot].bySkill[skill] = (out[slot].bySkill[skill] ?? 0) + duration;
+    out[slot].tasks.push({ at: (mod - SHIFT_SLOTS[slot].start + MINUTES_PER_DAY) % MINUTES_PER_DAY, duration, grace, skill });
+  };
+  if (state.chapter.id >= 6) for (const mod of slotsPerDesk(state)) for (let d = 0; d < clinicDesks(state); d++) add(mod, CONSULT_MINUTES, CONSULT_GRACE, 'consult');
+  for (let b = 0; b < strokeBeds(state).length; b++) {
+    for (const mod of NURSE_ROUNDS) add(mod, NURSE_ROUND_MINUTES, ROUND_GRACE, 'vital_signs');
+    add(DOCTOR_ROUND, DOCTOR_ROUND_MINUTES, DOCTOR_ROUND_GRACE, 'consult');
+  }
   return out;
 }
 
@@ -283,7 +319,7 @@ export function roleNeeds(demand: SlotDemand, shiftLength: number, rnOnDuty: boo
   const pn = Math.max(0, peopleFor(of('rn', 'pn'), shiftLength) - rn);
   // Caregiver work is planned for caregivers alone: in a rush, nurses' time goes to nurse-only work.
   const caregiver = peopleFor(of('caregiver'), shiftLength);
-  return { rn, pn, caregiver, pt: peopleFor(of('pt'), shiftLength), ot: peopleFor(of('ot'), shiftLength) };
+  return { doctor: peopleFor(of('doctor'), shiftLength), rn, pn, caregiver, pt: peopleFor(of('pt'), shiftLength), ot: peopleFor(of('ot'), shiftLength) };
 }
 
 export interface RosterCell {
@@ -376,7 +412,8 @@ export type StaffActivity =
   | { kind: 'busy'; taskKind: import('../domain/types').TaskKind; residentId: string }
   | { kind: 'away'; clientId: string }
   | { kind: 'placed'; contractId: string }
-  | { kind: 'training' };
+  | { kind: 'training' }
+  | { kind: 'hospital'; task: import('../domain/types').HospitalTask['kind']; patientId: string };
 
 export function staffActivity(state: GameState, e: Employee): StaffActivity {
   if (e.taskId) {
@@ -386,6 +423,8 @@ export function staffActivity(state: GameState, e: Employee): StaffActivity {
     if (v) return { kind: 'away', clientId: v.clientId };
     if (isPlacedAway(e)) return { kind: 'placed', contractId: e.placement ?? '' };
     if (isInClass(e)) return { kind: 'training' };
+    const h = hospitalTaskOf(state, e);
+    if (h) return { kind: 'hospital', task: h.kind, patientId: h.patientId };
   }
   return isOnShift(state, e.id, state.minute) ? { kind: 'idle' } : { kind: 'off' };
 }
@@ -403,11 +442,27 @@ export function peopleMarkers(state: GameState): Array<{ key: string; kind: 'res
   const station = state.site.rooms.find((r) => r.type === 'nursing_station') ?? state.site.rooms.find((r) => r.type === 'staff_room');
   let spot = 0;
   const classroom = state.site.rooms.find((r) => r.type === 'training_room');
+  const clinic = state.site.rooms.find((r) => r.type === 'neuro_clinic');
+  let desk = 0;
+  // Stroke-unit inpatients lie in their beds like residents.
+  const inpatientBed = new Map<string, { roomId: string; index: number }>();
+  for (const p of state.hospital.inpatients) {
+    const i = p.bedId.lastIndexOf('#');
+    const loc = { roomId: p.bedId.slice(0, i), index: Number(p.bedId.slice(i + 1)) };
+    inpatientBed.set(p.id, loc);
+    out.push({ key: p.id, kind: 'resident', roomId: loc.roomId, bed: loc.index, group: 'stroke_rehab' });
+  }
   let seat = 0;
   for (const e of state.employees) {
     const act = staffActivity(state, e);
     // Off duty, out on a home visit, or working at a partner: not in the building.
     if (act.kind === 'off' || act.kind === 'away' || act.kind === 'placed') continue;
+    if (act.kind === 'hospital') {
+      const loc = act.task === 'consult' ? undefined : inpatientBed.get(act.patientId);
+      if (loc) out.push({ key: e.id, kind: 'staff', roomId: loc.roomId, bed: loc.index, role: e.role });
+      else out.push({ key: e.id, kind: 'staff', roomId: clinic?.id ?? station?.id ?? null, spot: desk++, role: e.role });
+      continue;
+    }
     if (act.kind === 'training' && classroom) {
       out.push({ key: e.id, kind: 'staff', roomId: classroom.id, spot: seat++, role: e.role });
       continue;
@@ -494,8 +549,8 @@ export function financeView(state: GameState, period: 'month' | 'all'): FinanceV
     }
   }
 
-  const streams: RevenueStream[] = ['room_care', 'therapy', 'activity', 'special', 'homecare', 'workforce'];
-  const mixMap: Record<RevenueStream, Satang> = { room_care: 0, therapy: 0, activity: 0, special: 0, homecare: 0, workforce: 0 };
+  const streams: RevenueStream[] = ['room_care', 'therapy', 'activity', 'special', 'homecare', 'workforce', 'hospital'];
+  const mixMap: Record<RevenueStream, Satang> = { room_care: 0, therapy: 0, activity: 0, special: 0, homecare: 0, workforce: 0, hospital: 0 };
   for (const inv of state.invoices) {
     if (inv.status !== 'paid' || inv.paidAt === null) continue;
     const paidDay = dayOf(inv.paidAt % 1440 === 0 ? inv.paidAt - 1 : inv.paidAt);

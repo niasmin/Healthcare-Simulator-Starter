@@ -53,9 +53,18 @@ export const ROLES: Record<StaffRole, RoleDef> = {
     color: 0xc9822b,
     cssColor: '#b5741f',
   },
+  // Chapter 6: a neurologist sees clinic patients and does the daily stroke-unit round.
+  doctor: {
+    role: 'doctor',
+    skills: ['consult'],
+    baseWageSatang: thb(75_000),
+    wagePerYearSatang: thb(2_500),
+    color: 0x34495e,
+    cssColor: '#34495e',
+  },
 };
 
-export const ROLE_ORDER: StaffRole[] = ['rn', 'pn', 'caregiver', 'pt', 'ot'];
+export const ROLE_ORDER: StaffRole[] = ['doctor', 'rn', 'pn', 'caregiver', 'pt', 'ot'];
 
 export function wageFor(role: StaffRole, experienceYears: number): number {
   const d = ROLES[role];
