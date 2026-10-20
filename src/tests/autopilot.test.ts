@@ -3,7 +3,9 @@ import { createInitialState } from '../sim/state';
 import { reconcile } from '../domain/rules/ledger';
 import { fireEvent } from '../sim/systems/events';
 import { AUTO_CHOICES, AUTO_KEYS, BUILD_RESERVE, autoSettings, nextBuild } from '../sim/autopilot';
-import { campaignTurn } from '../sim/autoCampaign';
+import { campaignTurn, dailyCare, pricingFor } from '../sim/autoCampaign';
+import { alertsFor, LOW_CASH_DAYS } from '../ui/alerts';
+import { gardenAppeal } from '../data/decor';
 import { buildSomewhere } from '../sim/autoBuild';
 import { post } from '../sim/helpers';
 import { thb } from '../domain/money';
@@ -16,7 +18,7 @@ import { allRoomStatuses } from '../domain/rules/rooms';
 import { dailyRunningCost } from '../sim/selectors';
 import { MINUTES_PER_DAY } from '../sim/constants';
 import type { GameState } from '../domain/types';
-import { buildHome, hire, ok, quietEvents } from './helpers';
+import { admit, buildHome, hire, ok, quietEvents } from './helpers';
 
 const ALL_ON = { events: true, admit: true, carePlan: true, staff: true, build: true };
 const EVERYTHING = { ...ALL_ON, chapters: true };
@@ -174,6 +176,58 @@ describe('autopilot', () => {
       const base = quietEvents(buildHome(createInitialState(8)));
       const poor = campaignTurn({ ...base, organization: { ...base.organization, cashSatang: thb(200_000) } }, applyCommand, { ...OFF, shop: true });
       expect(poor.upgrades ?? []).toEqual([]);
+    });
+  });
+
+  describe('everyday extras', () => {
+    it('pricing: value with empty beds, premium for a full, liked home with a queue, else standard', () => {
+      let s = quietEvents(buildHome(createInitialState(8)));
+      [s] = hire(s, 'rn', ['morning']);
+      expect(pricingFor(s)).toBe('value');
+      s = ok(s, { type: 'setAuto', settings: { pricing: true } });
+      const priced = dailyCare({ ...s, minute: Math.floor(s.minute / 1440) * 1440 + 6 * 60 }, applyCommand, autoSettings(s));
+      expect(priced.priceLevel).toBe('value');
+      for (let i = 0; i < 10; i++) [s] = admit(s);
+      for (let i = 0; i < 6; i++) s = makeResidentCandidate(s, { group: 'active_aging' });
+      const liked = { ...s, organization: { ...s.organization, reputation: 70 }, residents: s.residents.map((r) => ({ ...r, needs: { ...r.needs, satisfaction: 90 } })) };
+      expect(pricingFor(liked)).toBe('premium');
+      expect(pricingFor({ ...liked, waitlist: liked.waitlist.slice(0, 2) })).toBe('standard');
+    });
+
+    it('staff care: a tired person on a double shift gets the second one off; a staff room is built if missing', () => {
+      let s = quietEvents(buildHome(createInitialState(8)));
+      let id: string;
+      [s, id] = hire(s, 'caregiver', ['morning', 'afternoon']);
+      [s] = admit(s);
+      s = { ...s, employees: s.employees.map((e) => (e.id === id ? { ...e, energy: 20 } : e)) };
+      const at5 = { ...s, minute: Math.floor(s.minute / 1440) * 1440 + 1440 + 5 * 60 };
+      const out = dailyCare(at5, applyCommand, { staffCare: true });
+      expect(out.shifts.filter((x) => x.employeeId === id)).toHaveLength(1);
+      const noRoom = ok(at5, { type: 'deleteRoom', roomId: at5.site.rooms.find((r) => r.type === 'staff_room')!.id });
+      expect(dailyCare(noRoom, applyCommand, { staffCare: true }).site.rooms.some((r) => r.type === 'staff_room')).toBe(true);
+    });
+
+    it('garden from chapter 1: decor around the wards, never next to a corridor, up to full appeal', () => {
+      let s = post(quietEvents(buildHome(createInitialState(8))), thb(2_000_000), 'capital', 'ledger.capital');
+      for (let i = 0; i < 20; i++) s = campaignTurn(s, applyCommand, { chapters: false, build: false, estate: false, homecare: false, training: false, placements: false, branches: false, shop: false, garden: true });
+      expect(gardenAppeal(s.site.decor)).toBeGreaterThanOrEqual(30);
+      for (const d of s.site.decor)
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          const x = d.cell.x + dx;
+          const y = d.cell.y + dy;
+          if (x >= 0 && y >= 0 && x < s.site.width && y < s.site.height) expect(s.site.corridor[y * s.site.width + x]).toBe(0);
+        }
+      expect(reconcile(s).ok).toBe(true);
+    });
+
+    it('alerts: low cash under two weeks of running costs, and a game paused for a decision', () => {
+      let s = quietEvents(buildHome(createInitialState(8)));
+      [s] = admit(s);
+      [s] = hire(s, 'rn', ['morning']);
+      expect(alertsFor(s)).toBeNull();
+      const poor = { ...s, organization: { ...s.organization, cashSatang: dailyRunningCost(s) * (LOW_CASH_DAYS - 4) } };
+      expect(alertsFor(poor)).toEqual({ kind: 'cash', days: LOW_CASH_DAYS - 4 });
+      expect(alertsFor(fireEvent({ ...s, speed: 1 }, 'family_visit'))?.kind).toBe('paused');
     });
   });
 

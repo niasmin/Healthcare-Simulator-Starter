@@ -1,3 +1,4 @@
+import { useAlerts } from './alerts';
 import { ShopModal } from './components/ShopModal';
 import { AutoModal, AwayProgress, AwayReportModal } from './components/AutoModal';
 import { useEffect } from 'react';
@@ -20,6 +21,7 @@ import { useGame } from './store';
 
 export function App() {
   useGameLoop();
+  useAlerts();
   useKeyboard();
   const lang = useGame((s) => s.lang);
   const mobile = useIsMobile();

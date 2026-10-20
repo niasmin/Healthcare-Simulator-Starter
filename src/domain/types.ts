@@ -602,6 +602,10 @@ export interface AutoSettings {
   placements?: boolean;
   branches?: boolean;
   shop?: boolean;
+  /** Everyday extras: dynamic pricing, a garden from day 1, and rest for tired staff. */
+  pricing?: boolean;
+  garden?: boolean;
+  staffCare?: boolean;
 }
 
 export interface GameState {

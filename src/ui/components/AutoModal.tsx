@@ -1,7 +1,8 @@
 import { useEffect } from 'react';
-import { AUTO_GROUPS, AUTO_KEYS, autoSettings, type AutoKey } from '../../sim/autopilot';
+import { AUTO_GROUPS, AUTO_KEYS, CHAPTERS_COVER, autoSettings, type AutoKey } from '../../sim/autopilot';
 import { useMoney, useT } from '../hooks';
 import { useGame } from '../store';
+import { askNotifyPermission } from '../alerts';
 
 const ICON: Record<AutoKey, string> = {
   events: '✉️',
@@ -15,6 +16,9 @@ const ICON: Record<AutoKey, string> = {
   placements: '🏭',
   branches: '🏢',
   shop: '🛒',
+  pricing: '🏷',
+  garden: '🌸',
+  staffCare: '💤',
   chapters: '🏆',
 };
 
@@ -25,23 +29,26 @@ export function AutoModal({ onClose }: { onClose: () => void }) {
   const dispatch = useGame((s) => s.dispatch);
   const awayPlay = useGame((s) => s.awayPlay);
   const setAwayPlay = useGame((s) => s.setAwayPlay);
+  const alertsOn = useGame((s) => s.alertsOn);
+  const setAlertsOn = useGame((s) => s.setAlertsOn);
   const allOn = AUTO_KEYS.every((k) => auto[k]);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
-  const row = (id: string, icon: string, title: string, desc: string, checked: boolean, onChange: (v: boolean) => void) => (
+  const row = (id: string, icon: string, title: string, desc: string, checked: boolean, onChange: (v: boolean) => void, covered = false) => (
     <li key={id}>
-      <label className={`rounded-xl border p-2.5 flex items-start gap-2.5 cursor-pointer ${checked ? 'border-teal/60 bg-teal/5' : 'border-line bg-white'}`}>
+      <label className={`rounded-xl border p-2.5 flex items-start gap-2.5 ${covered ? 'opacity-70' : 'cursor-pointer'} ${checked || covered ? 'border-teal/60 bg-teal/5' : 'border-line bg-white'}`}>
         <span className="text-2xl leading-none mt-0.5" aria-hidden>
           {icon}
         </span>
         <span className="min-w-0 flex-1">
           <span className="block text-sm font-bold">{title}</span>
           <span className="block text-xs text-ink-soft leading-snug">{desc}</span>
+          {covered && <span className="block text-[11px] font-semibold text-teal mt-0.5">🏆 {t('auto.covered')}</span>}
         </span>
-        <input type="checkbox" className="mt-1 size-5 accent-teal shrink-0" checked={checked} onChange={(e) => onChange(e.target.checked)} />
+        <input type="checkbox" className="mt-1 size-5 accent-teal shrink-0" checked={checked || covered} disabled={covered} onChange={(e) => onChange(e.target.checked)} />
       </label>
     </li>
   );
@@ -65,12 +72,18 @@ export function AutoModal({ onClose }: { onClose: () => void }) {
         {AUTO_GROUPS.map((g) => (
           <section key={g.id} className="flex flex-col gap-2">
             <h3 className="text-xs font-bold uppercase tracking-wide text-ink-soft">{t(`auto.group.${g.id}`)}</h3>
-            <ul className="flex flex-col gap-2">{g.keys.map((k) => row(k, ICON[k], t(`auto.${k}`), t(`auto.${k}.desc`), auto[k], (v) => dispatch({ type: 'setAuto', settings: { [k]: v } })))}</ul>
+            <ul className="flex flex-col gap-2">{g.keys.map((k) => row(k, ICON[k], t(`auto.${k}`), t(`auto.${k}.desc`), auto[k], (v) => dispatch({ type: 'setAuto', settings: { [k]: v } }), auto.chapters && CHAPTERS_COVER.includes(k)))}</ul>
           </section>
         ))}
         <section className="flex flex-col gap-2">
           <h3 className="text-xs font-bold uppercase tracking-wide text-ink-soft">{t('auto.group.away')}</h3>
-          <ul className="flex flex-col gap-2">{row('away', '🌙', t('auto.away'), t('auto.away.desc'), awayPlay, setAwayPlay)}</ul>
+          <ul className="flex flex-col gap-2">
+            {row('away', '🌙', t('auto.away'), t('auto.away.desc'), awayPlay, setAwayPlay)}
+            {row('alerts', '🔔', t('auto.alerts'), t('auto.alerts.desc'), alertsOn, (v) => {
+              setAlertsOn(v);
+              if (v) askNotifyPermission();
+            })}
+          </ul>
         </section>
         <p className="text-[11px] text-ink-soft leading-relaxed">{t('auto.note')}</p>
       </div>
