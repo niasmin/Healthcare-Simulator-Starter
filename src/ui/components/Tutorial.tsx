@@ -6,6 +6,7 @@ import { dayOf } from '../../sim/systems/time';
 import type { ChapterCheck } from '../../domain/types';
 import { isMobileNow, useMoney, useT } from '../hooks';
 import { useGame } from '../store';
+import { tourPointer, type TourPointer } from '../tour';
 
 /** Open the part of the UI a tutorial step talks about. */
 export function runGuideAction(a: GuideAction) {
@@ -40,6 +41,72 @@ export function runGuideAction(a: GuideAction) {
       st.dispatch({ type: 'setSpeed', speed: st.lastSpeed });
       break;
   }
+}
+
+/** Where the tutorial points right now: a control to ring and/or map tiles to suggest. */
+export function useTourPointer(): TourPointer | null {
+  const game = useGame((s) => s.game);
+  const tool = useGame((s) => s.tool);
+  const selectedRoomId = useGame((s) => s.selectedRoomId);
+  const hidden = useGame((s) => s.tutorialHidden);
+  const started = useGame((s) => s.started);
+  return useMemo(() => {
+    if (hidden || !started) return null;
+    const goal = buildObjectives(game).find((g) => !g.done) ?? null;
+    return tourPointer(goal, { game, tool, selectedRoomId });
+  }, [game, tool, selectedRoomId, hidden, started]);
+}
+
+type Box = { left: number; top: number; width: number; height: number };
+
+/** First on-screen element carrying one of the data-tour ids. */
+function findTarget(ids: string[]): HTMLElement | null {
+  for (const id of ids)
+    for (const el of document.querySelectorAll<HTMLElement>(`[data-tour="${id}"]`)) {
+      const r = el.getBoundingClientRect();
+      if (r.width > 0 && r.height > 0 && r.bottom > 0 && r.right > 0 && r.top < window.innerHeight && r.left < window.innerWidth) return el;
+    }
+  return null;
+}
+
+/**
+ * Pulsing ring around the control the current tutorial step needs. Polls the layout (cheap) so it
+ * follows sheets, tabs and scrolling; scrolls the control into view once; never blocks clicks.
+ */
+export function TourSpotlight() {
+  const pointer = useTourPointer();
+  const [box, setBox] = useState<Box | null>(null);
+  const scrolled = useRef('');
+  const sig = pointer?.targets.join('|') ?? '';
+  useEffect(() => {
+    const ids = sig ? sig.split('|') : [];
+    const tick = () => {
+      const el = ids.length ? findTarget(ids) : null;
+      if (el && scrolled.current !== el.dataset.tour) {
+        scrolled.current = el.dataset.tour ?? '';
+        el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+      }
+      const r = el?.getBoundingClientRect();
+      setBox((prev) => {
+        if (!r) return prev ? null : prev;
+        const next = { left: Math.round(r.left), top: Math.round(r.top), width: Math.round(r.width), height: Math.round(r.height) };
+        return prev && prev.left === next.left && prev.top === next.top && prev.width === next.width && prev.height === next.height ? prev : next;
+      });
+    };
+    tick();
+    const iv = window.setInterval(tick, 200);
+    return () => window.clearInterval(iv);
+  }, [sig]);
+  if (!box) return null;
+  const pad = 4;
+  return (
+    <div
+      aria-hidden
+      data-testid="tour-ring"
+      className="fixed z-[38] pointer-events-none rounded-xl border-[3px] border-coral tour-ring"
+      style={{ left: box.left - pad, top: box.top - pad, width: box.width + pad * 2, height: box.height + pad * 2 }}
+    />
+  );
 }
 
 function useObjectives() {

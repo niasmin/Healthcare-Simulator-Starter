@@ -66,6 +66,7 @@ function MobileTopBar({ alertCount }: { alertCount: number }) {
             <button
               key={s.speed}
               type="button"
+              data-tour={`speed-${s.speed}`}
               onClick={() => dispatch({ type: 'setSpeed', speed: s.speed })}
               aria-pressed={game.speed === s.speed}
               className={`min-w-10 h-9 px-2 rounded-md text-sm font-semibold ${game.speed === s.speed ? (s.speed === 0 ? 'bg-coral text-white' : 'bg-white text-ink') : 'text-white/80'}`}
@@ -74,7 +75,7 @@ function MobileTopBar({ alertCount }: { alertCount: number }) {
             </button>
           ))}
         </div>
-        <button type="button" onClick={() => setSheet('info')} className="relative size-9 grid place-items-center rounded-lg bg-white/10" aria-label={t('m.info')}>
+        <button type="button" data-tour="m-info" onClick={() => setSheet('info')} className="relative size-9 grid place-items-center rounded-lg bg-white/10" aria-label={t('m.info')}>
           <svg viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" aria-hidden>
             <path d="M6 16V11a6 6 0 1112 0v5l2 2H4l2-2zM10 20a2 2 0 004 0" />
           </svg>
@@ -209,6 +210,7 @@ export function MobileShell() {
             ) : (
               <button
                 type="button"
+                data-tour="m-build"
                 onClick={() => {
                   setLeftTab('build');
                   setSheet('tools');
@@ -230,6 +232,7 @@ export function MobileShell() {
             <button
               key={x.id}
               type="button"
+              data-tour={`nav-${x.id}`}
               onClick={() => {
                 if (x.id === 'manage') setSheet(sheet === 'tools' ? null : 'tools');
                 else {

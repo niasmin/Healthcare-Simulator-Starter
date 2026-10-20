@@ -32,6 +32,8 @@ export interface RenderInput {
   selectedRoomId: string | null;
   hover: Cell | null;
   preview: { cells: Cell[]; valid: boolean } | null;
+  /** Tutorial: suggested tiles to build on or tap. */
+  hint?: Cell[] | null;
   hoverTint: 'neutral' | 'danger';
   leftDragPans: boolean;
 }
@@ -582,6 +584,9 @@ export class IsoRenderer {
         const pts = [cellToWorld(x, y), cellToWorld(x + w, y), cellToWorld(x + w, y + h), cellToWorld(x, y + h)];
         g.poly(pts.flatMap((p) => [p.x, p.y])).fill({ color: 0xffd166, alpha: 0.18 }).stroke({ width: 3, color: 0xffb703 });
       }
+    }
+    if (input.hint && !input.preview) {
+      for (const c of input.hint) g.poly(cellDiamond(c.x, c.y)).fill({ color: 0x3b9ae1, alpha: 0.28 }).stroke({ width: 1.5, color: 0x1f7ac4, alpha: 0.85 });
     }
     if (input.preview) {
       const color = input.preview.valid ? 0x2bb673 : 0xe5484d;

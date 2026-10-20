@@ -8,6 +8,7 @@ import { peopleMarkers } from '../../sim/selectors';
 import type { CareGroup, StaffRole } from '../../domain/types';
 import { isMobileNow, useMoney, useSummary, useT } from '../hooks';
 import { useGame } from '../store';
+import { useTourPointer } from './Tutorial';
 
 const GROUP_HEX: Record<CareGroup, number> = { active_aging: 0xc9822b, stroke_rehab: 0x4a6aa5, bedridden: 0x8a5a9e };
 
@@ -28,6 +29,7 @@ export function GameCanvas() {
   const drag = useGame((s) => s.drag);
   const selectedRoomId = useGame((s) => s.selectedRoomId);
   const summary = useSummary();
+  const tourHint = useTourPointer()?.hint ?? null;
 
   // Create the renderer once.
   useEffect(() => {
@@ -107,10 +109,11 @@ export function GameCanvas() {
       selectedRoomId,
       hover,
       preview: preview ? { cells: preview.cells, valid: preview.check.ok } : null,
+      hint: tourHint,
       hoverTint: tool.kind === 'bulldoze' ? 'danger' : 'neutral',
       leftDragPans: tool.kind === 'select',
     });
-  }, [game, people, summary, selectedRoomId, hover, preview, tool, t, ready, lang]);
+  }, [game, people, summary, selectedRoomId, hover, preview, tool, t, ready, lang, tourHint]);
 
   const coarse = typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches;
   let status: { text: string; tone: 'ok' | 'bad' | 'muted' } = { text: t(coarse ? 'canvas.help_touch' : 'canvas.help'), tone: 'muted' };
