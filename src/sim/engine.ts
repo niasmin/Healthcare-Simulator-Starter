@@ -9,7 +9,7 @@ import { SHIFT_SLOTS } from '../data/staff';
 import { freeBeds, parseBedId, residentsInRoom } from '../domain/rules/beds';
 import { roomStatus } from '../domain/rules/rooms';
 import { validateShift } from '../domain/rules/shifts';
-import type { UpgradeId, BranchKind, Cell, CommandResult, CourseId, DayStats, DecorType, EquipmentId, GameSpeed, GameState, PriceLevel, Rect, Resident, Room, RoomType, ShiftSlot, AutoSettings } from '../domain/types';
+import type { CityPlace, UpgradeId, BranchKind, Cell, CommandResult, CourseId, DayStats, DecorType, EquipmentId, GameSpeed, GameState, PriceLevel, Rect, Resident, Room, RoomType, ShiftSlot, AutoSettings } from '../domain/types';
 import { dayInMonth, monthOfDay, PRICE_LEVELS } from '../data/finance';
 import { billAdmission, billFinal, billMonth, chargeDailyResidentCosts, collectPayments, refundUnusedDays } from './systems/billing';
 import { eventCheck, eventExpiryTick, expireReferrals, resolveEvent } from './systems/events';
@@ -29,6 +29,7 @@ import { GROUP_WARD_EQUIPMENT } from '../data/patients';
 import { FAMILY_APP_REPUTATION, FAMILY_APP_SATISFACTION_LINE, UPGRADES, hasUpgrade } from '../data/shop';
 import { admitInpatient, hospitalDayEnd, hospitalTick } from './systems/hospital';
 import { supportDayEnd } from './systems/support';
+import { cityBlocker, cityCost, visitPlace } from './systems/city';
 import { assignManager, closeBranch, networkDayEnd, openBranch, supportBranch } from './systems/network';
 import { acceptOffer, endContract, startTraining, workforceDayEnd, workforceTick } from './systems/workforce';
 
@@ -70,6 +71,7 @@ export type Command =
   | { type: 'supportBranch'; branchId: string }
   | { type: 'closeBranch'; branchId: string }
   | { type: 'buyUpgrade'; upgrade: UpgradeId }
+  | { type: 'visitPlace'; place: CityPlace }
   | { type: 'setAuto'; settings: Partial<AutoSettings> };
 
 export interface CommandOutcome {
@@ -389,6 +391,13 @@ export function applyCommand(state: GameState, cmd: Command): CommandOutcome {
     case 'setAuto': {
       const auto = { ...autoSettings(state), ...cmd.settings };
       return { state: { ...state, auto }, result: { ok: true } };
+    }
+
+    case 'visitPlace': {
+      const blocker = cityBlocker(state, cmd.place);
+      if (blocker) return fail(state, blocker);
+      const costSatang = cityCost(state, cmd.place);
+      return { state: visitPlace(state, cmd.place), result: { ok: true, costSatang } };
     }
 
     case 'buyUpgrade': {

@@ -8,6 +8,7 @@ import { SaveManager, type CloudStatus } from '../storage/saves';
 import type { GameState } from '../domain/types';
 import { useGame } from './store';
 import { create } from 'zustand';
+import { rankEntry, rankOptedIn } from './ranking';
 
 /** One save manager per page: this browser's IndexedDB plus the player's cloud space when available. */
 export const saves = new SaveManager(new LocalStore());
@@ -70,6 +71,8 @@ async function autosave() {
   saving = true;
   try {
     await saveTo('auto', game);
+    // Opted in to the online ranking: refresh this home's row with the save.
+    if (supabase?.account && rankOptedIn()) void supabase.publishRank(rankEntry(game, supabase.account));
   } finally {
     saving = false;
   }

@@ -117,6 +117,13 @@ export function TopBar() {
         </button>
         <button
           type="button"
+          onClick={() => useGame.getState().setCityOpen('city')}
+          className="px-3 py-1 rounded-md bg-white/15 border border-white/30 text-sm hover:bg-white/25 font-semibold"
+        >
+          🏙️ {t('city.title')}
+        </button>
+        <button
+          type="button"
           onClick={() => useGame.getState().setShopOpen(true)}
           className="px-3 py-1 rounded-md bg-white/15 border border-white/30 text-sm hover:bg-white/25 font-semibold"
         >

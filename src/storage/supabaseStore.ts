@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { CloudStore, type DocRef, type MiniDB } from './cloudStore';
+import type { Site } from '../domain/types';
 
 /**
  * Cloud saves in Supabase (for the deployed site; the Claude artifact keeps using its own `db`).
@@ -88,7 +89,34 @@ export interface SupabaseConnection {
   onChange(fn: (store: CloudStore | null, account: SupabaseAccount | null) => void): void;
   /** Add anonymous play statistics (insert-only table; see the game_events migration). */
   logEvents(rows: GameEventRow[]): Promise<boolean>;
+  /** The signed-in player's id, or null. */
+  userId(): string | null;
+  /** Put (or refresh) the signed-in player's home on the public ranking. */
+  publishRank(entry: RankEntry): Promise<boolean>;
+  /** Take the player's home off the ranking. */
+  withdrawRank(): Promise<boolean>;
+  /** The public ranking, best first (without the site layouts). */
+  leaderboard(limit?: number): Promise<RankRecord[]>;
+  /** One player's published layout, for a visit. */
+  rankSite(userId: string): Promise<Site | null>;
 }
+
+export const RANK_TABLE = 'leaderboard';
+export interface RankEntry {
+  display_name: string;
+  home_name: string | null;
+  score: number;
+  residents: number;
+  beds: number;
+  reputation: number;
+  satisfaction: number;
+  staff: number;
+  day: number;
+  chapter: number;
+  site: Site;
+}
+export type RankRecord = Omit<RankEntry, 'site'> & { user_id: string; updated_at: string };
+const RANK_COLUMNS = 'user_id,display_name,home_name,score,residents,beds,reputation,satisfaction,staff,day,chapter,updated_at';
 
 export const EVENTS_TABLE = 'game_events';
 export interface GameEventRow {
@@ -175,6 +203,25 @@ export async function connectSupabase(): Promise<SupabaseConnection | null> {
         // No select: players may add events but never read them back.
         const { error } = await sb.from(EVENTS_TABLE).insert(rows.map((r) => ({ ...r, user_id: currentId })));
         return !error;
+      },
+      userId: () => currentId,
+      publishRank: async (entry) => {
+        if (!currentId) return false;
+        const { error } = await sb.from(RANK_TABLE).upsert({ ...entry, user_id: currentId, updated_at: new Date().toISOString() });
+        return !error;
+      },
+      withdrawRank: async () => {
+        if (!currentId) return false;
+        const { error } = await sb.from(RANK_TABLE).delete().eq('user_id', currentId);
+        return !error;
+      },
+      leaderboard: async (limit = 30) => {
+        const { data: rows, error } = await sb.from(RANK_TABLE).select(RANK_COLUMNS).order('score', { ascending: false }).limit(limit);
+        return error || !rows ? [] : (rows as unknown as RankRecord[]);
+      },
+      rankSite: async (userId) => {
+        const { data: row, error } = await sb.from(RANK_TABLE).select('site').eq('user_id', userId).maybeSingle();
+        return error || !row ? null : ((row as { site: Site | null }).site ?? null);
       },
     };
     sb.auth.onAuthStateChange((event, session) => {

@@ -565,7 +565,7 @@ export function TitleScreen() {
                   onClick={() => setPanel("help")}
                 />
                 <SideButton label={t("home.shop")} icon="🏪" onClick={() => setPanel("shop")} />
-                <SideButton label={t("home.ranking")} icon="🏆" locked />
+                <SideButton label={t("home.ranking")} icon="🏆" onClick={() => useGame.getState().setCityOpen("ranking")} />
               </nav>
               <nav
                 className="flex flex-row sm:flex-col gap-2"

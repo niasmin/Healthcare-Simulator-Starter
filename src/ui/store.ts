@@ -60,6 +60,9 @@ interface UIStore {
   chaptersOpen: boolean;
   shopOpen: boolean;
   setShopOpen: (v: boolean) => void;
+  /** The town window (city map or ranking tab), or null. */
+  cityOpen: 'city' | 'ranking' | null;
+  setCityOpen: (v: 'city' | 'ranking' | null) => void;
   setChaptersOpen: (v: boolean) => void;
   /** Room name pills on the map (toggled by the layers button). */
   showLabels: boolean;
@@ -244,6 +247,8 @@ export const useGame = create<UIStore>((set, get) => ({
   chaptersOpen: false,
   shopOpen: false,
   setShopOpen: (shopOpen) => set({ shopOpen }),
+  cityOpen: null,
+  setCityOpen: (cityOpen) => set({ cityOpen }),
   setChaptersOpen: (chaptersOpen) => set({ chaptersOpen }),
   tutorialHidden: initialTutorialHidden(),
   setTutorialHidden: (tutorialHidden) => {
