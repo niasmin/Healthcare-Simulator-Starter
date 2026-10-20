@@ -27,9 +27,9 @@ const ROOM_ART: Record<RoomType, string> = {
   staff_room: 'rm_dining',
   villa: 'rm_villa',
   homecare_office: 'rm_homecare',
-  training_room: 'rm_station',
-  neuro_clinic: 'rm_station',
-  stroke_unit: 'rm_standard',
+  training_room: 'rm_training',
+  neuro_clinic: 'rm_clinic',
+  stroke_unit: 'rm_stroke',
 };
 
 const SWATCH: Record<RoomType, string> = {

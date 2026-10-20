@@ -1,3 +1,4 @@
+import { hasUpgrade, SMART_CALL_EXTRA_GRACE } from '../../data/shop';
 import { carePlanSchedule, TASK_KINDS } from '../../data/patients';
 import { parseBedId } from '../../domain/rules/beds';
 import { allRoomStatuses } from '../../domain/rules/rooms';
@@ -82,6 +83,7 @@ export function careTick(state: GameState): GameState {
   const therapyOpen = state.site.rooms.some((r) => r.type === 'therapy' && statuses.get(r.id)?.operational);
 
   const tasks = state.tasks.map((t) => ({ ...t }));
+  const smartCall = hasUpgrade(state, 'smart_call');
   const billable: Array<[string, 'therapy' | 'activity']> = [];
 
   // 1. Finish in-progress tasks.
@@ -106,7 +108,8 @@ export function careTick(state: GameState): GameState {
 
   // 2. Overdue pending tasks are missed.
   for (const t of tasks) {
-    if (t.status !== 'pending' || now <= t.dueAt + TASK_KINDS[t.kind].grace) continue;
+    // Shop upgrade: a smart call system alerts staff earlier, so routine care can run a little later.
+    if (t.status !== 'pending' || now <= t.dueAt + TASK_KINDS[t.kind].grace + (smartCall ? SMART_CALL_EXTRA_GRACE : 0)) continue;
     t.status = 'missed';
     missed++;
     changed = true;

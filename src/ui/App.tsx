@@ -1,3 +1,4 @@
+import { ShopModal } from './components/ShopModal';
 import { useEffect } from 'react';
 import { SaveModal } from './components/SaveModal';
 import { ChaptersModal } from './components/ChaptersModal';
@@ -28,6 +29,7 @@ export function App() {
   const saveOpen = useGame((s) => s.saveOpen);
   const setSaveOpen = useGame((s) => s.setSaveOpen);
   const chaptersOpen = useGame((s) => s.chaptersOpen);
+  const shopOpen = useGame((s) => s.shopOpen);
   const setChaptersOpen = useGame((s) => s.setChaptersOpen);
   useEffect(() => {
     if (window.location.search.includes('skiptitle')) setStarted(true);
@@ -44,6 +46,7 @@ export function App() {
       {started && <TourSpotlight />}
       {started && saveOpen && <SaveModal mode="game" onClose={() => setSaveOpen(false)} />}
       {chaptersOpen && <ChaptersModal onClose={() => setChaptersOpen(false)} />}
+      {shopOpen && <ShopModal onClose={() => useGame.getState().setShopOpen(false)} />}
     </>
   );
 

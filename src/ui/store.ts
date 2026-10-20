@@ -55,6 +55,8 @@ interface UIStore {
   saveOpen: boolean;
   setSaveOpen: (v: boolean) => void;
   chaptersOpen: boolean;
+  shopOpen: boolean;
+  setShopOpen: (v: boolean) => void;
   setChaptersOpen: (v: boolean) => void;
   /** Room name pills on the map (toggled by the layers button). */
   showLabels: boolean;
@@ -152,6 +154,8 @@ export const useGame = create<UIStore>((set, get) => ({
   saveOpen: false,
   setSaveOpen: (saveOpen) => set({ saveOpen }),
   chaptersOpen: false,
+  shopOpen: false,
+  setShopOpen: (shopOpen) => set({ shopOpen }),
   setChaptersOpen: (chaptersOpen) => set({ chaptersOpen }),
   tutorialHidden: initialTutorialHidden(),
   setTutorialHidden: (tutorialHidden) => {

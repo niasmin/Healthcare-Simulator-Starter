@@ -576,12 +576,16 @@ export interface ChapterState {
 /** campaign = the 7-chapter story; sandbox = free play, everything unlocked, no verdicts; challenge = one judged scenario. */
 export type GameMode = 'campaign' | 'sandbox' | 'challenge';
 export type ChallengeId = 'tight_budget' | 'bad_name' | 'big_start';
+/** Shop upgrades: permanent, bought once. */
+export type UpgradeId = 'online_marketing' | 'staff_welfare' | 'central_kitchen' | 'family_app' | 'laundry_supply' | 'smart_call';
 
 export interface GameState {
   schemaVersion: 10;
   /** Missing in saves made before modes existed: those are campaign games. */
   mode?: GameMode;
   challenge?: ChallengeId;
+  /** Shop upgrades owned (missing in older saves = none). */
+  upgrades?: UpgradeId[];
   seed: number;
   /** Current PRNG state (mulberry32). Advancing the RNG updates this. */
   rngState: number;
@@ -664,7 +668,8 @@ export type ReasonCode =
   | 'manager_role'
   | 'employee_branch'
   | 'support_cooldown'
-  | 'branch_limit';
+  | 'branch_limit'
+  | 'already_owned';
 
 export type CommandResult =
   | { ok: true; id?: string; costSatang?: Satang }
