@@ -47,7 +47,7 @@ export function summarize(state: GameState): SiteSummary {
       operationalByType[room.type]++;
     }
   }
-  const spentByCategory: Record<LedgerCategory, Satang> = { capital: 0, construction: 0, equipment: 0, refund: 0, upkeep: 0, payroll: 0, revenue: 0, fee_refund: 0, food: 0, supplies: 0, event: 0, training: 0, branch: 0 };
+  const spentByCategory: Record<LedgerCategory, Satang> = { capital: 0, construction: 0, equipment: 0, refund: 0, upkeep: 0, payroll: 0, revenue: 0, fee_refund: 0, food: 0, supplies: 0, event: 0, training: 0, branch: 0, outing: 0 };
   for (const e of state.ledger) spentByCategory[e.category] += e.amountSatang;
   return {
     statuses,
@@ -506,7 +506,7 @@ export function peopleMarkers(state: GameState): Array<{ key: string; kind: 'res
 // Phase 3: finance view (pure)
 // ---------------------------------------------------------------------------
 
-export const OPEX_CATEGORIES: LedgerCategory[] = ['payroll', 'upkeep', 'food', 'supplies', 'event', 'training', 'branch'];
+export const OPEX_CATEGORIES: LedgerCategory[] = ['payroll', 'upkeep', 'food', 'supplies', 'event', 'training', 'branch', 'outing'];
 export const CAPEX_CATEGORIES: LedgerCategory[] = ['construction', 'equipment', 'refund'];
 
 /** Entries posted exactly at midnight belong to the day that just closed. */

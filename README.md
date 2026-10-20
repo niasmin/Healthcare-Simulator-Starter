@@ -36,6 +36,7 @@ One-time setup:
   - The project URL and publishable key are in `.env.production`. The publishable key is meant to be public; RLS protects the rows.
   - In Supabase Auth → URL Configuration, add the two site URLs above as redirect URLs so the email links come back to the game.
   - Inside the Claude artifact, the artifact's own per-person storage is used instead.
+  - **Ranking:** `public.leaderboard` (one row per player, public read, own-row write, 200 KB layout cap) holds the opt-in online ranking.
   - Play statistics come from signed-in players only. Guests have no account, so nothing is sent for them.
 
 ### Launch polish
@@ -192,6 +193,24 @@ Results:
 - **Job descriptions:** every profession has a one-line description of its duties, shown on each applicant card and under each group in the staff list.
 - **Performance by profession:** the roster page ends with a table for the last 7 closed days: headcount, care tasks done and missed, success rate, time spent on tasks and payroll per task done. A missed task counts against the profession that owns that work (vital signs against PNs, personal care against caregivers). Support professions show whether they are helping (their room is open and they have a shift).
 - **Hire button:** on the phone, the bottom bar has Build, Hire (with the number of applicants), Residents and Report.
+
+### Town: city map, rivals and ranking
+
+The 🏙️ Town button (desktop top bar, phone map's left column) opens a town map laid out in blocks between roads.
+
+| Place | Cost (fictional) | Effect (once a game day) |
+|---|---|---|
+| ☕ Coffee shop | ฿80 per employee | Every employee's morale +5 |
+| 🍰 Cake shop | ฿120 per resident | Every resident's happiness +6 |
+| 🍜 Restaurant | ฿350 per resident | Happiness +3, family satisfaction +4 |
+| 🛍️ Shopping mall | ฿30,000 | Daily supplies cost 90% for 7 days |
+| 🌳 Park | free | Happiness +2 |
+
+A place can't be used twice on one day, for nobody, or without the cash. Spending is booked as "Town outings".
+
+- **Rival homes:** five fictional homes in town (standard, premium villas, budget, rehab). They are not simulated: their beds, residents, reputation and satisfaction grow with the calendar from a fixed recipe, with a small repeatable wobble. **Visit** builds a look-alike from the same ready-made rooms in a throwaway sandbox, moves residents and staff in for a few hours, and shows it read-only in the map renderer.
+- **Score:** residents × 10 + beds × 2 + reputation × 5 + family satisfaction × 3. The Ranking tab lists the town's homes with yours.
+- **Online ranking (real players):** on the deployed site, a signed-in player can choose to show their home. The row holds their sign-up name, the home's name, the score and headline numbers, and the building layout (no email, money or people). It is refreshed with every cloud autosave. Anyone can read the board and visit a published layout; each player can write only their own row (Supabase `public.leaderboard`, RLS). The title screen's 🏆 Ranking button opens it.
 
 ### More land
 
@@ -620,7 +639,7 @@ src/
   - Food, supplies, upkeep and payroll are each charged once per day.
   - An event's cost is charged once, and a resolved event can't be resolved again.
 
-## Tests (234 passing)
+## Tests (242 passing)
 
 | File | Covers |
 |---|---|
@@ -642,6 +661,7 @@ src/
 | `supabase.test.ts` | A save round-trips through `game_saves` rows: one row per part, each under the size check, keyed by the player's id; another player sees none of it; removal deletes every part; off without the build settings; Supabase auth messages map to the reasons the sign-in window explains |
 | `buildings.test.ts` | Wards and villas are numbered by age, one-of-a-kind rooms are not; renaming trims, caps at 30 characters, and an empty name brings the default back; the staff list groups by profession, costliest first, highest wage first |
 | `accounting.test.ts` | An accountant with a shift cuts daily costs by 3% and has invoices paid the day they are issued, without changing the random sequence; the four new shop items are priced and labelled, and the solar roof, scholarship fund and electronic records have their effects; every role has a job description; tasks done, minutes and missed work are counted per profession and closed into a 7-day report; older saves without the report still play |
+| `city.test.ts` | Coffee lifts morale and is paid per head with one ledger entry; cake, restaurant and park cheer residents (the park is free); each place once a day, never for nobody or into debt; the mall deal cuts supplies for 7 days then ends; rivals grow repeatably within their limits; the town ranking puts the player among the rivals, best first; a visit builds the same lived-in look-alike every time |
 | `shop.test.ts` | Upgrades are bought once, for their price, from their chapter (all at once in the sandbox); the central kitchen and laundry cut food and supplies by their percentages; staff welfare adds morale; online marketing adds an enquiry; the family app lifts reputation while residents are content; the smart call system keeps late routine care pending 30 minutes longer |
 | `modes.test.ts` | Campaign games are unchanged; sandbox books ฿50M as capital, unlocks every room, has no tutorial steps and is never judged after 70 days; each challenge opens with its own cash, reputation or chapter; each challenge is won by the scripted player and ends without a next chapter |
 | `chapter7.test.ts` | **Full 390-day campaign:** all 7 chapters won on schedule and solvent, ledger reconciles; one branch of each kind, each manager of the right role and off the roster; branch invoices exact; network occupancy ≥ 70%. **Opening:** locked before chapter 7; manager role checked; full opening cost charged; managers can’t take shifts or a second branch; cap of 5. **Running:** good branches fill and bill daily, poor ones empty, a poor name at headquarters stops growth; certificates raise the quality target; a lost manager leaves the branch leaderless until one is appointed; support visits lift quality, cost money and have a cooldown; closing refunds 30% and frees the manager; busy clinic branches refer to the stroke unit. Guide order; v9→v10 migration |

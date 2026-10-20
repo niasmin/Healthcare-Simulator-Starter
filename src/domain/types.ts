@@ -109,7 +109,17 @@ export type LedgerCategory =
   | 'supplies'
   | 'event'
   | 'training'
-  | 'branch';
+  | 'branch'
+  /** Treats and outings bought in town (city map). */
+  | 'outing';
+
+/** Places in town the player can visit from the city map. */
+export type CityPlace = 'coffee' | 'cake' | 'restaurant' | 'park' | 'mall';
+/** Town visits: the day each place was last used, and the mall deal's last day. */
+export interface CityState {
+  used: Partial<Record<CityPlace, number>>;
+  mallUntilDay?: number;
+}
 
 // ---------------------------------------------------------------------------
 // Billing (Phase 3). Fees are FICTIONAL game balancing values.
@@ -658,6 +668,8 @@ export interface GameState {
   perfToday?: RolePerf;
   /** The same for the last 7 closed days, oldest first. */
   perfDays?: RolePerf[];
+  /** Town visits from the city map (older saves: absent). */
+  city?: CityState;
   // Phase 3
   priceLevel: PriceLevel;
   invoices: Invoice[];
@@ -715,7 +727,9 @@ export type ReasonCode =
   | 'employee_branch'
   | 'support_cooldown'
   | 'branch_limit'
-  | 'already_owned';
+  | 'already_owned'
+  | 'already_today'
+  | 'nobody_to_treat';
 
 export type CommandResult =
   | { ok: true; id?: string; costSatang?: Satang }

@@ -15,6 +15,8 @@ import type { GameState, Invoice, InvoiceLine, Resident, RevenueStream } from '.
 import { allocId, log, post, randInt } from '../helpers';
 import { hasUpgrade, KITCHEN_FOOD_PERCENT, LAUNDRY_SUPPLIES_PERCENT } from '../../data/shop';
 import { pctOf } from '../../domain/money';
+import { MALL_SUPPLIES_PERCENT } from '../../data/city';
+import { mallDeal } from './city';
 import { dayOf } from './time';
 
 /**
@@ -151,6 +153,8 @@ export function dailyResidentCosts(state: GameState): { food: number; supplies: 
   let cut = hasUpgrade(state, 'laundry_supply') ? pctOf(supplies, LAUNDRY_SUPPLIES_PERCENT) : supplies;
   if (supportActive(state, 'pharmacist')) cut = pctOf(cut, PHARMACY_SUPPLIES_PERCENT);
   if (roomOpen(state, 'storage_room')) cut = pctOf(cut, STORAGE_SUPPLIES_PERCENT);
+  // The mall's bulk-buy deal from the city map.
+  if (mallDeal(state)) cut = pctOf(cut, MALL_SUPPLIES_PERCENT);
   const kitchen = hasUpgrade(state, 'central_kitchen') ? pctOf(food, KITCHEN_FOOD_PERCENT) : food;
   const books = supportActive(state, 'accountant');
   return {

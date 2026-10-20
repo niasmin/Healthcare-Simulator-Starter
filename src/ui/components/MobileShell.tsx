@@ -405,6 +405,7 @@ export function MobileShell() {
                     onClick={() => useGame.getState().setAutoOpen(true)}
                     className={autoOn ? '!from-[#f2b631] !to-[#d9901a]' : ''}
                   />
+                  <FloatButton emoji="🏙️" label={t('hud.city')} onClick={() => useGame.getState().setCityOpen('city')} />
                 </div>
                 <div className="absolute right-2 top-[11.2rem] z-10 flex flex-col gap-2 pointer-events-none">
                   <FloatButton icon={eventsIcon} label={t('hud.events')} onClick={() => setSheet('events')} />
