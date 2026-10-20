@@ -1,6 +1,7 @@
 import { staffPortrait } from '../portraits';
 import { useMemo, useState } from 'react';
-import { ROLES, ROLE_ORDER, SHIFT_SLOTS, SLOT_ORDER } from '../../data/staff';
+import { ROLES, ROLE_ORDER, SHIFT_SLOTS, SLOT_ORDER, SUPPORT_ROLES } from '../../data/staff';
+import { SUPPORT_ROOM } from '../../sim/systems/support';
 import { slotAt } from '../../domain/rules/shifts';
 import type { Employee, ShiftSlot, StaffRole } from '../../domain/types';
 import { rosterView, staffActivity } from '../../sim/selectors';
@@ -158,6 +159,8 @@ export function RosterView() {
   const [pickedSlot, setPickedSlot] = useState<ShiftSlot | null>(null);
   const mSlot = pickedSlot ?? current;
   const slots = mobile ? [mSlot] : SLOT_ORDER;
+  // Support roles get a row once someone is employed or their room exists.
+  const roles = ROLE_ORDER.filter((r) => !SUPPORT_ROLES.includes(r) || game.employees.some((e) => e.role === r) || game.site.rooms.some((x) => x.type === SUPPORT_ROOM[r]));
 
   return (
     <div className="p-3 flex flex-col gap-4">
@@ -196,7 +199,7 @@ export function RosterView() {
             </tr>
           </thead>
           <tbody>
-            {ROLE_ORDER.map((role) => (
+            {roles.map((role) => (
               <tr key={role}>
                 <th className="text-left align-middle">
                   <RoleChip role={role} label={t(`role.${role}.short`)} />

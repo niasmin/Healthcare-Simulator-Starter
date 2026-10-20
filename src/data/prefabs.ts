@@ -26,6 +26,9 @@ export const PREFABS: PrefabDef[] = [
   { id: 'training', roomType: 'training_room', w: 2, h: 3, equipment: { whiteboard: 1, training_manikin: 2 } },
   { id: 'clinic', roomType: 'neuro_clinic', w: 4, h: 3, equipment: { waiting_chairs: 1, exam_desk: 2 } },
   { id: 'stroke', roomType: 'stroke_unit', w: 4, h: 3, equipment: { care_bed: 6, call_system: 1, vital_monitor: 1 } },
+  { id: 'pharmacy', roomType: 'pharmacy', w: 2, h: 2, equipment: { medicine_shelf: 2 } },
+  { id: 'dining', roomType: 'dining_room', w: 3, h: 3, equipment: { dining_table: 3 } },
+  { id: 'laundry', roomType: 'laundry_room', w: 2, h: 2, equipment: { washer: 2 } },
 ];
 
 export function prefabDef(id: string): PrefabDef | undefined {

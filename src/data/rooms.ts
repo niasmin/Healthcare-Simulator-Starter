@@ -32,6 +32,9 @@ export const EQUIPMENT: Record<EquipmentId, EquipmentDef> = {
   exam_desk: { id: 'exam_desk', costSatang: thb(45_000), color: 0xdfe6ee },
   waiting_chairs: { id: 'waiting_chairs', costSatang: thb(10_000), color: 0x6d8fb3 },
   vital_monitor: { id: 'vital_monitor', costSatang: thb(40_000), color: 0x3d4b5c },
+  medicine_shelf: { id: 'medicine_shelf', costSatang: thb(20_000), color: 0xe8f0f6 },
+  dining_table: { id: 'dining_table', costSatang: thb(9_000), color: 0xc98a52 },
+  washer: { id: 'washer', costSatang: thb(35_000), color: 0xdfe6ec },
 };
 
 export interface EquipmentSlot {
@@ -215,11 +218,50 @@ export const ROOMS: Record<RoomType, RoomDef> = {
     wallColor: 0x7a4fa0,
     unlockChapter: 6,
   },
+  // Optional support rooms. Each works with its own support role (see sim/systems/support.ts).
+  pharmacy: {
+    type: 'pharmacy',
+    minSide: 2,
+    minArea: 4,
+    maxArea: 9,
+    baseCostSatang: thb(60_000),
+    costPerTileSatang: thb(12_000),
+    upkeepPerTileSatang: thb(20),
+    equipment: [{ id: 'medicine_shelf', required: 1, max: () => 3 }],
+    floorColor: 0xe3eef3,
+    wallColor: 0x2a7f7f,
+    unlockChapter: 2,
+  },
+  dining_room: {
+    type: 'dining_room',
+    minSide: 2,
+    minArea: 6,
+    maxArea: 20,
+    baseCostSatang: thb(40_000),
+    costPerTileSatang: thb(10_000),
+    upkeepPerTileSatang: thb(15),
+    // One table seats four.
+    equipment: [{ id: 'dining_table', required: 1, max: (r) => Math.max(1, Math.floor(rectArea(r) / 2)) }],
+    floorColor: 0xf0e2c8,
+    wallColor: 0xc9771f,
+  },
+  laundry_room: {
+    type: 'laundry_room',
+    minSide: 2,
+    minArea: 4,
+    maxArea: 9,
+    baseCostSatang: thb(40_000),
+    costPerTileSatang: thb(10_000),
+    upkeepPerTileSatang: thb(15),
+    equipment: [{ id: 'washer', required: 1, max: () => 3 }],
+    floorColor: 0xe4ebf0,
+    wallColor: 0x5f6b78,
+  },
 };
 
 
 
-export const ROOM_TYPES: RoomType[] = ['ward', 'nursing_station', 'therapy', 'staff_room', 'villa', 'homecare_office', 'training_room', 'neuro_clinic', 'stroke_unit'];
+export const ROOM_TYPES: RoomType[] = ['ward', 'nursing_station', 'therapy', 'staff_room', 'villa', 'homecare_office', 'training_room', 'neuro_clinic', 'stroke_unit', 'pharmacy', 'dining_room', 'laundry_room'];
 /** Rooms whose care beds count as resident capacity. */
 export const BED_ROOMS: RoomType[] = ['ward', 'villa'];
 

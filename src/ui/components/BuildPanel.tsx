@@ -30,6 +30,9 @@ const ROOM_ART: Record<RoomType, string> = {
   training_room: 'rm_training',
   neuro_clinic: 'rm_clinic',
   stroke_unit: 'rm_stroke',
+  pharmacy: 'rm_pharmacy',
+  dining_room: 'rm_dining_hall',
+  laundry_room: 'rm_laundry',
 };
 
 const SWATCH: Record<RoomType, string> = {
@@ -42,6 +45,9 @@ const SWATCH: Record<RoomType, string> = {
   training_room: '#2f7d8c',
   neuro_clinic: '#3b5ba5',
   stroke_unit: '#7a4fa0',
+  pharmacy: '#2a7f7f',
+  dining_room: '#c9771f',
+  laundry_room: '#5f6b78',
 };
 
 function sameTool(a: Tool, b: Tool) {

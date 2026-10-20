@@ -1,3 +1,4 @@
+import { PHARMACY_SUPPLIES_PERCENT, supportActive } from './support';
 import {
   dayInMonth,
   DAYS_PER_MONTH,
@@ -146,7 +147,7 @@ export function dailyResidentCosts(state: GameState): { food: number; supplies: 
   // Shop upgrades: a central kitchen and an in-house laundry and supply room cut these costs.
   return {
     food: hasUpgrade(state, 'central_kitchen') ? pctOf(food, KITCHEN_FOOD_PERCENT) : food,
-    supplies: hasUpgrade(state, 'laundry_supply') ? pctOf(supplies, LAUNDRY_SUPPLIES_PERCENT) : supplies,
+    supplies: pctOf(hasUpgrade(state, 'laundry_supply') ? pctOf(supplies, LAUNDRY_SUPPLIES_PERCENT) : supplies, supportActive(state, 'pharmacist') ? PHARMACY_SUPPLIES_PERCENT : 100),
   };
 }
 

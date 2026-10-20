@@ -1,3 +1,4 @@
+import { DINING_MEAL_HAPPINESS, DINING_MEAL_NUTRITION, roomOpen } from './support';
 import { MEAL_TIMES, SELF_MEAL_NUTRITION, selfFeeds } from '../../data/patients';
 import { minuteOfDay } from '../../domain/rules/shifts';
 import { PRICE_SATISFACTION_DRIFT } from '../../data/finance';
@@ -22,7 +23,7 @@ export function wellbeing(n: Needs): number {
   return (n.physical + n.mobility + n.mental + n.happiness + n.nutrition) / 5;
 }
 
-function decayResident(r: Resident, minute: number, priceDrift: number, appeal: number): Resident {
+function decayResident(r: Resident, minute: number, priceDrift: number, appeal: number, dining: boolean): Resident {
   const n = r.needs;
   const lvl = r.careLevel;
   const d: Partial<Record<NeedKey, number>> = {
@@ -45,7 +46,8 @@ function decayResident(r: Resident, minute: number, priceDrift: number, appeal: 
   // Satisfaction drifts slowly toward overall wellbeing.
   needs = { ...needs, satisfaction: r2(clamp(needs.satisfaction + (wellbeing(needs) - needs.satisfaction) * 0.004)) };
   // Independent residents eat at meal times on their own (kitchen is abstract).
-  if (selfFeeds(r.group, lvl) && MEAL_TIMES.includes(minuteOfDay(minute))) needs = applyNeedDelta(needs, { nutrition: SELF_MEAL_NUTRITION });
+  if (selfFeeds(r.group, lvl) && MEAL_TIMES.includes(minuteOfDay(minute)))
+    needs = applyNeedDelta(needs, dining ? { nutrition: SELF_MEAL_NUTRITION + DINING_MEAL_NUTRITION, happiness: DINING_MEAL_HAPPINESS } : { nutrition: SELF_MEAL_NUTRITION });
   return { ...r, needs };
 }
 
@@ -53,5 +55,7 @@ export function needsTick(state: GameState): GameState {
   if (state.residents.length === 0) return state;
   const drift = PRICE_SATISFACTION_DRIFT[state.priceLevel];
   const appeal = gardenAppeal(state.site.decor);
-  return { ...state, residents: state.residents.map((r) => decayResident(r, state.minute, drift, appeal)) };
+  // A dining room makes shared meals better (checked only at meal times; it walks the rooms).
+  const dining = MEAL_TIMES.includes(minuteOfDay(state.minute)) && roomOpen(state, 'dining_room');
+  return { ...state, residents: state.residents.map((r) => decayResident(r, state.minute, drift, appeal, dining)) };
 }

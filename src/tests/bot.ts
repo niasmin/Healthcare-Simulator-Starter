@@ -36,6 +36,7 @@ const SKILL_ROLE: Record<Skill, StaffRole> = {
   tube_feeding: 'pn',
   airway_care: 'rn',
   consult: 'doctor',
+  cleaning: 'cleaner',
 };
 
 /** Preferred answer per event, falling back to the next choice when blocked. */
