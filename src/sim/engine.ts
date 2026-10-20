@@ -1,3 +1,4 @@
+import { autopilot, autoSettings } from './autopilot';
 import { CORRIDOR_COST_PER_TILE, EQUIPMENT, REFUND_PERCENT, ROOMS, equipmentSlot, roomConstructionCost } from '../data/rooms';
 import { cellIndex, inBounds, rectContains } from '../domain/grid';
 import { pctOf } from '../domain/money';
@@ -8,7 +9,7 @@ import { SHIFT_SLOTS } from '../data/staff';
 import { freeBeds, parseBedId, residentsInRoom } from '../domain/rules/beds';
 import { roomStatus } from '../domain/rules/rooms';
 import { validateShift } from '../domain/rules/shifts';
-import type { UpgradeId, BranchKind, Cell, CommandResult, CourseId, DayStats, DecorType, EquipmentId, GameSpeed, GameState, PriceLevel, Rect, Resident, Room, RoomType, ShiftSlot } from '../domain/types';
+import type { UpgradeId, BranchKind, Cell, CommandResult, CourseId, DayStats, DecorType, EquipmentId, GameSpeed, GameState, PriceLevel, Rect, Resident, Room, RoomType, ShiftSlot, AutoSettings } from '../domain/types';
 import { dayInMonth, monthOfDay, PRICE_LEVELS } from '../data/finance';
 import { billAdmission, billFinal, billMonth, chargeDailyResidentCosts, collectPayments, refundUnusedDays } from './systems/billing';
 import { eventCheck, eventExpiryTick, expireReferrals, resolveEvent } from './systems/events';
@@ -22,7 +23,7 @@ import { advanceClock, dayOf, schedule } from './systems/time';
 import { summarizeBeds } from './bedsSummary';
 import { judgeChapter, startNextChapter } from './systems/chapter';
 import { admitClient, dischargeClient, hasHomecareOffice, homecareDayEnd, homecareTick } from './systems/homecare';
-import { EXPANDED_WIDTH, LAND_PRICE } from '../data/chapters';
+import { nextPlot } from '../data/chapters';
 import { prefabCost, prefabDef, prefabRect } from '../data/prefabs';
 import { GROUP_WARD_EQUIPMENT } from '../data/patients';
 import { FAMILY_APP_REPUTATION, FAMILY_APP_SATISFACTION_LINE, UPGRADES, hasUpgrade } from '../data/shop';
@@ -67,7 +68,8 @@ export type Command =
   | { type: 'assignBranchManager'; branchId: string; managerId: string }
   | { type: 'supportBranch'; branchId: string }
   | { type: 'closeBranch'; branchId: string }
-  | { type: 'buyUpgrade'; upgrade: UpgradeId };
+  | { type: 'buyUpgrade'; upgrade: UpgradeId }
+  | { type: 'setAuto'; settings: Partial<AutoSettings> };
 
 export interface CommandOutcome {
   state: GameState;
@@ -303,17 +305,18 @@ export function applyCommand(state: GameState, cmd: Command): CommandOutcome {
     }
 
     case 'expandLot': {
-      // Chapter 3: buy the plot next door; the lot grows east, everything built stays where it is.
-      if (state.chapter.id < 3) return fail(state, 'chapter_locked');
+      // Buy the next plot down the street (from chapter 3); the lot grows east, everything built stays where it is.
       const { site } = state;
-      if (site.width >= EXPANDED_WIDTH) return fail(state, 'already_done');
-      if (state.organization.cashSatang < LAND_PRICE) return fail(state, 'insufficient_funds');
-      const corridor = new Array<number>(EXPANDED_WIDTH * site.height).fill(0);
-      for (let y = 0; y < site.height; y++) for (let x = 0; x < site.width; x++) corridor[y * EXPANDED_WIDTH + x] = site.corridor[cellIndex(x, y, site.width)];
-      let s: GameState = { ...state, site: { ...site, width: EXPANDED_WIDTH, corridor } };
-      s = post(s, -LAND_PRICE, 'construction', 'ledger.land');
+      const plot = nextPlot(site.width);
+      if (!plot) return fail(state, 'already_done');
+      if (state.chapter.id < plot.chapter) return fail(state, 'chapter_locked');
+      if (state.organization.cashSatang < plot.priceSatang) return fail(state, 'insufficient_funds');
+      const corridor = new Array<number>(plot.width * site.height).fill(0);
+      for (let y = 0; y < site.height; y++) for (let x = 0; x < site.width; x++) corridor[y * plot.width + x] = site.corridor[cellIndex(x, y, site.width)];
+      let s: GameState = { ...state, site: { ...site, width: plot.width, corridor } };
+      s = post(s, -plot.priceSatang, 'construction', 'ledger.land');
       s = log(s, 'good', 'log.land_bought');
-      return { state: s, result: { ok: true, costSatang: LAND_PRICE } };
+      return { state: s, result: { ok: true, costSatang: plot.priceSatang } };
     }
 
     case 'admitClient': {
@@ -365,6 +368,11 @@ export function applyCommand(state: GameState, cmd: Command): CommandOutcome {
     case 'closeBranch': {
       const next = closeBranch(state, cmd.branchId);
       return next ? { state: next, result: { ok: true } } : fail(state, 'not_found');
+    }
+
+    case 'setAuto': {
+      const auto = { ...autoSettings(state), ...cmd.settings };
+      return { state: { ...state, auto }, result: { ok: true } };
     }
 
     case 'buyUpgrade': {
@@ -514,6 +522,8 @@ export function step(state: GameState): GameState {
     }
   }
   s = eventExpiryTick(s);
+  // Autopilot (if switched on) answers events and does the routine admin through public commands.
+  s = autopilot(s, applyCommand);
   // Home visits are booked appointments, so they claim staff before in-house tasks.
   s = homecareTick(s);
   s = hospitalTick(s);

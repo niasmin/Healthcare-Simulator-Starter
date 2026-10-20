@@ -7,7 +7,7 @@ import { ROLES } from '../../data/staff';
 import { peopleMarkers } from '../../sim/selectors';
 import { STAFF_SPRITE } from '../../render/sprites';
 import { prefabCost, prefabDef, prefabRect } from '../../data/prefabs';
-import { EXPANDED_WIDTH, LAND_PRICE } from '../../data/chapters';
+import { nextPlot } from '../../data/chapters';
 import type { CareGroup, StaffRole } from '../../domain/types';
 import { isMobileNow, useMoney, useSummary, useT } from '../hooks';
 import { useGame } from '../store';
@@ -32,6 +32,7 @@ export function GameCanvas({ controls = true }: { controls?: boolean } = {}) {
   const drag = useGame((s) => s.drag);
   const selectedRoomId = useGame((s) => s.selectedRoomId);
   const showLabels = useGame((s) => s.showLabels);
+  const exterior = useGame((s) => s.exterior);
   const summary = useSummary();
   const tourHint = useTourPointer()?.hint ?? null;
 
@@ -124,6 +125,7 @@ export function GameCanvas({ controls = true }: { controls?: boolean } = {}) {
     [game],
   );
 
+  const plot = nextPlot(game.site.width);
   useEffect(() => {
     rendererRef.current?.update({
       people,
@@ -138,9 +140,10 @@ export function GameCanvas({ controls = true }: { controls?: boolean } = {}) {
       hoverTint: tool.kind === 'bulldoze' ? 'danger' : 'neutral',
       leftDragPans: tool.kind === 'select',
       showLabels,
-      sale: game.site.width < EXPANDED_WIDTH ? { toX: EXPANDED_WIDTH, label: game.chapter.id >= 3 ? t('world.sale_now', { price: money(LAND_PRICE) }) : t('world.sale_later', { c: 3 }) } : null,
+      exterior,
+      sale: plot ? { toX: plot.width, label: game.chapter.id >= plot.chapter ? t('world.sale_now', { price: money(plot.priceSatang) }) : t('world.sale_later', { c: plot.chapter }) } : null,
     });
-  }, [game, people, summary, selectedRoomId, hover, preview, tool, t, ready, lang, showLabels, tourHint]);
+  }, [game, people, summary, selectedRoomId, hover, preview, tool, t, ready, lang, showLabels, exterior, tourHint]);
 
   // The phone HUD's "overview map" button recenters through this event.
   useEffect(() => {
@@ -170,14 +173,16 @@ export function GameCanvas({ controls = true }: { controls?: boolean } = {}) {
           { label: '+', title: t('canvas.zoom_in'), fn: () => r?.zoomBy(1.2) },
           { label: '−', title: t('canvas.zoom_out'), fn: () => r?.zoomBy(1 / 1.2) },
           { label: '⌖', title: t('canvas.reset'), fn: () => r?.recenter() },
+          { label: '🏠', title: t(exterior ? 'canvas.interior' : 'canvas.exterior'), fn: () => useGame.getState().setExterior(!exterior), on: exterior },
         ].map((b) => (
           <button
             key={b.label}
             type="button"
             title={b.title}
             aria-label={b.title}
+            aria-pressed={'on' in b ? b.on : undefined}
             onClick={b.fn}
-            className="size-9 rounded-lg bg-white/90 border border-line text-lg font-semibold shadow-sm hover:bg-white"
+            className={`size-9 rounded-lg border text-lg font-semibold shadow-sm ${'on' in b && b.on ? 'bg-teal text-white border-teal' : 'bg-white/90 border-line hover:bg-white'}`}
           >
             {b.label}
           </button>

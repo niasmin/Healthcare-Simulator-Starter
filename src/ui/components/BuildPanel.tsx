@@ -6,7 +6,7 @@ import { DECOR_SPRITE, spriteUrl } from '../../render/sprites';
 import { ROLES, wageFor } from '../../data/staff';
 import { freeBeds } from '../../domain/rules/beds';
 import { monthlyFee, PROGRAMME_FEE, VISIT_PRICE } from '../../data/finance';
-import { EXPANDED_WIDTH, LAND_PRICE } from '../../data/chapters';
+import { nextPlot } from '../../data/chapters';
 import { PREFABS, prefabCost } from '../../data/prefabs';
 import { vansAvailable, visitRate } from '../../sim/systems/homecare';
 import { GROUP_WARD_EQUIPMENT } from '../../data/patients';
@@ -35,6 +35,7 @@ const ROOM_ART: Record<RoomType, string> = {
   laundry_room: 'rm_laundry',
   reception: 'rm_reception',
   storage_room: 'rm_storage',
+  bathroom: 'rm_bath',
 };
 
 const SWATCH: Record<RoomType, string> = {
@@ -52,6 +53,7 @@ const SWATCH: Record<RoomType, string> = {
   laundry_room: '#5f6b78',
   reception: '#4b4fc4',
   storage_room: '#8a6a45',
+  bathroom: '#3f8fae',
 };
 
 function sameTool(a: Tool, b: Tool) {
@@ -79,6 +81,7 @@ function BuildTools() {
   };
 
   const chapter = useGame((s) => s.game.chapter.id);
+  const plot = nextPlot(useGame((s) => s.game.site.width));
   const site = useGame((s) => s.game.site);
   const dispatch = useGame((s) => s.dispatch);
 
@@ -151,12 +154,16 @@ function BuildTools() {
       {chapter >= 3 && (
         <button
           type="button"
-          disabled={site.width >= EXPANDED_WIDTH}
+          disabled={!plot || chapter < plot.chapter}
           onClick={() => dispatch({ type: 'expandLot' })}
           className="w-full text-left rounded-xl border border-teal/50 bg-teal/5 px-3 py-2 disabled:opacity-60"
         >
-          <div className="font-semibold text-sm">🗺 {t(site.width >= EXPANDED_WIDTH ? 'build.land_done' : 'build.land', { w: site.width, h: site.height })}</div>
-          {site.width < EXPANDED_WIDTH && <div className="text-xs text-ink-soft mt-0.5">{t('build.land_sub', { w: EXPANDED_WIDTH, h: site.height, cost: money(LAND_PRICE) })}</div>}
+          <div className="font-semibold text-sm">🗺 {t(!plot ? 'build.land_done' : 'build.land', { w: site.width, h: site.height })}</div>
+          {plot && (
+            <div className="text-xs text-ink-soft mt-0.5">
+              {chapter >= plot.chapter ? t('build.land_sub', { w: plot.width, h: site.height, cost: money(plot.priceSatang) }) : t('build.land_later', { w: plot.width, h: site.height, c: plot.chapter })}
+            </div>
+          )}
         </button>
       )}
       <div className="h-px bg-line my-1" />

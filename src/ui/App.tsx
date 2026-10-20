@@ -1,4 +1,5 @@
 import { ShopModal } from './components/ShopModal';
+import { AutoModal } from './components/AutoModal';
 import { useEffect } from 'react';
 import { SaveModal } from './components/SaveModal';
 import { ChaptersModal } from './components/ChaptersModal';
@@ -30,6 +31,7 @@ export function App() {
   const setSaveOpen = useGame((s) => s.setSaveOpen);
   const chaptersOpen = useGame((s) => s.chaptersOpen);
   const shopOpen = useGame((s) => s.shopOpen);
+  const autoOpen = useGame((s) => s.autoOpen);
   const setChaptersOpen = useGame((s) => s.setChaptersOpen);
   useEffect(() => {
     if (window.location.search.includes('skiptitle')) setStarted(true);
@@ -47,6 +49,7 @@ export function App() {
       {started && saveOpen && <SaveModal mode="game" onClose={() => setSaveOpen(false)} />}
       {chaptersOpen && <ChaptersModal onClose={() => setChaptersOpen(false)} />}
       {shopOpen && <ShopModal onClose={() => useGame.getState().setShopOpen(false)} />}
+      {autoOpen && <AutoModal onClose={() => useGame.getState().setAutoOpen(false)} />}
     </>
   );
 

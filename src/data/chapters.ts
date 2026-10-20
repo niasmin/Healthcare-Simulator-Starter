@@ -65,6 +65,23 @@ export const PREMIUM_SHARE = 30;
 export const EXPANDED_WIDTH = 32;
 export const LAND_PRICE = thb(300_000);
 
+/** Plots for sale east of the lot, bought in order: each grows the lot to `width` tiles. */
+export interface LandPlot {
+  width: number;
+  priceSatang: number;
+  chapter: number;
+}
+export const LAND_PLOTS: LandPlot[] = [
+  { width: EXPANDED_WIDTH, priceSatang: LAND_PRICE, chapter: 3 },
+  { width: 44, priceSatang: thb(500_000), chapter: 4 },
+  { width: 56, priceSatang: thb(800_000), chapter: 5 },
+];
+
+/** The next plot to buy, or null when the whole street is ours. */
+export function nextPlot(width: number): LandPlot | null {
+  return LAND_PLOTS.find((p) => p.width > width) ?? null;
+}
+
 /** Chapters shown on the road map (the rest unlock in later versions). */
 export const ROADMAP_CHAPTERS = 7;
 

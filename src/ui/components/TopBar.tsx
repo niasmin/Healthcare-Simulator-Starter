@@ -1,3 +1,4 @@
+import { useAutoOn } from './AutoModal';
 import { useEffect, useState } from 'react';
 import type { GameSpeed } from '../../domain/types';
 import { dayOf, formatClock } from '../../sim/systems/time';
@@ -16,6 +17,7 @@ const SPEEDS: { speed: GameSpeed; label: string }[] = [
 
 export function TopBar() {
   const t = useT();
+  const autoOn = useAutoOn();
   const money = useMoney();
   const minute = useGame((s) => s.game.minute);
   const speed = useGame((s) => s.game.speed);
@@ -35,10 +37,10 @@ export function TopBar() {
   }, [confirming]);
 
   return (
-    <header className="flex flex-wrap items-center gap-x-5 gap-y-2 px-4 py-2 bg-ink text-white">
+    <header className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-2 bg-ink text-white">
       <div className="flex items-baseline gap-2 mr-auto">
         <span className="text-lg font-bold tracking-tight">{t('app.title')}</span>
-        <span className="text-xs text-white/60">{t('app.subtitle')}</span>
+        <span className="text-xs text-white/60 max-2xl:hidden">{t('app.subtitle')}</span>
       </div>
 
       <div className="flex items-center gap-3 tabular" aria-live="polite">
@@ -104,6 +106,14 @@ export function TopBar() {
       </div>
 
       <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={() => useGame.getState().setAutoOpen(true)}
+          aria-pressed={autoOn}
+          className={`px-3 py-1 rounded-md border text-sm font-semibold ${autoOn ? 'bg-[#f2b631] text-ink border-[#f2b631]' : 'bg-white/15 border-white/30 hover:bg-white/25'}`}
+        >
+          🤖 {t('hud.auto')}{autoOn ? ' ✓' : ''}
+        </button>
         <button
           type="button"
           onClick={() => useGame.getState().setShopOpen(true)}

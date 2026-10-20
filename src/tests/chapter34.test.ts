@@ -102,7 +102,7 @@ describe('the full campaign: chapters 1–4 in 210 days (scripted careful player
 });
 
 describe('chapter 3 rules', () => {
-  it('land is bought once, from chapter 3, and keeps every corridor tile in place', () => {
+  it('the first plot is bought from chapter 3 and keeps every corridor tile in place', () => {
     expect(applyCommand(inChapter(2), { type: 'expandLot' }).result).toMatchObject({ ok: false, reason: 'chapter_locked' });
     const before = inChapter(3);
     const after = ok(before, { type: 'expandLot' });
@@ -110,7 +110,8 @@ describe('chapter 3 rules', () => {
     expect(after.organization.cashSatang).toBe(before.organization.cashSatang - LAND_PRICE);
     for (let y = 0; y < before.site.height; y++)
       for (let x = 0; x < before.site.width; x++) expect(after.site.corridor[cellIndex(x, y, EXPANDED_WIDTH)]).toBe(before.site.corridor[cellIndex(x, y, before.site.width)]);
-    expect(applyCommand(after, { type: 'expandLot' }).result).toMatchObject({ ok: false, reason: 'already_done' });
+    // The next plot down the street goes on sale in chapter 4.
+    expect(applyCommand(after, { type: 'expandLot' }).result).toMatchObject({ ok: false, reason: 'chapter_locked' });
     expect(reconcile(after).ok).toBe(true);
   });
 

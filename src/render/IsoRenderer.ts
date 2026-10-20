@@ -4,7 +4,7 @@ import { WORLD_MARGIN, drawWorld, worldBounds } from './WorldBackdrop';
 import { EQUIPMENT, ROOMS } from '../data/rooms';
 import { cellIndex } from '../domain/grid';
 import type { RoomStatus } from '../domain/rules/rooms';
-import type { Cell, EquipmentId, GameState, Room } from '../domain/types';
+import type { Cell, EquipmentId, GameState, Room, RoomType } from '../domain/types';
 import { cellCenter, cellDiamond, cellToWorld, TILE_H, TILE_W, worldToCell } from './iso';
 
 /**
@@ -43,6 +43,8 @@ export interface RenderInput {
   sale: { toX: number; label: string } | null;
   /** Room name pills on the map (the layers button hides them). Default on. */
   showLabels?: boolean;
+  /** Exterior view: finished buildings with roofs, no interiors or people. */
+  exterior?: boolean;
 }
 
 export interface RendererCallbacks {
@@ -58,7 +60,17 @@ export interface RendererCallbacks {
 const WALL_H = 26;
 const FRONT_WALL_H = 6;
 const SLAB_DEPTH = 14;
+/** Exterior view: storey height of a finished building, and the room types that get a pitched roof. */
+const STOREY_H = 46;
+const PITCHED: ReadonlySet<RoomType> = new Set<RoomType>(['ward', 'villa', 'staff_room', 'dining_room']);
 const FONT = '"IBM Plex Sans Thai", "Noto Sans Thai", "Leelawadee UI", Tahoma, sans-serif';
+
+/** Blend two colours: t = 0 gives a, t = 1 gives b. */
+function mix(a: number, b: number, t: number): number {
+  const ch = (c: number, s: number) => (c >> s) & 255;
+  const m = (s: number) => Math.round(ch(a, s) + (ch(b, s) - ch(a, s)) * t) << s;
+  return m(16) | m(8) | m(0);
+}
 
 function shade(color: number, f: number): number {
   const r = Math.min(255, Math.max(0, Math.round(((color >> 16) & 255) * f)));
@@ -94,6 +106,7 @@ const PROP: Record<EquipmentId, PropStyle> = {
   washer: { s: 0.42, h: 18 },
   reception_desk: { s: 0.7, h: 14 },
   storage_rack: { s: 0.4, h: 28 },
+  bath_set: { s: 0.4, h: 12 },
 };
 
 export class IsoRenderer {
@@ -432,6 +445,7 @@ export class IsoRenderer {
     if (!this.ready) return;
     this.drawNight(input.game.minute);
     this.labelLayer.visible = input.showLabels !== false;
+    this.peopleLayer.visible = !input.exterior;
     const backdropKey = `${input.game.site.width}x${input.game.site.height}|${input.sale?.label ?? ''}|${this.tex.size}`;
     if (backdropKey !== this.lastBackdrop) {
       this.lastBackdrop = backdropKey;
@@ -439,7 +453,7 @@ export class IsoRenderer {
       this.makeCars(input.game.site);
       this.updateMinScale();
     }
-    const staticKey = `${input.labelFor({ id: '', type: 'ward', rect: { x: 0, y: 0, w: 1, h: 1 }, equipment: {}, builtAt: 0 })}|${input.entranceLabel}`;
+    const staticKey = `${input.labelFor({ id: '', type: 'ward', rect: { x: 0, y: 0, w: 1, h: 1 }, equipment: {}, builtAt: 0 })}|${input.entranceLabel}|${input.exterior ? 'ext' : 'int'}`;
     if (input.game.site !== this.lastSite || staticKey !== this.lastStatic) {
       this.lastSite = input.game.site;
       this.lastStatic = staticKey;
@@ -519,7 +533,7 @@ export class IsoRenderer {
     // Rooms and garden items, back to front (painter's order by their front-most tile)
     const items: Array<{ key: number; draw: () => void }> = [];
     for (const room of site.rooms)
-      items.push({ key: room.rect.x + room.rect.w - 1 + room.rect.y + room.rect.h - 1, draw: () => this.drawRoom(room, input.statuses.get(room.id), input.labelFor(room)) });
+      items.push({ key: room.rect.x + room.rect.w - 1 + room.rect.y + room.rect.h - 1, draw: () => (input.exterior ? this.drawBuilding(room, input.statuses.get(room.id), input.labelFor(room)) : this.drawRoom(room, input.statuses.get(room.id), input.labelFor(room))) });
     for (const d of site.decor ?? [])
       items.push({
         key: d.cell.x + d.cell.y + 0.5,
@@ -606,6 +620,106 @@ export class IsoRenderer {
     const badge = ROOM_BADGE[room.type];
     if (status?.operational) this.addBadge(label, badge.glyph, c.x, c.y - WALL_H - 14, badge.color);
     else this.addBadge(`⚠ ${label}`, null, c.x, c.y - WALL_H - 14, 0xc0392b);
+  }
+
+  /**
+   * Exterior view: the room as a finished building seen from above. Walls on the two faces toward
+   * the viewer with windows and the front door, then a roof (pitched for homes, flat with rooftop
+   * units for clinical and service rooms). People and interiors are hidden in this view.
+   */
+  private drawBuilding(room: Room, status: RoomStatus | undefined, label: string): void {
+    const def = ROOMS[room.type];
+    const g = new Graphics();
+    this.staticLayer.addChild(g);
+    const { x, y, w, h } = room.rect;
+    const H = STOREY_H;
+    const up = (p: { x: number; y: number }, z: number) => ({ x: p.x, y: p.y - z });
+    const T = cellToWorld(x, y);
+    const R = cellToWorld(x + w, y);
+    const B = cellToWorld(x + w, y + h);
+    const L = cellToWorld(x, y + h);
+    // Cream walls tinted a little toward the room's colour.
+    const wallColor = mix(0xf6f1e7, def.wallColor, 0.18);
+    // soft shadow to the front-right
+    g.poly([L.x, L.y, B.x, B.y, R.x, R.y, R.x + 18, R.y + 9, B.x + 18, B.y + 9, L.x + 18, L.y + 9]).fill({ color: 0x000000, alpha: 0.1 });
+    // front-left face (edge y + h) and front-right face (edge x + w)
+    const face = (a: { x: number; y: number }, b: { x: number; y: number }, color: number) => {
+      const a1 = up(a, H);
+      const b1 = up(b, H);
+      g.poly([a.x, a.y, b.x, b.y, b1.x, b1.y, a1.x, a1.y]).fill(color);
+      // a plinth and a band under the roof in the room's own colour
+      g.poly([a.x, a.y, b.x, b.y, b.x, b.y - 4, a.x, a.y - 4]).fill(shade(color, 0.8));
+      g.poly([a1.x, a1.y + 6, b1.x, b1.y + 6, b1.x, b1.y, a1.x, a1.y]).fill(shade(def.wallColor, 0.95));
+    };
+    face(L, B, shade(wallColor, 0.97));
+    face(B, R, shade(wallColor, 0.84));
+    // windows: one per tile along each face, skipping the door tile
+    const door = status?.door ?? null;
+    const win = (a: { x: number; y: number }, b: { x: number; y: number }, n: number, skip: number, dark: number) => {
+      for (let i = 0; i < n; i++) {
+        const f0 = (i + 0.25) / n;
+        const f1 = (i + 0.75) / n;
+        const p0 = { x: a.x + (b.x - a.x) * f0, y: a.y + (b.y - a.y) * f0 };
+        const p1 = { x: a.x + (b.x - a.x) * f1, y: a.y + (b.y - a.y) * f1 };
+        if (i === skip) {
+          // the front door with a small canopy
+          g.poly([p0.x, p0.y - 2, p1.x, p1.y - 2, p1.x, p1.y - 24, p0.x, p0.y - 24]).fill(0x7a5236);
+          g.poly([p0.x - 3, p0.y - 26, p1.x + 3, p1.y - 26, p1.x + 3, p1.y - 30, p0.x - 3, p0.y - 30]).fill(shade(def.wallColor, 1.1));
+          continue;
+        }
+        g.poly([p0.x, p0.y - 14, p1.x, p1.y - 14, p1.x, p1.y - 32, p0.x, p0.y - 32]).fill({ color: dark, alpha: 0.9 });
+        g.poly([p0.x, p0.y - 23, p1.x, p1.y - 23]).stroke({ width: 1, color: 0xffffff, alpha: 0.6 });
+      }
+    };
+    const doorLeft = door && door.outside.y === y + h ? door.inside.x - x : -1;
+    const doorRight = door && door.outside.x === x + w ? door.inside.y - y : -1;
+    win(L, B, w, doorLeft, 0x8fbccc);
+    win(B, R, h, doorRight, 0x76a6b8);
+    const [t1, r1, b1, l1] = [up(T, H), up(R, H), up(B, H), up(L, H)];
+    if (PITCHED.has(room.type)) {
+      // pitched tile roof, ridge along the longer side, with eaves
+      const roof = room.type === 'villa' ? 0x9c5a3c : room.type === 'ward' ? 0xc0634a : shade(def.wallColor, 0.9);
+      const ridge = 14 + Math.min(w, h) * 5;
+      const mid = (a: { x: number; y: number }, b: { x: number; y: number }) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 - ridge });
+      const alongX = w >= h;
+      const k1 = alongX ? mid(t1, l1) : mid(t1, r1);
+      const k2 = alongX ? mid(r1, b1) : mid(l1, b1);
+      if (alongX) {
+        g.poly([t1.x, t1.y, r1.x, r1.y, k2.x, k2.y, k1.x, k1.y]).fill(shade(roof, 1.1));
+        g.poly([l1.x, l1.y, b1.x, b1.y, k2.x, k2.y, k1.x, k1.y]).fill(roof);
+        g.poly([b1.x, b1.y, r1.x, r1.y, k2.x, k2.y]).fill(shade(wallColor, 0.8));
+      } else {
+        g.poly([t1.x, t1.y, l1.x, l1.y, k2.x, k2.y, k1.x, k1.y]).fill(shade(roof, 1.1));
+        g.poly([r1.x, r1.y, b1.x, b1.y, k2.x, k2.y, k1.x, k1.y]).fill(shade(roof, 0.85));
+        g.poly([l1.x, l1.y, b1.x, b1.y, k2.x, k2.y]).fill(shade(wallColor, 0.92));
+      }
+      g.moveTo(k1.x, k1.y).lineTo(k2.x, k2.y).stroke({ width: 2, color: shade(roof, 0.7) });
+    } else {
+      // flat roof with a parapet and rooftop units
+      g.poly([t1.x, t1.y, r1.x, r1.y, b1.x, b1.y, l1.x, l1.y]).fill(0xd9dcd6).stroke({ width: 3, color: shade(def.wallColor, 0.95) });
+      const inset = (p: { x: number; y: number }, k: number) => ({ x: p.x + ((t1.x + b1.x) / 2 - p.x) * k, y: p.y + ((t1.y + b1.y) / 2 - p.y) * k });
+      const [ti, ri, bi, li] = [inset(t1, 0.12), inset(r1, 0.12), inset(b1, 0.12), inset(l1, 0.12)];
+      g.poly([ti.x, ti.y, ri.x, ri.y, bi.x, bi.y, li.x, li.y]).fill(0xc9cdc6);
+      const units = Math.max(1, Math.min(3, Math.floor((w * h) / 4)));
+      for (let k = 0; k < units; k++) {
+        const c = cellToWorld(x + w * (units === 1 ? 0.5 : 0.28 + (0.44 * k) / (units - 1)), y + h * 0.4);
+        const cx = c.x;
+        const cy = c.y - H;
+        g.poly([cx - 9, cy, cx, cy + 4.5, cx + 9, cy, cx, cy - 4.5]).fill(0xf2f2ee);
+        g.poly([cx - 9, cy, cx, cy + 4.5, cx, cy + 10.5, cx - 9, cy + 6]).fill(0xbfc3bd);
+        g.poly([cx, cy + 4.5, cx + 9, cy, cx + 9, cy + 6, cx, cy + 10.5]).fill(0xa8aca6);
+      }
+      // a sign band in the room colour on the front face
+      const s0 = { x: L.x + (B.x - L.x) * 0.2, y: L.y + (B.y - L.y) * 0.2 - H + 6 };
+      const s1 = { x: L.x + (B.x - L.x) * 0.8, y: L.y + (B.y - L.y) * 0.8 - H + 6 };
+      g.poly([s0.x, s0.y + 2, s1.x, s1.y + 2, s1.x, s1.y - 7, s0.x, s0.y - 7]).fill(def.wallColor);
+    }
+    if (status && !status.operational) g.poly([t1.x, t1.y, r1.x, r1.y, b1.x, b1.y, l1.x, l1.y]).fill({ color: 0xe5484d, alpha: 0.25 });
+    const c = cellToWorld(x + w / 2, y + h / 2);
+    const badge = ROOM_BADGE[room.type];
+    const top = c.y - H - (PITCHED.has(room.type) ? 26 + Math.min(w, h) * 5 : 18);
+    if (status?.operational) this.addBadge(label, badge.glyph, c.x, top, badge.color);
+    else this.addBadge(`⚠ ${label}`, null, c.x, top, 0xc0392b);
   }
 
   /** Place a sprite with its base at a world point; width in world px. */

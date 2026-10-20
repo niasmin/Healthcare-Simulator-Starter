@@ -24,7 +24,7 @@ export interface Rect {
   h: number;
 }
 
-export type RoomType = 'ward' | 'nursing_station' | 'therapy' | 'staff_room' | 'villa' | 'homecare_office' | 'training_room' | 'neuro_clinic' | 'stroke_unit' | 'pharmacy' | 'dining_room' | 'laundry_room' | 'reception' | 'storage_room';
+export type RoomType = 'ward' | 'nursing_station' | 'therapy' | 'staff_room' | 'villa' | 'homecare_office' | 'training_room' | 'neuro_clinic' | 'stroke_unit' | 'pharmacy' | 'dining_room' | 'laundry_room' | 'reception' | 'storage_room' | 'bathroom';
 
 export type EquipmentId =
   | 'care_bed'
@@ -48,7 +48,8 @@ export type EquipmentId =
   | 'dining_table'
   | 'washer'
   | 'reception_desk'
-  | 'storage_rack';
+  | 'storage_rack'
+  | 'bath_set';
 
 export interface Room {
   id: string;
@@ -584,8 +585,17 @@ export type ChallengeId = 'tight_budget' | 'bad_name' | 'big_start';
 /** Shop upgrades: permanent, bought once. */
 export type UpgradeId = 'online_marketing' | 'staff_welfare' | 'central_kitchen' | 'family_app' | 'laundry_supply' | 'smart_call';
 
+/** Autopilot switches (sim/autopilot.ts). Missing in older saves = all off. */
+export interface AutoSettings {
+  events: boolean;
+  admit: boolean;
+  carePlan: boolean;
+  staff: boolean;
+}
+
 export interface GameState {
   schemaVersion: 10;
+  auto?: AutoSettings;
   /** Missing in saves made before modes existed: those are campaign games. */
   mode?: GameMode;
   challenge?: ChallengeId;

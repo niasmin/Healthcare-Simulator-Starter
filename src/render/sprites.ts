@@ -49,6 +49,7 @@ export const ROOM_BADGE: Record<RoomType, { glyph: string; color: number }> = {
   laundry_room: { glyph: 'g_doc', color: 0x5f6b78 },
   reception: { glyph: 'g_doc', color: 0x4b4fc4 },
   storage_room: { glyph: 'g_doc', color: 0x8a6a45 },
+  bathroom: { glyph: 'g_bed', color: 0x3f8fae },
 };
 
 /** Full-body chibi sprite per staff role (from the character sheet). RN and PN share the nurse uniform. */
