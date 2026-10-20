@@ -1,4 +1,4 @@
-import { supportApplicants } from './support';
+import { RECEPTION_EXTRA_ENQUIRIES, supportActive, supportApplicants } from './support';
 import { hasUpgrade, MARKETING_EXTRA_ENQUIRIES, WELFARE_MORALE_PER_DAY } from '../../data/shop';
 import { GROUP_LEVELS, RESIDENT_NAMES } from '../../data/patients';
 import { chapterDef, PREMIUM_SHARE } from '../../data/chapters';
@@ -126,6 +126,8 @@ export function refreshCandidates(state: GameState): GameState {
   if (s.organization.reputation >= 70) add++;
   // Shop upgrade: online marketing brings more enquiries.
   if (hasUpgrade(s, 'online_marketing')) add += MARKETING_EXTRA_ENQUIRIES;
+  // A staffed front desk answers more calls.
+  if (supportActive(s, 'receptionist')) add += RECEPTION_EXTRA_ENQUIRIES;
   if (s.organization.reputation < 30) add = Math.max(0, add - 1);
   if (s.organization.reputation < 15) add = 0;
   // ...and families already waiting look elsewhere (the oldest leave first; urgent referrals are separate).

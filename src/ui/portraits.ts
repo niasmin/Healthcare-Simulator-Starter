@@ -9,9 +9,9 @@ import residentF2 from '../assets/portraits/resident_f2.jpg';
 const faces = import.meta.glob('../assets/faces/*.png', { eager: true, import: 'default' }) as Record<string, string>;
 
 export type Mood = 'default' | 'smile' | 'happy' | 'surprise' | 'sad';
-type FaceSet = 'owner_f' | 'owner_m' | 'nurse' | 'caregiver' | 'pt' | 'ot' | 'resident' | 'doctor' | 'pharmacist' | 'nutritionist' | 'cleaner';
+type FaceSet = 'owner_f' | 'owner_m' | 'nurse' | 'caregiver' | 'pt' | 'ot' | 'resident' | 'doctor' | 'pharmacist' | 'nutritionist' | 'cleaner' | 'receptionist' | 'security';
 
-const ROLE_FACE: Record<StaffRole, FaceSet> = { rn: 'nurse', pn: 'nurse', caregiver: 'caregiver', pt: 'pt', ot: 'ot', doctor: 'doctor', pharmacist: 'pharmacist', nutritionist: 'nutritionist', cleaner: 'cleaner' };
+const ROLE_FACE: Record<StaffRole, FaceSet> = { rn: 'nurse', pn: 'nurse', caregiver: 'caregiver', pt: 'pt', ot: 'ot', doctor: 'doctor', pharmacist: 'pharmacist', nutritionist: 'nutritionist', cleaner: 'cleaner', receptionist: 'receptionist', security: 'security' };
 
 function face(set: FaceSet, mood: Mood): string {
   return faces[`../assets/faces/${set}_${mood}.png`];

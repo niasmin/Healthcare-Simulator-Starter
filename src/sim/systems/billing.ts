@@ -1,4 +1,4 @@
-import { PHARMACY_SUPPLIES_PERCENT, supportActive } from './support';
+import { PHARMACY_SUPPLIES_PERCENT, roomOpen, STORAGE_SUPPLIES_PERCENT, supportActive } from './support';
 import {
   dayInMonth,
   DAYS_PER_MONTH,
@@ -144,10 +144,13 @@ export function collectPayments(state: GameState, closingDay: number): GameState
 export function dailyResidentCosts(state: GameState): { food: number; supplies: number } {
   const food = FOOD_PER_RESIDENT_DAY * state.residents.length;
   const supplies = state.residents.reduce((a, r) => a + SUPPLIES_BASE_PER_DAY + SUPPLIES_PER_LEVEL_DAY * r.careLevel + (PROGRAMME_SUPPLIES_PER_DAY[r.group] ?? 0), 0);
-  // Shop upgrades: a central kitchen and an in-house laundry and supply room cut these costs.
+  // Shop upgrades (central kitchen, supply stock system) and support rooms (pharmacy, storage) cut these costs.
+  let cut = hasUpgrade(state, 'laundry_supply') ? pctOf(supplies, LAUNDRY_SUPPLIES_PERCENT) : supplies;
+  if (supportActive(state, 'pharmacist')) cut = pctOf(cut, PHARMACY_SUPPLIES_PERCENT);
+  if (roomOpen(state, 'storage_room')) cut = pctOf(cut, STORAGE_SUPPLIES_PERCENT);
   return {
     food: hasUpgrade(state, 'central_kitchen') ? pctOf(food, KITCHEN_FOOD_PERCENT) : food,
-    supplies: pctOf(hasUpgrade(state, 'laundry_supply') ? pctOf(supplies, LAUNDRY_SUPPLIES_PERCENT) : supplies, supportActive(state, 'pharmacist') ? PHARMACY_SUPPLIES_PERCENT : 100),
+    supplies: cut,
   };
 }
 

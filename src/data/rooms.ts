@@ -35,6 +35,8 @@ export const EQUIPMENT: Record<EquipmentId, EquipmentDef> = {
   medicine_shelf: { id: 'medicine_shelf', costSatang: thb(20_000), color: 0xe8f0f6 },
   dining_table: { id: 'dining_table', costSatang: thb(9_000), color: 0xc98a52 },
   washer: { id: 'washer', costSatang: thb(35_000), color: 0xdfe6ec },
+  reception_desk: { id: 'reception_desk', costSatang: thb(30_000), color: 0xe9c48f },
+  storage_rack: { id: 'storage_rack', costSatang: thb(12_000), color: 0xb08a5a },
 };
 
 export interface EquipmentSlot {
@@ -257,11 +259,39 @@ export const ROOMS: Record<RoomType, RoomDef> = {
     floorColor: 0xe4ebf0,
     wallColor: 0x5f6b78,
   },
+  // The front lobby: the receptionist and the security guard both work from here.
+  reception: {
+    type: 'reception',
+    minSide: 2,
+    minArea: 4,
+    maxArea: 12,
+    baseCostSatang: thb(50_000),
+    costPerTileSatang: thb(10_000),
+    upkeepPerTileSatang: thb(15),
+    equipment: [
+      { id: 'reception_desk', required: 1, max: () => 1 },
+      { id: 'waiting_chairs', required: 0, max: () => 2 },
+    ],
+    floorColor: 0xf1e9dc,
+    wallColor: 0x4b4fc4,
+  },
+  storage_room: {
+    type: 'storage_room',
+    minSide: 2,
+    minArea: 4,
+    maxArea: 9,
+    baseCostSatang: thb(30_000),
+    costPerTileSatang: thb(8_000),
+    upkeepPerTileSatang: thb(10),
+    equipment: [{ id: 'storage_rack', required: 1, max: () => 4 }],
+    floorColor: 0xe9e2d6,
+    wallColor: 0x8a6a45,
+  },
 };
 
 
 
-export const ROOM_TYPES: RoomType[] = ['ward', 'nursing_station', 'therapy', 'staff_room', 'villa', 'homecare_office', 'training_room', 'neuro_clinic', 'stroke_unit', 'pharmacy', 'dining_room', 'laundry_room'];
+export const ROOM_TYPES: RoomType[] = ['ward', 'nursing_station', 'therapy', 'staff_room', 'villa', 'homecare_office', 'training_room', 'neuro_clinic', 'stroke_unit', 'pharmacy', 'dining_room', 'laundry_room', 'reception', 'storage_room'];
 /** Rooms whose care beds count as resident capacity. */
 export const BED_ROOMS: RoomType[] = ['ward', 'villa'];
 

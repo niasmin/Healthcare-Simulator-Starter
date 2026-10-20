@@ -87,11 +87,27 @@ export const ROLES: Record<StaffRole, RoleDef> = {
     color: 0x6f7c8a,
     cssColor: '#5f6b78',
   },
+  receptionist: {
+    role: 'receptionist',
+    skills: ['front_desk'],
+    baseWageSatang: thb(15_000),
+    wagePerYearSatang: thb(400),
+    color: 0x4b4fc4,
+    cssColor: '#4b4fc4',
+  },
+  security: {
+    role: 'security',
+    skills: ['security'],
+    baseWageSatang: thb(13_000),
+    wagePerYearSatang: thb(300),
+    color: 0x24344d,
+    cssColor: '#24344d',
+  },
 };
 
-export const ROLE_ORDER: StaffRole[] = ['doctor', 'rn', 'pn', 'caregiver', 'pt', 'ot', 'pharmacist', 'nutritionist', 'cleaner'];
+export const ROLE_ORDER: StaffRole[] = ['doctor', 'rn', 'pn', 'caregiver', 'pt', 'ot', 'pharmacist', 'nutritionist', 'cleaner', 'receptionist', 'security'];
 /** Support roles: optional, offered only once their room exists, never required by the roster advice. */
-export const SUPPORT_ROLES: StaffRole[] = ['pharmacist', 'nutritionist', 'cleaner'];
+export const SUPPORT_ROLES: StaffRole[] = ['pharmacist', 'nutritionist', 'cleaner', 'receptionist', 'security'];
 
 export function wageFor(role: StaffRole, experienceYears: number): number {
   const d = ROLES[role];

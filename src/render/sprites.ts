@@ -30,6 +30,7 @@ export const EQUIP_SPRITE: Partial<Record<EquipmentId, { name: string; width: nu
   whiteboard: { name: 'eq_board', width: 30 },
   medicine_shelf: { name: 'eq_medshelf', width: 30 },
   dining_table: { name: 'eq_dining', width: 50 },
+  reception_desk: { name: 'eq_reception', width: 56 },
 };
 
 /** Map-label pill per room type: glyph texture name and pill colour. */
@@ -46,10 +47,12 @@ export const ROOM_BADGE: Record<RoomType, { glyph: string; color: number }> = {
   pharmacy: { glyph: 'g_doc', color: 0x2a7f7f },
   dining_room: { glyph: 'g_sofa', color: 0xc9771f },
   laundry_room: { glyph: 'g_doc', color: 0x5f6b78 },
+  reception: { glyph: 'g_doc', color: 0x4b4fc4 },
+  storage_room: { glyph: 'g_doc', color: 0x8a6a45 },
 };
 
 /** Full-body chibi sprite per staff role (from the character sheet). RN and PN share the nurse uniform. */
-export const STAFF_SPRITE: Record<StaffRole, string> = { rn: 'ch_nurse', pn: 'ch_nurse', caregiver: 'ch_caregiver', pt: 'ch_pt', ot: 'ch_ot', doctor: 'ch_doctor', pharmacist: 'ch_pharmacist', nutritionist: 'ch_nutritionist', cleaner: 'ch_cleaner' };
+export const STAFF_SPRITE: Record<StaffRole, string> = { rn: 'ch_nurse', pn: 'ch_nurse', caregiver: 'ch_caregiver', pt: 'ch_pt', ot: 'ch_ot', doctor: 'ch_doctor', pharmacist: 'ch_pharmacist', nutritionist: 'ch_nutritionist', cleaner: 'ch_cleaner', receptionist: 'ch_receptionist', security: 'ch_security' };
 /** Map width of a standing character, in world px. */
 export const PERSON_SPRITE_WIDTH = 24;
 
