@@ -22,7 +22,7 @@ function AddPopover({ role, slot, onClose }: { role: StaffRole; slot: ShiftSlot;
   // Staff with the fewest shifts first, so filling a column spreads work instead of stacking double shifts.
   const shiftCount = (id: string) => game.shifts.filter((s) => s.employeeId === id).length;
   const options = game.employees
-    .filter((e) => e.role === role && !game.shifts.some((s) => s.employeeId === e.id && s.slot === slot))
+    .filter((e) => e.role === role && !e.placement && !game.shifts.some((s) => s.employeeId === e.id && s.slot === slot))
     .sort((a, b) => shiftCount(a.id) - shiftCount(b.id));
   return (
     <div className="absolute z-20 left-0 top-full mt-1 w-60 max-lg:fixed max-lg:inset-x-3 max-lg:top-auto max-lg:bottom-24 max-lg:w-auto max-lg:max-h-[50dvh] max-lg:overflow-y-auto rounded-xl border border-line bg-white shadow-2xl p-2 flex flex-col gap-1" role="dialog">
@@ -76,7 +76,14 @@ function StaffRow({ e }: { e: Employee }) {
   } else if (act.kind === 'away') {
     status = `🚐 ${t('staff.away')}`;
     tone = 'text-teal';
+  } else if (act.kind === 'placed') {
+    status = `🤝 ${t('staff.placed')}`;
+    tone = 'text-teal';
+  } else if (act.kind === 'training') {
+    status = `🎓 ${t('staff.training')}`;
+    tone = 'text-teal';
   }
+  const contract = e.placement ? game.workforce.contracts.find((c) => c.id === e.placement) : undefined;
   return (
     <tr className="border-t border-line">
       <td className="py-1.5 pr-2">
@@ -84,11 +91,26 @@ function StaffRow({ e }: { e: Employee }) {
           <Avatar src={staffPortrait(e)} name={e.name} color={ROLES[e.role].cssColor} size={28} />
           <div className="min-w-0">
             <div className="text-sm font-medium truncate">{name(e.name, true)}</div>
-            <RoleChip role={e.role} label={t(`role.${e.role}.short`)} />
+            <div className="flex items-center gap-1">
+              <RoleChip role={e.role} label={t(`role.${e.role}.short`)} />
+              {e.certs?.map((c) => (
+                <span key={c} title={t(`course.${c}`)} className="text-[9px] px-1 rounded bg-ok/15 text-ok font-semibold">
+                  🎓
+                </span>
+              ))}
+            </div>
           </div>
         </div>
       </td>
-      <td className="py-1.5 pr-2 text-xs whitespace-nowrap">{slots.length ? slots.map((s) => t(`slot.${s.slot}`)).join(' + ') : <span className="text-warn">{t('roster.no_shift')}</span>}</td>
+      <td className="py-1.5 pr-2 text-xs whitespace-nowrap">
+        {contract ? (
+          <span className="text-teal">🤝 {name(contract.org)}</span>
+        ) : slots.length ? (
+          slots.map((s) => t(`slot.${s.slot}`)).join(' + ')
+        ) : (
+          <span className="text-warn">{t('roster.no_shift')}</span>
+        )}
+      </td>
       <td className="py-1.5 pr-2 w-24">
         <StatBar value={e.energy} color="#2f9e9a" />
         <div className="text-[10px] tabular text-ink-soft">{Math.round(e.energy)}</div>

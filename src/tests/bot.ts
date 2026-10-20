@@ -5,13 +5,16 @@ import { EVENT_DEFS } from '../data/events';
 import { dailyRunningCost, nextBillingDay, rosterView } from '../sim/selectors';
 import { dayOf } from '../sim/systems/time';
 import { SLOT_ORDER } from '../data/staff';
-import type { GameState, Rect, ShiftSlot, Skill, StaffRole } from '../domain/types';
+import type { CourseId, GameState, Rect, ShiftSlot, Skill, StaffRole } from '../domain/types';
 import { EQUIPMENT, TILES_PER_BED, roomConstructionCost } from '../data/rooms';
 import { chapterDef, EXPANDED_WIDTH, LAND_PRICE } from '../data/chapters';
 import { DECOR, MAX_APPEAL, gardenAppeal } from '../data/decor';
 import { monthlyFee } from '../data/finance';
 import { thb } from '../domain/money';
 import { buildHome } from './helpers';
+import { prefabCost, prefabDef } from '../data/prefabs';
+import { COURSES } from '../data/workforce';
+import { certifiedCount, isCertified, placementBlocker, trainingBlocker, trainingSeats } from '../sim/systems/workforce';
 
 /**
  * A scripted "sensible player" used by the 30-day playthrough test and balancing.
@@ -154,6 +157,50 @@ function homeCare(s: GameState, reserve: number): GameState {
   }
   return s;
 }
+/** Chapter 5: the training room sits beside the Home Care centre, on the row-10 corridor. */
+export const TRAINING_ROOM = { x: 30, y: 11 };
+/** Contracts the bot runs at once, and the most extra staff it keeps for placements. */
+const MAX_CONTRACTS = 4;
+const MAX_POOL = 7;
+
+/** Staff kept off the roster for training and placements: certified, in class, or placed. */
+function reserved(s: GameState, id: string): boolean {
+  const e = s.employees.find((x) => x.id === id);
+  return !!e && (!!e.placement || isCertified(e) || s.workforce.training.some((t) => t.employeeId === id));
+}
+
+/** Chapter 5: open a training room, certify a pool of extra staff, and place them with partners. */
+function workforce(s: GameState, reserve: number): GameState {
+  const def = chapterDef(s.chapter.id);
+  if (!s.site.rooms.some((r) => r.type === 'training_room')) {
+    const pf = prefabDef('training')!;
+    if (s.organization.cashSatang < prefabCost(pf) + runwayNeed(s, reserve)) return s;
+    s = tryCmd(s, { type: 'placePrefab', prefab: 'training', origin: TRAINING_ROOM });
+  }
+  const free = () => s.employees.filter((e) => !e.placement && !s.shifts.some((x) => x.employeeId === e.id) && !s.workforce.training.some((t) => t.employeeId === e.id));
+  const pool = () => s.employees.filter((e) => !s.shifts.some((x) => x.employeeId === e.id)).length;
+  const train = (role: StaffRole, course: CourseId): void => {
+    if (s.organization.cashSatang < COURSES[course].costSatang + runwayNeed(s, reserve)) return;
+    let trainee = free().find((e) => e.role === role && trainingBlocker(s, e.id, course) === null)?.id ?? null;
+    if (!trainee && pool() < MAX_POOL && s.workforce.training.length < trainingSeats(s)) [s, trainee] = hireRole(s, role);
+    if (trainee) s = tryCmd(s, { type: 'startTraining', employeeId: trainee, course });
+  };
+  for (const o of [...s.workforce.offers].sort((a, b) => a.expiresDay - b.expiresDay)) {
+    if (s.workforce.contracts.length >= MAX_CONTRACTS) break;
+    let who = free().find((e) => placementBlocker(s, o.id, e.id) === null)?.id ?? null;
+    if (!who && !o.cert && pool() < MAX_POOL) [s, who] = hireRole(s, o.role);
+    if (who) s = tryCmd(s, { type: 'acceptOffer', offerId: o.id, employeeId: who });
+    else if (o.cert) train(o.role, o.cert);
+  }
+  // Work towards the certification target with the pool: caregivers first, then practical nurses.
+  if (certifiedCount(s) + s.workforce.training.length < (def.targetCertified ?? 0) && s.workforce.training.length < trainingSeats(s)) {
+    const caregivers = s.employees.filter((e) => e.role === 'caregiver' && isCertified(e)).length;
+    if (caregivers < 4) train('caregiver', 'care_cert');
+    else train('pn', 'airway_cert');
+  }
+  return s;
+}
+
 /** Visits one van can make in a morning (appointments 08:00–13:00, 100 minutes each). */
 const VISITS_PER_VAN = 4;
 
@@ -172,7 +219,7 @@ function hireRole(s: GameState, role: StaffRole): [GameState, string | null] {
 /** Put someone of `role` on `slot`: an unrostered employee first, else hire one. */
 function cover(s: GameState, role: StaffRole, slot: ShiftSlot): GameState {
   const rostered = new Set(s.shifts.map((x) => x.employeeId));
-  let emp = s.employees.find((e) => e.role === role && !rostered.has(e.id))?.id ?? null;
+  let emp = s.employees.find((e) => e.role === role && !rostered.has(e.id) && !reserved(s, e.id))?.id ?? null;
   if (!emp) [s, emp] = hireRole(s, role);
   return emp ? tryCmd(s, { type: 'assignShift', employeeId: emp, slot }) : s;
 }
@@ -188,6 +235,7 @@ export function botTurn(state: GameState, opts: BotOptions = {}): GameState {
   }
   if (s.chapter.id >= 3) s = tranquila(s, opts.reserve ?? thb(50_000));
   if (s.chapter.id >= 4) s = homeCare(s, opts.reserve ?? thb(50_000));
+  if (s.chapter.id >= 5) s = workforce(s, opts.reserve ?? thb(50_000));
   if (s.events.active) {
     for (const id of EVENT_PREFS[s.events.active.defId]) {
       if (!EVENT_DEFS[s.events.active.defId].choices.some((c) => c.id === id) || choiceBlocker(s, id)) continue;

@@ -2,6 +2,7 @@ import { reconcile } from '../domain/rules/ledger';
 import type { ChapterResult, GameState } from '../domain/types';
 import { ROLES } from '../data/staff';
 import { emptyHomecare } from '../sim/systems/homecare';
+import { emptyWorkforce } from '../sim/systems/workforce';
 import { dayOf } from '../sim/systems/time';
 
 /**
@@ -11,7 +12,7 @@ import { dayOf } from '../sim/systems/time';
  * CompressionStream, so even long games stay far below storage limits.
  */
 export const SAVE_FORMAT = 1;
-export const CURRENT_SCHEMA = 7;
+export const CURRENT_SCHEMA = 8;
 
 export type SlotId = 'auto' | 'slot1' | 'slot2' | 'slot3';
 export const SLOTS: SlotId[] = ['auto', 'slot1', 'slot2', 'slot3'];
@@ -131,6 +132,10 @@ export function migrate(state: GameState): GameState {
   if (s.schemaVersion === 6) {
     // v7 adds home care (Chapter 4); villas and premium residents need no new fields.
     s = { ...s, schemaVersion: 7, homecare: emptyHomecare() };
+  }
+  if (s.schemaVersion === 7) {
+    // v8 adds the Chapter 5 workforce: training, partner offers and placements.
+    s = { ...s, schemaVersion: 8, workforce: emptyWorkforce() };
   }
   return s as GameState;
 }

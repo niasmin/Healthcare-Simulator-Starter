@@ -3,7 +3,7 @@ import type { CareGroup } from '../domain/types';
 
 /**
  * Campaign chapters (concept-art road map). Each one is judged once by the engine when its last day
- * closes. Targets are FICTIONAL game balancing. Chapters 3–7 are listed in the UI but not playable yet.
+ * closes. Targets are FICTIONAL game balancing. Chapters 6–7 are listed in the UI but not playable yet.
  */
 export interface ChapterDef {
   id: number;
@@ -26,6 +26,9 @@ export interface ChapterDef {
   /** Chapter 4: home-care clients and the share of visits completed over the last 7 days (0..1). */
   targetClients?: number;
   targetVisitRate?: number;
+  /** Chapter 5: staff holding at least one training certificate, and placement contracts completed in the chapter. */
+  targetCertified?: number;
+  targetContracts?: number;
 }
 
 export const BASIC_GROUPS: CareGroup[] = ['active_aging', 'stroke_rehab', 'bedridden'];
@@ -39,6 +42,8 @@ export const CHAPTERS: ChapterDef[] = [
   { id: 3, days: 60, targetBeds: 36, targetResidents: 30, targetQuality: 75, targetPremium: 4, targetPremiumSat: 78, targetAppeal: 20, groups: [...BASIC_GROUPS, ...BASIC_GROUPS, ...PROGRAMMES] },
   // Home Care: staff visit clients at home by van, while the home stays full and well run.
   { id: 4, days: 60, targetBeds: 36, targetResidents: 30, targetQuality: 75, targetClients: 12, targetVisitRate: 0.9, groups: [...BASIC_GROUPS, ...BASIC_GROUPS, ...PROGRAMMES] },
+  // Healthcare Workforce: a training centre certifies staff, and partner organisations hire them by the day.
+  { id: 5, days: 60, targetBeds: 36, targetResidents: 30, targetQuality: 75, targetCertified: 6, targetContracts: 6, groups: [...BASIC_GROUPS, ...BASIC_GROUPS, ...PROGRAMMES] },
 ];
 
 /** Share of new waiting-list candidates who want a villa, once villas are unlocked (Chapter 3+). */

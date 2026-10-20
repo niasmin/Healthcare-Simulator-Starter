@@ -27,6 +27,8 @@ export const EQUIPMENT: Record<EquipmentId, EquipmentDef> = {
   feeding_pump: { id: 'feeding_pump', costSatang: thb(12_000), color: 0xe8eef2 },
   suction_unit: { id: 'suction_unit', costSatang: thb(20_000), color: 0xdfe8f0 },
   care_van: { id: 'care_van', costSatang: thb(180_000), color: 0xf4f6f8 },
+  training_manikin: { id: 'training_manikin', costSatang: thb(25_000), color: 0xe9c9a8 },
+  whiteboard: { id: 'whiteboard', costSatang: thb(8_000), color: 0xf7f7f2 },
 };
 
 export interface EquipmentSlot {
@@ -158,11 +160,28 @@ export const ROOMS: Record<RoomType, RoomDef> = {
     wallColor: 0x3f7f9a,
     unlockChapter: 4,
   },
+  training_room: {
+    type: 'training_room',
+    minSide: 2,
+    minArea: 6,
+    maxArea: 16,
+    baseCostSatang: thb(50_000),
+    costPerTileSatang: thb(12_000),
+    upkeepPerTileSatang: thb(20),
+    // One training manikin per seat: how many staff can be in class at once.
+    equipment: [
+      { id: 'whiteboard', required: 1, max: () => 1 },
+      { id: 'training_manikin', required: 1, max: (r) => Math.max(1, Math.floor(rectArea(r) / 3)) },
+    ],
+    floorColor: 0xd9e4f0,
+    wallColor: 0x2f7d8c,
+    unlockChapter: 5,
+  },
 };
 
 
 
-export const ROOM_TYPES: RoomType[] = ['ward', 'nursing_station', 'therapy', 'staff_room', 'villa', 'homecare_office'];
+export const ROOM_TYPES: RoomType[] = ['ward', 'nursing_station', 'therapy', 'staff_room', 'villa', 'homecare_office', 'training_room'];
 /** Rooms whose care beds count as resident capacity. */
 export const BED_ROOMS: RoomType[] = ['ward', 'villa'];
 

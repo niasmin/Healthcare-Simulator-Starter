@@ -5,6 +5,7 @@ import { summarizeBeds } from '../bedsSummary';
 import { entryDay, totalsOf } from '../selectors';
 import { makeResidentCandidate } from './staffing';
 import { visitRate } from './homecare';
+import { certifiedCount, contractsCompleted } from './workforce';
 import { gardenAppeal } from '../../data/decor';
 import { dayOf } from './time';
 
@@ -73,6 +74,14 @@ export function chapterChecks(state: GameState, def: ChapterDef = chapterDef(sta
     const pct = Math.round((visitRate(state) ?? 0) * 100);
     const need = Math.round(def.targetVisitRate * 100);
     checks.push({ id: 'visit_rate', have: pct, need, ok: pct >= need });
+  }
+  if (def.targetCertified) {
+    const n = certifiedCount(state);
+    checks.push({ id: 'certified', have: n, need: def.targetCertified, ok: n >= def.targetCertified });
+  }
+  if (def.targetContracts) {
+    const n = contractsCompleted(state, start);
+    checks.push({ id: 'contracts', have: n, need: def.targetContracts, ok: n >= def.targetContracts });
   }
   checks.push({ id: 'cashflow', have: net, need: 1, ok: net > 0 }, { id: 'quality', have: quality, need: def.targetQuality, ok: quality >= def.targetQuality });
   return checks;

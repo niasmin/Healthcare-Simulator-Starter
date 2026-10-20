@@ -8,7 +8,7 @@ import { SHIFT_SLOTS } from '../data/staff';
 import { freeBeds, parseBedId, residentsInRoom } from '../domain/rules/beds';
 import { roomStatus } from '../domain/rules/rooms';
 import { validateShift } from '../domain/rules/shifts';
-import type { Cell, CommandResult, DayStats, DecorType, EquipmentId, GameSpeed, GameState, PriceLevel, Rect, Resident, Room, RoomType, ShiftSlot } from '../domain/types';
+import type { Cell, CommandResult, CourseId, DayStats, DecorType, EquipmentId, GameSpeed, GameState, PriceLevel, Rect, Resident, Room, RoomType, ShiftSlot } from '../domain/types';
 import { dayInMonth, monthOfDay, PRICE_LEVELS } from '../data/finance';
 import { billAdmission, billFinal, billMonth, chargeDailyResidentCosts, collectPayments } from './systems/billing';
 import { eventCheck, eventExpiryTick, expireReferrals, resolveEvent } from './systems/events';
@@ -25,6 +25,7 @@ import { admitClient, dischargeClient, hasHomecareOffice, homecareDayEnd, homeca
 import { EXPANDED_WIDTH, LAND_PRICE } from '../data/chapters';
 import { prefabCost, prefabDef, prefabRect } from '../data/prefabs';
 import { GROUP_WARD_EQUIPMENT } from '../data/patients';
+import { acceptOffer, endContract, startTraining, workforceDayEnd, workforceTick } from './systems/workforce';
 
 /**
  * Commands are the ONLY way the UI changes game state.
@@ -53,7 +54,10 @@ export type Command =
   | { type: 'placePrefab'; prefab: string; origin: Cell; rotated?: boolean }
   | { type: 'retryChapter' }
   | { type: 'admitClient'; leadId: string }
-  | { type: 'dischargeClient'; clientId: string };
+  | { type: 'dischargeClient'; clientId: string }
+  | { type: 'startTraining'; employeeId: string; course: CourseId }
+  | { type: 'acceptOffer'; offerId: string; employeeId: string }
+  | { type: 'endContract'; contractId: string };
 
 export interface CommandOutcome {
   state: GameState;
@@ -320,6 +324,21 @@ export function applyCommand(state: GameState, cmd: Command): CommandOutcome {
       return next ? { state: next, result: { ok: true } } : fail(state, 'not_found');
     }
 
+    case 'startTraining': {
+      const out = startTraining(state, cmd.employeeId, cmd.course);
+      return 'reason' in out ? fail(state, out.reason) : { state: out.state, result: { ok: true, id: out.id } };
+    }
+
+    case 'acceptOffer': {
+      const out = acceptOffer(state, cmd.offerId, cmd.employeeId);
+      return 'reason' in out ? fail(state, out.reason) : { state: out.state, result: { ok: true, id: out.id } };
+    }
+
+    case 'endContract': {
+      const next = endContract(state, cmd.contractId);
+      return next ? { state: next, result: { ok: true } } : fail(state, 'not_found');
+    }
+
     case 'startChapter': {
       const next = startNextChapter(state);
       return next ? { state: next, result: { ok: true } } : fail(state, 'chapter_locked');
@@ -376,6 +395,7 @@ export function step(state: GameState): GameState {
         s = collectPayments(s, closingDay);
         s = expireReferrals(s, closingDay);
         s = homecareDayEnd(s, closingDay, ev.at);
+        s = workforceDayEnd(s, closingDay);
         s = closeDay(s);
         s = judgeChapter(s, closingDay);
         // The new day starts: bill the month in advance on its first day.
@@ -398,6 +418,8 @@ export function step(state: GameState): GameState {
   s = eventExpiryTick(s);
   // Home visits are booked appointments, so they claim staff before in-house tasks.
   s = homecareTick(s);
+  // Placements and classes take their people before in-house tasks are handed out.
+  s = workforceTick(s);
   s = careTick(s);
   s = needsTick(s);
   s = staffEnergyTick(s);

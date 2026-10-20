@@ -27,11 +27,11 @@ Add `?debug` to the URL to expose `window.__HE__` (store + renderer) for automat
 | **3** | Pricing, monthly invoices and payments, running costs, Financial Dashboard, 4 events, title screen, character portraits | ✅ Done |
 | **4** | Save/load, guided tutorial, 30-day chapter goal with win/lose verdict, three scripted events, balancing | ✅ Done (**MVP complete**) |
 | **5** | Chapter campaign; Ch. 2 nursing center with specialised programmes; Ch. 3 premium villas (Tranquila); Ch. 4 Home Care | ✅ Done |
-| 6 | Workforce, hospital, multi-site | ⏳ Not started |
+| 6 | Ch. 5 workforce (training + B2B placements) ✅; Ch. 6 hospital, Ch. 7 multi-site | 🚧 In progress |
 
 ## What you can play now
 
-Playable today, as one 210-day campaign with the same business:
+Playable today, as one 270-day campaign with the same business:
 
 | Chapter | Days |
 |---|---|
@@ -39,8 +39,28 @@ Playable today, as one 210-day campaign with the same business:
 | 2. Professional Nursing Center | 31–90 |
 | 3. Tranquila Senior Living | 91–150 |
 | 4. Home Care | 151–210 |
+| 5. Healthcare Workforce | 211–270 |
 
-Chapters 5–7 (PHC workforce, Neuro Hospital, multi-site empire) come in Phase 6.
+Chapters 6–7 (Neuro Hospital, multi-site empire) come later in Phase 6.
+
+### Phase 6, part 1: Chapter 5 (Healthcare Workforce)
+
+- **Training room** (unlocks in chapter 5, ready-made 2×3): one whiteboard plus training manikins. Each manikin is one seat in class.
+- **Courses** (abstract qualifications, never clinical instruction; fictional prices):
+  - *Advanced elder care* (caregivers, ฿6,000): a certificate.
+  - *Tube-feeding care* (caregivers, ฿8,000): a certificate plus the tube-feeding qualification.
+  - *Airway care* (practical nurses, ฿12,000): a certificate plus the airway-care qualification.
+- **How class works:** a course is 8 hours, taken during the trainee's own shift, so the home is a pair of hands short while they learn. Staff without shifts attend 08:00–16:00. Trainees sit in the training room on the map, and passing adds +5 morale.
+- **Partner requests:** clinics, hospitals, companies and schools (all fictional) send 1–2 requests a day once a training room exists. A request names the role, an optional certificate, 7/10/14 days and a daily rate (caregiver ฿1,100, PN ฿1,700, RN ฿2,600; +25% when a certificate is required). Requests stay open for 4 days, and at most 4 wait at once.
+- **Placements:**
+  - A placed employee leaves the home's roster. Their shifts are removed and new shifts are refused.
+  - They work at the partner 07:00–15:00 on each contract day and are not drawn on the map then.
+  - Each worked day is billed to the partner at midnight on a `b2b` invoice and paid like any other.
+  - An exhausted employee misses the day.
+  - A completed contract returns the employee and gives +1 reputation if no day was missed. Ending early, or losing the employee, gives −2.
+- **Targets:** 60 days; 6 certified staff; 6 contracts completed; the home stays at 36 beds / 30 residents with quality 75 and a profit.
+- The guide walks through the room, the first certificate, the first placement, the roster, then the two targets. The Hire tab has the whole workforce panel, and the roster shows 🎓 certificates and where placed staff are.
+- Save schema 8 (a v7 save gains an empty workforce).
 
 ### Phone play screen in the concept-art style
 
@@ -358,7 +378,7 @@ src/
   - Food, supplies, upkeep and payroll are each charged once per day.
   - An event's cost is charged once, and a resolved event can't be resolved again.
 
-## Tests (123 passing)
+## Tests (134 passing)
 
 | File | Covers |
 |---|---|
@@ -374,6 +394,7 @@ src/
 | `decor.test.ts` | Decor placed on an empty tile and charged once; can't overlap rooms, corridor, entrance or decor, and blocks building over it; demolish refunds half; appeal is capped and makes residents happier; schema-3 saves migrate to schema 4 |
 | `chapter.test.ts` | **30-day playthrough** by a scripted sensible player using only public commands and the real applicant and waiting-list pools: wins chapter 1 with cash positive every day; every invariant holds (ledger, unique beds, no overlapping shifts, no care without the skill); roster ready and >95% of tasks done; the three scripted events fire on their days; the same seed plays byte-identically; the verdict pauses the game and survives a save. **Balance:** a full home wins on more seeds, a 40% empty home and an overstaffed home fail on targets. **Verdict rules:** bankrupt at the first negative midnight, decided once and never changed; nothing decided before day 30; a migrated save past day 30 is judged at the next midnight. **Tutorial:** step order, derived from state, a goal and a how-to hint in Thai and English for every step. **Staffing advice:** rush-hour windows, RN covering PN work, one OT for ten sessions |
 | `chapter2.test.ts` | **90-day campaign** by the scripted player: wins Chapter 1, starts Chapter 2 on day 31 and wins it on day 90 with every target; dementia residents only in secured wards; airway care only by RNs and tube feeding only by RNs/PNs; an RN on the night roster; >93% of tasks done; byte-identical rerun; a reckless builder's lowest cash falls far below the careful one, with at least one bankruptcy; a second full team fails the chapter. **Rules:** the next chapter only after a win, with one candidate per programme; secured-ward admission; RN-only airway care missed with only a PN on nights; programme fees; schema-5 migration; Thai and English text for every Chapter 2 step |
+| `chapter5.test.ts` | **Full 270-day campaign:** chapters 1–5 all won on schedule and solvent, ledger reconciles, at least 6 certified staff, b2b invoices are quantity × rate, and placed staff hold no shifts. **Training:** needs a room, the right role and a free seat; the cost is charged; class is taken in the shift, in the room; passing adds the certificate and qualification; staff without shifts attend 08:00–16:00. **Placements:** role and certificate checks; placed staff leave the roster and can’t get shifts or courses; 07:00–15:00 away, billed per day, released at the end; ending early or dismissal costs reputation; requests only from chapter 5 with a room, and they expire. Guide order; v7→v8 save migration |
 | `chapter34.test.ts` | **Full 210-day campaign** by the careful scripted player: chapters 1–4 all won on schedule and solvent, ledger reconciles; premium residents only in villas; visits only by qualified staff, billed per visit, and staff on a visit leave the map. **Chapter 3 rules:** land bought once, from chapter 3, keeping every corridor tile; villas locked before chapter 3 and premium-only; a garden keeps premium families content. **Chapter 4 rules:** clients need a centre with a van; one van takes one visit at a time and done visits bill at midnight; missed visits lead to cancellation; visits need the skill and a shift; schema-6 migration; Thai and English text for every step |
 | `prefabs.test.ts` | Ready-made rooms place the room and equipment in one command for exactly the hand-built price; all or nothing on overlap or short cash; rotation; chapter locks; labels. Starter campus: built and paid from capital, tutorial skips straight to the ward step, deterministic; the empty template changes nothing. Retrying a failed chapter restarts its days with the same business and is refused otherwise |
 | `i18n-iso.test.ts` | TH/EN key parity; labels for every room, equipment and reason; Thai interpolation; iso projection inverts for all 400 cells |

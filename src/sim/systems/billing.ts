@@ -98,7 +98,7 @@ export function billFinal(state: GameState, resident: Resident): GameState {
   return s;
 }
 
-export function recordService(state: GameState, residentId: string, stream: Exclude<RevenueStream, 'room_care' | 'homecare'>, n = 1): GameState {
+export function recordService(state: GameState, residentId: string, stream: Exclude<RevenueStream, 'room_care' | 'homecare' | 'workforce'>, n = 1): GameState {
   const cur = state.unbilled[residentId] ?? EMPTY;
   return { ...state, unbilled: { ...state.unbilled, [residentId]: { ...cur, [stream]: cur[stream] + n } } };
 }
@@ -109,7 +109,7 @@ export function collectPayments(state: GameState, closingDay: number): GameState
   const due = s.invoices.filter((i) => i.status === 'issued' && i.payDay <= closingDay);
   for (const inv of due) {
     s = { ...s, invoices: s.invoices.map((x) => (x.id === inv.id ? { ...x, status: 'paid' as const, paidAt: s.minute } : x)) };
-    s = post(s, inv.totalSatang, 'revenue', 'ledger.revenue', { ref: inv.id, memoParams: { name: inv.clientName.th, nameEn: inv.clientName.en, month: inv.month } });
+    s = post(s, inv.totalSatang, 'revenue', inv.kind === 'b2b' ? 'ledger.revenue_b2b' : 'ledger.revenue', { ref: inv.id, memoParams: { name: inv.clientName.th, nameEn: inv.clientName.en, month: inv.month } });
   }
   if (due.length) s = log(s, 'good', 'log.payments', { n: due.length });
   return s;

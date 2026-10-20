@@ -62,7 +62,7 @@ describe('garden decorations', () => {
     const res = validate(v3);
     expect(res.ok).toBe(true);
     if (res.ok) {
-      expect(res.state.schemaVersion).toBe(7);
+      expect(res.state.schemaVersion).toBe(8);
       expect(res.state.site.decor).toEqual([]);
       expect(res.state.chapter).toEqual({ id: 1, startDay: 1, result: null, past: [] });
     }

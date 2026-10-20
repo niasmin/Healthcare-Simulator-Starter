@@ -82,6 +82,8 @@ const PROP: Record<EquipmentId, PropStyle> = {
   feeding_pump: { s: 0.25, h: 18 },
   suction_unit: { s: 0.3, h: 18 },
   care_van: { s: 0.85, h: 22 },
+  training_manikin: { s: 0.5, h: 7 },
+  whiteboard: { s: 0.5, h: 26 },
 };
 
 export class IsoRenderer {

@@ -4,6 +4,7 @@ import type { GameState, LedgerCategory, RoomType, Satang } from '../domain/type
 import { dailyPayroll, dailyUpkeep } from './systems/finance';
 import { dailyResidentCosts } from './systems/billing';
 import { VISIT_DURATION, VISIT_GRACE, VISIT_SKILL, hasHomecareOffice, visitRate } from './systems/homecare';
+import { certifiedCount, contractsCompleted, hasTrainingRoom, isInClass, isPlacedAway } from './systems/workforce';
 import { gardenAppeal } from '../data/decor';
 import { carePlanSchedule, TASK_KINDS } from '../data/patients';
 import { ROLE_ORDER, SHIFT_SLOTS, SLOT_ORDER } from '../data/staff';
@@ -32,7 +33,7 @@ export function summarize(state: GameState): SiteSummary {
   let roomsOperational = 0;
   let bedsInstalled = 0;
   let bedsOperational = 0;
-  const operationalByType: Record<RoomType, number> = { ward: 0, nursing_station: 0, therapy: 0, staff_room: 0, villa: 0, homecare_office: 0 };
+  const operationalByType: Record<RoomType, number> = { ward: 0, nursing_station: 0, therapy: 0, staff_room: 0, villa: 0, homecare_office: 0, training_room: 0 };
   for (const room of state.site.rooms) {
     const st = statuses.get(room.id)!;
     bedsInstalled += st.installedBeds;
@@ -42,7 +43,7 @@ export function summarize(state: GameState): SiteSummary {
       operationalByType[room.type]++;
     }
   }
-  const spentByCategory: Record<LedgerCategory, Satang> = { capital: 0, construction: 0, equipment: 0, refund: 0, upkeep: 0, payroll: 0, revenue: 0, food: 0, supplies: 0, event: 0 };
+  const spentByCategory: Record<LedgerCategory, Satang> = { capital: 0, construction: 0, equipment: 0, refund: 0, upkeep: 0, payroll: 0, revenue: 0, food: 0, supplies: 0, event: 0, training: 0 };
   for (const e of state.ledger) spentByCategory[e.category] += e.amountSatang;
   return {
     statuses,
@@ -146,6 +147,23 @@ export function buildObjectives(state: GameState, summary: SiteSummary = summari
       step('hc_roster', state.homecare.clients.length > 0 && rosterReady, { kind: 'view', view: 'roster' }, { key: 'goal.roster' }),
       step('hc_clients', state.homecare.clients.length >= n, { kind: 'tab', tab: 'admit' }, { params: { n }, progress: capped(state.homecare.clients.length, n) }),
       step('hc_rate', rate !== null && rate >= (def.targetVisitRate ?? 0) && state.homecare.history.length >= 7, { kind: 'view', view: 'roster' }, { params: { n: Math.round((def.targetVisitRate ?? 0) * 100) } }),
+      chapterStep(state, def),
+    ];
+  }
+
+  if (def.id === 5) {
+    const certified = certifiedCount(state);
+    const done = contractsCompleted(state, state.chapter.startDay);
+    const n = def.targetCertified ?? 0;
+    const m = def.targetContracts ?? 0;
+    const placed = state.workforce.contracts.length > 0 || done > 0;
+    return [
+      step('tr_room', hasTrainingRoom(state), { kind: 'tool', tool: 'training_room' }),
+      step('tr_first', certified > 0, { kind: 'tab', tab: 'hire' }),
+      step('wf_first', placed, { kind: 'tab', tab: 'hire' }),
+      step('wf_roster', placed && rosterReady, { kind: 'view', view: 'roster' }, { key: 'goal.roster' }),
+      step('certified', certified >= n, { kind: 'tab', tab: 'hire' }, { params: { n }, progress: capped(certified, n) }),
+      step('contracts', done >= m, { kind: 'tab', tab: 'hire' }, { params: { n: m }, progress: capped(done, m) }),
       chapterStep(state, def),
     ];
   }
@@ -356,7 +374,9 @@ export type StaffActivity =
   | { kind: 'off' }
   | { kind: 'idle' }
   | { kind: 'busy'; taskKind: import('../domain/types').TaskKind; residentId: string }
-  | { kind: 'away'; clientId: string };
+  | { kind: 'away'; clientId: string }
+  | { kind: 'placed'; contractId: string }
+  | { kind: 'training' };
 
 export function staffActivity(state: GameState, e: Employee): StaffActivity {
   if (e.taskId) {
@@ -364,6 +384,8 @@ export function staffActivity(state: GameState, e: Employee): StaffActivity {
     if (t) return { kind: 'busy', taskKind: t.kind, residentId: t.residentId };
     const v = state.homecare.visits.find((x) => x.id === e.taskId);
     if (v) return { kind: 'away', clientId: v.clientId };
+    if (isPlacedAway(e)) return { kind: 'placed', contractId: e.placement ?? '' };
+    if (isInClass(e)) return { kind: 'training' };
   }
   return isOnShift(state, e.id, state.minute) ? { kind: 'idle' } : { kind: 'off' };
 }
@@ -380,10 +402,16 @@ export function peopleMarkers(state: GameState): Array<{ key: string; kind: 'res
   }
   const station = state.site.rooms.find((r) => r.type === 'nursing_station') ?? state.site.rooms.find((r) => r.type === 'staff_room');
   let spot = 0;
+  const classroom = state.site.rooms.find((r) => r.type === 'training_room');
+  let seat = 0;
   for (const e of state.employees) {
     const act = staffActivity(state, e);
-    // Off duty, or out on a home visit: not in the building.
-    if (act.kind === 'off' || act.kind === 'away') continue;
+    // Off duty, out on a home visit, or working at a partner: not in the building.
+    if (act.kind === 'off' || act.kind === 'away' || act.kind === 'placed') continue;
+    if (act.kind === 'training' && classroom) {
+      out.push({ key: e.id, kind: 'staff', roomId: classroom.id, spot: seat++, role: e.role });
+      continue;
+    }
     if (act.kind === 'busy') {
       const loc = bedOf.get(act.residentId);
       if (loc) {
@@ -400,7 +428,7 @@ export function peopleMarkers(state: GameState): Array<{ key: string; kind: 'res
 // Phase 3: finance view (pure)
 // ---------------------------------------------------------------------------
 
-export const OPEX_CATEGORIES: LedgerCategory[] = ['payroll', 'upkeep', 'food', 'supplies', 'event'];
+export const OPEX_CATEGORIES: LedgerCategory[] = ['payroll', 'upkeep', 'food', 'supplies', 'event', 'training'];
 export const CAPEX_CATEGORIES: LedgerCategory[] = ['construction', 'equipment', 'refund'];
 
 /** Entries posted exactly at midnight belong to the day that just closed. */
@@ -466,8 +494,8 @@ export function financeView(state: GameState, period: 'month' | 'all'): FinanceV
     }
   }
 
-  const streams: RevenueStream[] = ['room_care', 'therapy', 'activity', 'special', 'homecare'];
-  const mixMap: Record<RevenueStream, Satang> = { room_care: 0, therapy: 0, activity: 0, special: 0, homecare: 0 };
+  const streams: RevenueStream[] = ['room_care', 'therapy', 'activity', 'special', 'homecare', 'workforce'];
+  const mixMap: Record<RevenueStream, Satang> = { room_care: 0, therapy: 0, activity: 0, special: 0, homecare: 0, workforce: 0 };
   for (const inv of state.invoices) {
     if (inv.status !== 'paid' || inv.paidAt === null) continue;
     const paidDay = dayOf(inv.paidAt % 1440 === 0 ? inv.paidAt - 1 : inv.paidAt);

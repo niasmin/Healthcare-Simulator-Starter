@@ -149,7 +149,9 @@ export function staffEnergyTick(state: GameState): GameState {
   const hasStaffRoom = state.site.rooms.some((r) => r.type === 'staff_room' && statuses.get(r.id)?.operational);
   const employees = state.employees.map((e) => {
     let delta: number;
-    if (!isOnShift(state, e.id, state.minute)) delta = 2.5;
+    // At work with a partner organisation (Chapter 5): a working day, wherever it is.
+    if (e.taskId?.startsWith('place-')) delta = -0.6;
+    else if (!isOnShift(state, e.id, state.minute)) delta = 2.5;
     else if (e.taskId) delta = -0.9;
     else delta = hasStaffRoom ? 0.3 : -0.25;
     const energy = r2(clamp(e.energy + delta));
@@ -183,5 +185,6 @@ export function removeEmployee(state: GameState, employeeId: string): GameState 
     homecare: { ...state.homecare, visits },
     employees: state.employees.filter((x) => x.id !== employeeId),
     shifts: state.shifts.filter((x) => x.employeeId !== employeeId),
+    workforce: { ...state.workforce, training: state.workforce.training.filter((t) => t.employeeId !== employeeId) },
   };
 }

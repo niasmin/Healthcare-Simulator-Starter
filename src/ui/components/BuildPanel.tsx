@@ -15,6 +15,7 @@ import { careKpis } from '../../sim/selectors';
 import { useMoney, useT } from '../hooks';
 import { useGame, type LeftTab, type Tool } from '../store';
 import { Avatar, GROUP_COLOR, RoleChip, StatBar, useName } from './people';
+import { WorkforcePanel } from './WorkforcePanel';
 
 /** Room pictures from the Game Assets Pack. */
 const ROOM_ART: Record<RoomType, string> = {
@@ -24,6 +25,7 @@ const ROOM_ART: Record<RoomType, string> = {
   staff_room: 'rm_dining',
   villa: 'rm_villa',
   homecare_office: 'rm_homecare',
+  training_room: 'rm_station',
 };
 
 const SWATCH: Record<RoomType, string> = {
@@ -33,6 +35,7 @@ const SWATCH: Record<RoomType, string> = {
   staff_room: '#a77b4f',
   villa: '#b08850',
   homecare_office: '#3f7f9a',
+  training_room: '#2f7d8c',
 };
 
 function sameTool(a: Tool, b: Tool) {
@@ -230,6 +233,7 @@ function HireList() {
         </div>
       ))}
       <p className="text-[11px] text-ink-soft/80 leading-snug">{t('hire.note')}</p>
+      {(game.chapter.id >= 5 || game.workforce.contracts.length > 0 || game.workforce.training.length > 0) && <WorkforcePanel />}
     </>
   );
 }
