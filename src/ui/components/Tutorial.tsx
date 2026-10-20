@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { STARTER_SCENARIO } from '../../data/scenarios';
+import { chapterDef } from '../../data/chapters';
 import { buildObjectives, type GuideAction, type Objective } from '../../sim/selectors';
-import { chapterChecks } from '../../sim/systems/chapter';
+import { chapterChecks, nextChapterAvailable } from '../../sim/systems/chapter';
 import { dayOf } from '../../sim/systems/time';
 import type { ChapterCheck } from '../../domain/types';
 import { isMobileNow, useMoney, useT } from '../hooks';
 import { useGame } from '../store';
+import clipIcon from '../../assets/hud/clip.png';
+import giftIcon from '../../assets/hud/gift.png';
 import { tourPointer, type TourPointer } from '../tour';
 
 /** Open the part of the UI a tutorial step talks about. */
@@ -39,6 +41,13 @@ export function runGuideAction(a: GuideAction) {
       break;
     case 'speed':
       st.dispatch({ type: 'setSpeed', speed: st.lastSpeed });
+      break;
+    case 'land':
+    case 'decor':
+      // Both live in the Build tab (the land button on top, the garden section below).
+      st.setView('map');
+      st.setLeftTab('build');
+      if (mobile) st.setSheet('tools');
       break;
   }
 }
@@ -154,14 +163,21 @@ function StepBody({ goal }: { goal: Objective }) {
   const t = useT();
   const game = useGame((s) => s.game);
   const checks = useMemo(() => (goal.id === 'chapter' ? chapterChecks(game) : null), [goal.id, game]);
+  const days = chapterDef(game.chapter.id).days;
+  const failed = goal.id === 'chapter' && game.chapter.result?.outcome === 'failed';
   return (
     <>
-      <p className="text-xs leading-relaxed text-ink-soft">{t(`tut.${goal.id}`, goal.params)}</p>
+      <p className="text-xs leading-relaxed text-ink-soft">{t(goal.hint, goal.params)}</p>
       {checks && (
         <div className="rounded-lg bg-sand/60 p-2">
-          <div className="text-[11px] font-semibold mb-1 tabular">{t('chapter.day', { day: Math.min(dayOf(game.minute), STARTER_SCENARIO.targetDays), n: STARTER_SCENARIO.targetDays })}</div>
+          <div className="text-[11px] font-semibold mb-1 tabular">{t('chapter.day', { day: Math.min(dayOf(game.minute) - game.chapter.startDay + 1, days), n: days })}</div>
           <ChapterChecks checks={checks} />
         </div>
+      )}
+      {failed && (
+        <button type="button" onClick={() => useGame.getState().dispatch({ type: 'retryChapter' })} className="self-start px-3 py-1.5 rounded-lg bg-coral text-white text-xs font-bold">
+          ↻ {t('chapter.retry_chapter')}
+        </button>
       )}
     </>
   );
@@ -176,11 +192,24 @@ export function TutorialCard({ compact = false }: { compact?: boolean }) {
   const t = useT();
   const goals = useObjectives();
   const hidden = useGame((s) => s.tutorialHidden);
+  const chapter = useGame((s) => s.game.chapter.id);
+  const next = useGame((s) => nextChapterAvailable(s.game));
   const setHidden = useGame((s) => s.setTutorialHidden);
   const [open, setOpen] = useState(!compact);
   const idx = goals.findIndex((g) => !g.done);
   const goal = idx >= 0 ? goals[idx] : null;
   const doneCount = goals.filter((g) => g.done).length;
+
+  if (!goal && next && !hidden)
+    return (
+      <section className={`pointer-events-auto rounded-xl bg-white/97 border border-teal/40 shadow-lg px-3 py-2.5 flex flex-col gap-2 ${compact ? 'min-w-0 flex-1' : 'w-[340px]'} max-w-full`}>
+        <div className="text-sm font-semibold">🏆 {t('tut.chapter_done', { c: chapter })}</div>
+        <p className="text-xs text-ink-soft leading-relaxed">{t(`chapters.c${next}.desc`)}</p>
+        <button type="button" onClick={() => useGame.getState().dispatch({ type: 'startChapter' })} className="self-start px-3 py-1.5 rounded-lg bg-teal text-white text-xs font-bold">
+          {t('chapter.start', { c: next, name: t(`chapters.c${next}.title`) })} →
+        </button>
+      </section>
+    );
 
   if (hidden || !goal) {
     if (!goal && hidden) return null;
@@ -198,11 +227,11 @@ export function TutorialCard({ compact = false }: { compact?: boolean }) {
   return (
     <section
       className={`pointer-events-auto rounded-xl bg-white/97 border border-teal/40 shadow-lg ${compact ? 'min-w-0 flex-1' : 'w-[340px]'} max-w-full`}
-      aria-label={t('tut.header', { n: idx + 1, total: goals.length })}
+      aria-label={t('tut.header', { c: chapter, n: idx + 1, total: goals.length })}
     >
       <button type="button" onClick={() => compact && setOpen(!open)} className="w-full text-left px-3 pt-2 pb-1.5 flex items-start gap-2">
         <span className="min-w-0 flex-1">
-          <span className="block text-[10px] text-teal font-semibold tabular">{t('tut.header', { n: idx + 1, total: goals.length })}</span>
+          <span className="block text-[10px] text-teal font-semibold tabular">{t('tut.header', { c: chapter, n: idx + 1, total: goals.length })}</span>
           <span className={`block text-sm font-semibold leading-snug ${compact && !open ? 'truncate' : ''}`}>
             {t(goal.key, goal.params)}
             {goal.progress && (
@@ -231,5 +260,105 @@ export function TutorialCard({ compact = false }: { compact?: boolean }) {
         </div>
       )}
     </section>
+  );
+}
+
+/**
+ * Phone mission card (play-screen concept art): clipboard, chapter step, goal and progress bar;
+ * the gift opens the chapter road map (what this chapter unlocks next), ▾ unfolds the step.
+ */
+export function MissionCard() {
+  const t = useT();
+  const goals = useObjectives();
+  const chapter = useGame((s) => s.game.chapter.id);
+  const next = useGame((s) => nextChapterAvailable(s.game));
+  const [open, setOpen] = useState(false);
+  const idx = goals.findIndex((g) => !g.done);
+  const goal = idx >= 0 ? goals[idx] : null;
+  const doneCount = goals.filter((g) => g.done).length;
+  const title = goal ? t(goal.key, goal.params) : next ? t('tut.chapter_done', { c: chapter }) : t('tut.all_done');
+  return (
+    <section className="pointer-events-auto rounded-2xl bg-white/97 shadow-lg border border-white" aria-label={t('tut.header', { c: chapter, n: Math.max(1, idx + 1), total: goals.length })}>
+      <div className="flex items-center gap-2 pl-2 pr-1 py-1.5">
+        <button type="button" onClick={() => useGame.getState().setSheet('missions')} className="shrink-0 size-12 rounded-xl bg-[#eef1ee] grid place-items-center" aria-label={t('hud.missions')}>
+          <img src={clipIcon} alt="" className="h-10" />
+        </button>
+        <button type="button" onClick={() => setOpen(!open)} className="min-w-0 flex-1 text-left" aria-expanded={open}>
+          <span className="block text-[11px] text-ink-soft tabular">{t('tut.header', { c: chapter, n: goal ? idx + 1 : goals.length, total: goals.length })}</span>
+          <span className={`block text-sm font-bold leading-snug ${open ? '' : 'truncate'}`}>
+            {title}
+            {goal?.progress && (
+              <span className="ml-1.5 text-xs font-normal text-ink-soft tabular">
+                {goal.progress.have}/{goal.progress.need}
+              </span>
+            )}
+          </span>
+          <span className="mt-1 block h-2 rounded-full bg-[#e3e6e3] overflow-hidden" aria-hidden>
+            <span className="block h-full rounded-full bg-gradient-to-r from-[#1fa36f] to-[#2bc183]" style={{ width: `${(doneCount / Math.max(1, goals.length)) * 100}%` }} />
+          </span>
+        </button>
+        <span className="self-stretch w-px bg-line mx-0.5" aria-hidden />
+        <button type="button" onClick={() => useGame.getState().setChaptersOpen(true)} className="shrink-0 size-11 grid place-items-center" aria-label={t('hud.reward')}>
+          <img src={giftIcon} alt="" className="h-9" />
+        </button>
+        <button type="button" onClick={() => setOpen(!open)} className="shrink-0 px-1 text-ink-soft text-xs" aria-label={t('tut.show')}>
+          {open ? '▲' : '▼'}
+        </button>
+      </div>
+      {open && (
+        <div className="px-3 pb-2.5 flex flex-col gap-2">
+          {goal ? (
+            <>
+              <StepBody goal={goal} />
+              <button type="button" onClick={() => runGuideAction(goal.action)} className="self-start px-3 py-1.5 rounded-lg bg-teal text-white text-xs font-bold">
+                {t('tut.show')} →
+              </button>
+            </>
+          ) : next ? (
+            <>
+              <p className="text-xs text-ink-soft leading-relaxed">{t(`chapters.c${next}.desc`)}</p>
+              <button type="button" onClick={() => useGame.getState().dispatch({ type: 'startChapter' })} className="self-start px-3 py-1.5 rounded-lg bg-teal text-white text-xs font-bold">
+                {t('chapter.start', { c: next, name: t(`chapters.c${next}.title`) })} →
+              </button>
+            </>
+          ) : null}
+        </div>
+      )}
+    </section>
+  );
+}
+
+/** Every step of the running chapter, ticked off, each with its "Show me" shortcut. */
+export function ObjectiveList() {
+  const t = useT();
+  const goals = useObjectives();
+  const setSheet = useGame((s) => s.setSheet);
+  const current = goals.findIndex((g) => !g.done);
+  return (
+    <ol className="flex flex-col gap-1.5">
+      {goals.map((g, i) => (
+        <li key={g.id} className={`rounded-xl border px-3 py-2 flex items-center gap-2 ${i === current ? 'bg-white border-teal/50 shadow-sm' : 'bg-white/60 border-line'}`}>
+          <span className={`grid place-items-center size-6 rounded-full text-xs font-bold shrink-0 ${g.done ? 'bg-ok text-white' : i === current ? 'bg-teal text-white' : 'bg-sand text-ink-soft'}`} aria-hidden>
+            {g.done ? '✓' : i + 1}
+          </span>
+          <span className={`flex-1 min-w-0 text-sm ${g.done ? 'text-ink-soft line-through' : ''}`}>
+            {t(g.key, g.params)}
+            {g.progress && !g.done && <span className="ml-1 text-xs text-ink-soft tabular">{g.progress.have}/{g.progress.need}</span>}
+          </span>
+          {!g.done && (
+            <button
+              type="button"
+              onClick={() => {
+                setSheet(null);
+                runGuideAction(g.action);
+              }}
+              className="shrink-0 px-2.5 py-1 rounded-lg bg-teal text-white text-xs font-bold"
+            >
+              {t('tut.show')}
+            </button>
+          )}
+        </li>
+      ))}
+    </ol>
   );
 }

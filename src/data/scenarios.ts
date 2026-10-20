@@ -13,14 +13,6 @@ export interface ScenarioDef {
   gridHeight: number;
   entrance: Cell;
   defaultSeed: number;
-  /** Target for the first milestone: number of operational beds. */
-  targetBeds: number;
-  /** Days the player must keep cash positive in the full MVP story. */
-  targetDays: number;
-  /** Residents living in the home when the last day closes. */
-  targetResidents: number;
-  /** Care quality (0..100) on the last day. */
-  targetQuality: number;
 }
 
 export const STARTER_SCENARIO: ScenarioDef = {
@@ -31,8 +23,4 @@ export const STARTER_SCENARIO: ScenarioDef = {
   gridHeight: 20,
   entrance: { x: 9, y: 19 },
   defaultSeed: 20261016,
-  targetBeds: 10,
-  targetDays: 30,
-  targetResidents: 8,
-  targetQuality: 70,
 };

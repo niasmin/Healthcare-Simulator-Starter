@@ -40,7 +40,7 @@ function ResidentCard({ r }: { r: Resident }) {
   return (
     <article className="rounded-2xl bg-white border border-line shadow-[0_1px_0_rgba(31,45,43,0.04)] p-4 flex flex-col gap-3 min-w-0">
       <header className="flex items-start gap-3">
-        <Avatar src={residentPortrait(r.name)} name={r.name} color={GROUP_COLOR[r.group]} size={48} />
+        <Avatar src={residentPortrait(r.name, r.needs)} name={r.name} color={GROUP_COLOR[r.group]} size={48} />
         <div className="min-w-0 flex-1">
           <div className="text-[10px] uppercase tracking-wider text-ink-soft">{t('res.profile')}</div>
           <h3 className="font-bold text-base leading-tight">

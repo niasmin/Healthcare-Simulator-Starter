@@ -53,8 +53,11 @@ describe('economy balance (90 days, beds refilled daily)', () => {
   const thinPremium = run90(THIN, 'premium');
   const half = run90(MID, 'standard', 6);
 
-  it('a skeleton crew loses money from the first month and the home empties', () => {
-    expect(skeleton.net(1)).toBeLessThan(0);
+  it('a skeleton crew loses money once the prepaid first month runs out, and the home empties', () => {
+    // Month 1 is carried by the fees families pay in advance on admission: at most a sliver of a well-run home's profit.
+    expect(skeleton.net(1)).toBeLessThan(mid.net(1) / 10);
+    expect(skeleton.net(2)).toBeLessThan(0);
+    expect(skeleton.net(3)).toBeLessThan(0);
     expect(skeleton.s.residents.length).toBeLessThanOrEqual(2);
     expect(skeleton.left('log.withdrawn')).toBeGreaterThan(5);
     expect(skeleton.s.organization.reputation).toBe(0);
@@ -78,7 +81,7 @@ describe('economy balance (90 days, beds refilled daily)', () => {
   });
 
   it('a staffed but 60%-full home barely breaks even', () => {
-    expect(half.net(2)).toBeLessThan(mid.net(2) / 10);
+    expect(half.net(2) + half.net(3)).toBeLessThan((mid.net(2) + mid.net(3)) / 10);
   });
 
   it('when staff are short, missed care is shared out rather than hitting the same residents', () => {

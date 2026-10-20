@@ -1,4 +1,4 @@
-import { ROOMS } from '../../data/rooms';
+import { BED_ROOMS, ROOMS } from '../../data/rooms';
 import type { EquipmentId, Room, Site } from '../types';
 import { findDoor, reachableCorridor, type Door } from './navigation';
 
@@ -10,7 +10,7 @@ export interface RoomStatus {
   operational: boolean;
   door: Door | null;
   issues: RoomIssue[];
-  /** Resident capacity provided by this room when operational (wards only). */
+  /** Resident capacity provided by this room when operational (wards and villas). */
   capacity: number;
   /** Beds physically installed regardless of operational status. */
   installedBeds: number;
@@ -33,7 +33,7 @@ export function roomStatus(room: Room, site: Site, reachable: Uint8Array = reach
     if (have < slot.required) issues.push({ kind: 'missing_equipment', equipment: slot.id, need: slot.required, have });
   }
   const operational = issues.length === 0;
-  const installedBeds = room.type === 'ward' ? equipmentCount(room, 'care_bed') : 0;
+  const installedBeds = BED_ROOMS.includes(room.type) ? equipmentCount(room, 'care_bed') : 0;
   return { operational, door, issues, capacity: operational ? installedBeds : 0, installedBeds };
 }
 

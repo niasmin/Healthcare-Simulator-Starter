@@ -1,5 +1,5 @@
 import { thb } from '../domain/money';
-import type { PriceLevel, RevenueStream } from '../domain/types';
+import type { CareGroup, PriceLevel, RevenueStream, VisitPlan } from '../domain/types';
 
 /**
  * Billing catalogue. ALL VALUES ARE FICTIONAL GAME BALANCING, not real tariffs.
@@ -8,10 +8,23 @@ import type { PriceLevel, RevenueStream } from '../domain/types';
 
 /** Monthly room & care fee by abstract care level 1..4 at the standard price level. */
 export const MONTHLY_FEE_BY_LEVEL: Record<number, number> = {
-  1: thb(26_000),
-  2: thb(30_000),
-  3: thb(36_000),
-  4: thb(42_000),
+  1: thb(29_000),
+  2: thb(33_000),
+  3: thb(39_000),
+  4: thb(46_000),
+};
+
+/** Extra monthly fee for a private villa (Chapter 3 premium tier, standard price level). */
+export const VILLA_FEE = thb(42_000);
+
+/** Home-care visit prices (Chapter 4), billed per completed visit. */
+export const VISIT_PRICE: Record<VisitPlan, number> = { caregiver: thb(900), nurse: thb(1_500) };
+
+/** Extra monthly fee for the Chapter 2 specialised programmes (standard price level). */
+export const PROGRAMME_FEE: Partial<Record<CareGroup, number>> = {
+  dementia: thb(4_000),
+  tube_feeding: thb(6_000),
+  airway: thb(12_000),
 };
 
 export const PRICE_LEVELS: PriceLevel[] = ['value', 'standard', 'premium'];
@@ -25,7 +38,7 @@ export const WAITLIST_ARRIVALS: Record<PriceLevel, [number, number]> = { value: 
 export const PRICE_SATISFACTION_DRIFT: Record<PriceLevel, number> = { value: 0.02, standard: 0, premium: -0.06 };
 
 /** Billable services, charged per completed session on the next monthly invoice. */
-export const SERVICE_PRICE: Record<Exclude<RevenueStream, 'room_care'>, number> = {
+export const SERVICE_PRICE: Record<Exclude<RevenueStream, 'room_care' | 'homecare' | 'workforce' | 'hospital'>, number> = {
   therapy: thb(300),
   activity: thb(100),
   special: thb(3_000),
@@ -50,6 +63,10 @@ export function dayInMonth(day: number): number {
 }
 
 /** Monthly fee for a level at a price level, rounded down to whole baht. */
-export function monthlyFee(level: number, price: PriceLevel): number {
-  return Math.floor((MONTHLY_FEE_BY_LEVEL[level] * PRICE_MULTIPLIER[price]) / 100) * 100;
+export function monthlyFee(level: number, price: PriceLevel, group?: CareGroup, premium = false): number {
+  const base = MONTHLY_FEE_BY_LEVEL[level] + (group ? (PROGRAMME_FEE[group] ?? 0) : 0) + (premium ? VILLA_FEE : 0);
+  return Math.floor((base * PRICE_MULTIPLIER[price]) / 100) * 100;
 }
+
+/** Extra daily supplies for programmes (feeding sets, airway consumables). */
+export const PROGRAMME_SUPPLIES_PER_DAY: Partial<Record<CareGroup, number>> = { tube_feeding: thb(40), airway: thb(90) };

@@ -1,20 +1,40 @@
-import type { PersonName, StaffRole } from '../domain/types';
-import caregiver from '../assets/portraits/caregiver.jpg';
-import ceo from '../assets/portraits/ceo.jpg';
-import ot from '../assets/portraits/ot.jpg';
-import pn from '../assets/portraits/pn.jpg';
-import pt from '../assets/portraits/pt.jpg';
+import type { Employee, Needs, PersonName, StaffRole } from '../domain/types';
 import residentF from '../assets/portraits/resident_f.jpg';
 import residentF2 from '../assets/portraits/resident_f2.jpg';
-import residentM from '../assets/portraits/resident_m.jpg';
-import rn from '../assets/portraits/rn.jpg';
 
-/** Character portraits cropped from the project's concept art (fictional characters). */
-export const ROLE_PORTRAIT: Record<StaffRole, string> = { rn, pn, caregiver, pt, ot };
-export const CEO_PORTRAIT = ceo;
+/**
+ * Character portraits from the project's chibi character sheet (fictional characters).
+ * Each character has five expressions; the UI picks one from the person's live mood.
+ */
+const faces = import.meta.glob('../assets/faces/*.png', { eager: true, import: 'default' }) as Record<string, string>;
 
-export function residentPortrait(name: PersonName): string {
-  if (name.gender === 'm') return residentM;
+export type Mood = 'default' | 'smile' | 'happy' | 'surprise' | 'sad';
+type FaceSet = 'owner_f' | 'owner_m' | 'nurse' | 'caregiver' | 'pt' | 'ot' | 'resident';
+
+const ROLE_FACE: Record<StaffRole, FaceSet> = { rn: 'nurse', pn: 'nurse', caregiver: 'caregiver', pt: 'pt', ot: 'ot', doctor: 'owner_m' };
+
+function face(set: FaceSet, mood: Mood): string {
+  return faces[`../assets/faces/${set}_${mood}.png`];
+}
+
+/** 0..100 → expression. */
+export function moodOf(value: number): Mood {
+  return value >= 80 ? 'happy' : value >= 65 ? 'smile' : value >= 45 ? 'default' : 'sad';
+}
+
+export function rolePortrait(role: StaffRole, mood: Mood = 'default'): string {
+  return face(ROLE_FACE[role], mood);
+}
+
+/** Staff look tired when exhausted, otherwise as their morale. */
+export function staffPortrait(e: Employee): string {
+  return rolePortrait(e.role, e.energy < 20 ? 'sad' : moodOf(e.morale));
+}
+
+
+/** Male residents use the chibi elder with live expressions; female residents keep the earlier portraits. */
+export function residentPortrait(name: PersonName, needs?: Needs, mood?: Mood): string {
+  if (name.gender === 'm') return face('resident', mood ?? (needs ? moodOf((needs.happiness + needs.satisfaction) / 2) : 'default'));
   let h = 0;
   for (const ch of name.th) h = (h + ch.charCodeAt(0)) % 97;
   return h % 2 ? residentF2 : residentF;

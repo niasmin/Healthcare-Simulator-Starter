@@ -1,4 +1,5 @@
-import { CARE_GROUPS, GROUP_LEVELS, RESIDENT_NAMES } from '../../data/patients';
+import { GROUP_LEVELS, RESIDENT_NAMES } from '../../data/patients';
+import { chapterDef, PREMIUM_SHARE } from '../../data/chapters';
 import { ROLES, STAFF_NAMES, wageFor } from '../../data/staff';
 import { WAITLIST_ARRIVALS } from '../../data/finance';
 import { allRoomStatuses } from '../../domain/rules/rooms';
@@ -51,18 +52,19 @@ export function randomRole(state: GameState): [GameState, StaffRole] {
   return [s, 'caregiver'];
 }
 
-export function makeResidentCandidate(state: GameState, forced?: { group: CareGroup; referralDeadline: number }): GameState {
+export function makeResidentCandidate(state: GameState, forced?: { group: CareGroup; referralDeadline?: number; premium?: boolean }): GameState {
   let s = state;
   let name: PersonName;
   [s, name] = pickName(s, RESIDENT_NAMES, usedNames(s));
   let gi: number, age: number, level: number;
-  [s, gi] = randInt(s, 0, CARE_GROUPS.length - 1);
-  const group = forced?.group ?? CARE_GROUPS[gi];
+  const groups = chapterDef(s.chapter.id).groups;
+  [s, gi] = randInt(s, 0, groups.length - 1);
+  const group = forced?.group ?? groups[gi];
   [s, age] = randInt(s, 64, 92);
   [s, level] = randInt(s, GROUP_LEVELS[group][0], GROUP_LEVELS[group][1]);
   const ranges: Record<keyof Needs, [number, number]> = {
     physical: [55, 80],
-    mobility: group === 'active_aging' ? [60, 85] : group === 'stroke_rehab' ? [25, 45] : [5, 20],
+    mobility: group === 'active_aging' ? [60, 85] : group === 'stroke_rehab' ? [25, 45] : group === 'dementia' ? [45, 75] : [5, 20],
     mental: [50, 85],
     happiness: [45, 75],
     satisfaction: [60, 75],
@@ -76,7 +78,23 @@ export function makeResidentCandidate(state: GameState, forced?: { group: CareGr
   }
   let id: string;
   [s, id] = allocId(s, 'cand');
-  const c: ResidentCandidate = { id, name, age, group, careLevel: level, needs, ...(forced ? { referralDeadline: forced.referralDeadline } : {}) };
+  // From Chapter 3 some families ask for a private villa (only independent and rehab residents).
+  let premium = !!forced?.premium;
+  if (s.chapter.id >= 3 && !forced && (group === 'active_aging' || group === 'stroke_rehab')) {
+    let roll: number;
+    [s, roll] = randInt(s, 1, 100);
+    premium = roll <= PREMIUM_SHARE;
+  }
+  const c: ResidentCandidate = {
+    id,
+    name,
+    age,
+    group,
+    careLevel: level,
+    needs,
+    ...(forced?.referralDeadline !== undefined ? { referralDeadline: forced.referralDeadline } : {}),
+    ...(premium ? { premium: true } : {}),
+  };
   return { ...s, waitlist: [...s.waitlist, c] };
 }
 
@@ -96,6 +114,8 @@ export function refreshCandidates(state: GameState): GameState {
     [s, role] = randomRole(s);
     s = makeApplicant(s, role);
   }
+  // From Chapter 6 a neurologist is always among the applicants.
+  if (s.chapter.id >= 6 && !s.applicants.some((a) => a.role === 'doctor')) s = makeApplicant(s, 'doctor');
   const [lo, hi] = WAITLIST_ARRIVALS[s.priceLevel];
   let add: number;
   [s, add] = randInt(s, lo, hi);
@@ -108,6 +128,11 @@ export function refreshCandidates(state: GameState): GameState {
   if (drop) {
     const leaving = new Set(s.waitlist.filter((c) => !c.referralDeadline).slice(0, drop).map((c) => c.id));
     s = { ...s, waitlist: s.waitlist.filter((c) => !leaving.has(c.id)) };
+  }
+  // From Chapter 3, when the list is full the longest-waiting candidate finds another home, so new families keep arriving.
+  if (s.chapter.id >= 3 && add > 0) {
+    const open = s.waitlist.filter((c) => !c.referralDeadline);
+    if (open.length >= WAITLIST_SIZE) s = { ...s, waitlist: s.waitlist.filter((c) => c.id !== open[0].id) };
   }
   for (let i = 0; i < add && s.waitlist.filter((c) => !c.referralDeadline).length < WAITLIST_SIZE; i++) s = makeResidentCandidate(s);
   return s;
@@ -135,7 +160,9 @@ export function staffEnergyTick(state: GameState): GameState {
   const hasStaffRoom = state.site.rooms.some((r) => r.type === 'staff_room' && statuses.get(r.id)?.operational);
   const employees = state.employees.map((e) => {
     let delta: number;
-    if (!isOnShift(state, e.id, state.minute)) delta = 2.5;
+    // At work with a partner organisation (Chapter 5): a working day, wherever it is.
+    if (e.taskId?.startsWith('place-')) delta = -0.6;
+    else if (!isOnShift(state, e.id, state.minute)) delta = 2.5;
     else if (e.taskId) delta = -0.9;
     else delta = hasStaffRoom ? 0.3 : -0.25;
     const energy = r2(clamp(e.energy + delta));
@@ -162,10 +189,15 @@ export function staffMoraleDaily(state: GameState): GameState {
 /** Remove an employee, their shifts, and hand any in-progress task back to the queue. */
 export function removeEmployee(state: GameState, employeeId: string): GameState {
   const tasks = state.tasks.map((t) => (t.assigneeId === employeeId && t.status === 'in_progress' ? { ...t, status: 'pending' as const, assigneeId: null, finishAt: null } : t));
+  const visits = state.homecare.visits.map((v) => (v.assigneeId === employeeId && v.status === 'in_progress' ? { ...v, status: 'pending' as const, assigneeId: null, finishAt: null } : v));
+  const htasks = state.hospital.tasks.map((t) => (t.assigneeId === employeeId && t.status === 'in_progress' ? { ...t, status: 'pending' as const, assigneeId: null, finishAt: null } : t));
   return {
     ...state,
     tasks,
+    hospital: { ...state.hospital, tasks: htasks },
+    homecare: { ...state.homecare, visits },
     employees: state.employees.filter((x) => x.id !== employeeId),
     shifts: state.shifts.filter((x) => x.employeeId !== employeeId),
+    workforce: { ...state.workforce, training: state.workforce.training.filter((t) => t.employeeId !== employeeId) },
   };
 }

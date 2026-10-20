@@ -59,6 +59,7 @@ export function useKeyboard() {
       else if (e.key === '2') st.dispatch({ type: 'setSpeed', speed: 1 });
       else if (e.key === '3') st.dispatch({ type: 'setSpeed', speed: 2 });
       else if (e.key === '4') st.dispatch({ type: 'setSpeed', speed: 4 });
+      else if ((e.key === 'r' || e.key === 'R') && st.tool.kind === 'prefab') st.setTool({ ...st.tool, rotated: !st.tool.rotated });
       else if (e.key === 'Escape') {
         if (st.chaptersOpen) return st.setChaptersOpen(false);
         if (st.saveOpen) return st.setSaveOpen(false);

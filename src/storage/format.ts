@@ -1,5 +1,9 @@
 import { reconcile } from '../domain/rules/ledger';
-import type { GameState } from '../domain/types';
+import type { ChapterResult, GameState } from '../domain/types';
+import { ROLES } from '../data/staff';
+import { emptyHomecare } from '../sim/systems/homecare';
+import { emptyWorkforce } from '../sim/systems/workforce';
+import { emptyHospital } from '../sim/systems/hospital';
 import { dayOf } from '../sim/systems/time';
 
 /**
@@ -9,7 +13,7 @@ import { dayOf } from '../sim/systems/time';
  * CompressionStream, so even long games stay far below storage limits.
  */
 export const SAVE_FORMAT = 1;
-export const CURRENT_SCHEMA = 5;
+export const CURRENT_SCHEMA = 9;
 
 export type SlotId = 'auto' | 'slot1' | 'slot2' | 'slot3';
 export const SLOTS: SlotId[] = ['auto', 'slot1', 'slot2', 'slot3'];
@@ -26,6 +30,9 @@ export interface SaveMeta {
   residents: number;
   staff: number;
   reputation: number;
+  /** Running chapter and chapters won (for the title screen's player card). */
+  chapter?: number;
+  chaptersWon?: number;
 }
 
 export interface SaveBlob {
@@ -48,6 +55,8 @@ export function metaOf(state: GameState, slot: SlotId, savedAt: number): SaveMet
     residents: state.residents.length,
     staff: state.employees.length,
     reputation: state.organization.reputation,
+    chapter: state.chapter.id,
+    chaptersWon: [...state.chapter.past, ...(state.chapter.result ? [state.chapter.result] : [])].filter((r) => r.outcome === 'won').length,
   };
 }
 
@@ -109,7 +118,29 @@ export function migrate(state: GameState): GameState {
   }
   if (s.schemaVersion === 4) {
     // v5 adds the chapter verdict; a game already past day 30 is judged at its next midnight.
-    s = { ...s, schemaVersion: 5, chapter: { result: null } };
+    s = { ...s, schemaVersion: 5, chapter: { result: null } as unknown as GameState['chapter'] };
+  }
+  if (s.schemaVersion === 5) {
+    // v6: chapters 1..n with a start day, and the Chapter 2 skills for staff hired earlier.
+    const old = (s.chapter as unknown as { result: Omit<ChapterResult, 'chapter'> | null }).result;
+    s = {
+      ...s,
+      schemaVersion: 6,
+      chapter: { id: 1, startDay: 1, result: old ? { ...old, chapter: 1 } : null, past: [] },
+      employees: s.employees.map((e) => ({ ...e, skills: [...new Set([...e.skills, ...ROLES[e.role].skills])] })),
+    };
+  }
+  if (s.schemaVersion === 6) {
+    // v7 adds home care (Chapter 4); villas and premium residents need no new fields.
+    s = { ...s, schemaVersion: 7, homecare: emptyHomecare() };
+  }
+  if (s.schemaVersion === 7) {
+    // v8 adds the Chapter 5 workforce: training, partner offers and placements.
+    s = { ...s, schemaVersion: 8, workforce: emptyWorkforce() };
+  }
+  if (s.schemaVersion === 8) {
+    // v9 adds the Chapter 6 neuro hospital: clinic work, referrals and stroke-unit inpatients.
+    s = { ...s, schemaVersion: 9, hospital: emptyHospital() };
   }
   return s as GameState;
 }
@@ -121,7 +152,7 @@ export function validate(input: GameState): { ok: true; state: GameState } | { o
   if (state.schemaVersion !== CURRENT_SCHEMA) return { ok: false, error: 'incompatible' };
   const arrays = [state.ledger, state.site?.rooms, state.site?.corridor, state.site?.decor, state.residents, state.employees, state.shifts, state.tasks, state.invoices, state.queue];
   if (arrays.some((a) => !Array.isArray(a))) return { ok: false, error: 'corrupt' };
-  if (!Number.isFinite(state.minute) || !state.organization || !state.events || !state.chapter) return { ok: false, error: 'corrupt' };
+  if (!Number.isFinite(state.minute) || !state.organization || !state.events || !state.chapter || !state.homecare) return { ok: false, error: 'corrupt' };
   if (!reconcile(state).ok) return { ok: false, error: 'corrupt' };
   return { ok: true, state };
 }

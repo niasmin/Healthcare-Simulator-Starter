@@ -1,5 +1,6 @@
 import { CORRIDOR_UPKEEP_PER_TILE, ROOMS } from '../../data/rooms';
 import { DECOR_UPKEEP } from '../../data/decor';
+import { VAN_COST_PER_DAY } from './homecare';
 import { rectArea } from '../../domain/grid';
 import type { GameState, Satang } from '../../domain/types';
 import { post } from '../helpers';
@@ -12,6 +13,8 @@ export function dailyUpkeep(state: GameState): Satang {
   const corridorTiles = state.site.corridor.reduce((a, b) => a + b, 0);
   total += CORRIDOR_UPKEEP_PER_TILE * corridorTiles;
   total += DECOR_UPKEEP * state.site.decor.length;
+  // Home Care vans cost fuel and insurance every day.
+  total += VAN_COST_PER_DAY * state.site.rooms.reduce((a, r) => a + (r.equipment.care_van ?? 0), 0);
   return total;
 }
 

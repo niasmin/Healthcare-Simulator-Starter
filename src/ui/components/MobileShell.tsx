@@ -1,7 +1,18 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { GameSpeed } from '../../domain/types';
 import { headline, rosterView, summarize } from '../../sim/selectors';
-import { TutorialCard } from './Tutorial';
+import { MissionCard, ObjectiveList } from './Tutorial';
+import { chapterDef } from '../../data/chapters';
+import { nextChapterAvailable } from '../../sim/systems/chapter';
+import ownerFace from '../../assets/faces/owner_f_smile.png';
+import clipIcon from '../../assets/hud/clip.png';
+import eventsIcon from '../../assets/hud/events.png';
+import trophyIcon from '../../assets/hud/trophy.png';
+import shopIcon from '../../assets/hud/shop.png';
+import mapIcon from '../../assets/hud/map.png';
+import hatIcon from '../../assets/hud/hat.png';
+import peopleIcon from '../../assets/hud/people.png';
+import chartIcon from '../../assets/hud/chart.png';
 import { dayOf, formatClock } from '../../sim/systems/time';
 import { useMoney, useT } from '../hooks';
 import { useGame, type View } from '../store';
@@ -47,62 +58,199 @@ const SPEEDS: { speed: GameSpeed; label: string }[] = [
   { speed: 4, label: '4×' },
 ];
 
-function MobileTopBar({ alertCount }: { alertCount: number }) {
+function HudPill({ children, onClick, label }: { children: ReactNode; onClick?: () => void; label?: string }) {
+  const cls = 'pointer-events-auto flex items-center gap-1.5 rounded-full bg-[#14365f]/85 border border-white/25 text-white pl-1 pr-2 h-8 text-[13px] font-bold tabular shadow';
+  return onClick ? (
+    <button type="button" onClick={onClick} className={cls} aria-label={label}>
+      {children}
+    </button>
+  ) : (
+    <div className={cls}>{children}</div>
+  );
+}
+
+function RoundButton({ onClick, label, children, dot, tour }: { onClick: () => void; label: string; children: ReactNode; dot?: number; tour?: string }) {
+  return (
+    <button type="button" data-tour={tour} onClick={onClick} className="pointer-events-auto relative size-9 shrink-0 grid place-items-center rounded-xl bg-[#14365f]/85 border border-white/25 text-white shadow" aria-label={label}>
+      {children}
+      {dot ? <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1 rounded-full bg-coral text-[10px] font-bold grid place-items-center">{dot}</span> : null}
+    </button>
+  );
+}
+
+/** Phone HUD over the map, in the play-screen concept style: manager card, money, clock and speed, stats. */
+function MobileTopBar({ alertCount, overlay }: { alertCount: number; overlay: boolean }) {
   const t = useT();
   const money = useMoney();
   const game = useGame((s) => s.game);
   const dispatch = useGame((s) => s.dispatch);
   const setSheet = useGame((s) => s.setSheet);
+  const setView = useGame((s) => s.setView);
   const h = useMemo(() => headline(game), [game]);
+  const days = chapterDef(game.chapter.id).days;
+  const chapterDay = Math.max(1, Math.min(days, dayOf(game.minute) - game.chapter.startDay + 1));
   return (
-    <header className="bg-ink text-white px-3 pt-2 pb-1.5 flex flex-col gap-1.5 shrink-0">
-      <div className="flex items-center gap-2">
-        <div className="leading-none tabular">
-          <div className="text-[10px] text-white/60">{t('top.day', { day: dayOf(game.minute) })}</div>
-          <div className="text-lg font-semibold">{formatClock(game.minute)}</div>
-        </div>
-        <div className="flex rounded-lg bg-white/10 p-0.5 mx-auto" role="group" aria-label="speed">
-          {SPEEDS.map((s) => (
-            <button
-              key={s.speed}
-              type="button"
-              data-tour={`speed-${s.speed}`}
-              onClick={() => dispatch({ type: 'setSpeed', speed: s.speed })}
-              aria-pressed={game.speed === s.speed}
-              className={`min-w-10 h-9 px-2 rounded-md text-sm font-semibold ${game.speed === s.speed ? (s.speed === 0 ? 'bg-coral text-white' : 'bg-white text-ink') : 'text-white/80'}`}
-            >
-              {s.label}
-            </button>
-          ))}
-        </div>
-        <button type="button" data-tour="m-info" onClick={() => setSheet('info')} className="relative size-9 grid place-items-center rounded-lg bg-white/10" aria-label={t('m.info')}>
-          <svg viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" aria-hidden>
-            <path d="M6 16V11a6 6 0 1112 0v5l2 2H4l2-2zM10 20a2 2 0 004 0" />
+    <header
+      className={`px-2 pt-[max(env(safe-area-inset-top),0.4rem)] pb-1 flex flex-col gap-1 ${
+        overlay ? 'absolute inset-x-0 top-0 z-20 pointer-events-none bg-gradient-to-b from-[#0d2440]/70 via-[#0d2440]/35 to-transparent' : 'shrink-0 bg-[#0d2440]'
+      }`}
+    >
+      <div className="flex items-center gap-1.5">
+        <button
+          type="button"
+          onClick={() => useGame.getState().setChaptersOpen(true)}
+          className="pointer-events-auto flex items-center min-w-0 shrink rounded-full bg-[#14365f]/85 border border-white/25 shadow pr-2.5"
+          aria-label={t('chapters.open')}
+        >
+          <img src={ownerFace} alt="" className="size-10 -my-1 -ml-0.5 rounded-full border-2 border-white bg-[#cfe6f5] object-cover shrink-0" />
+          <span className="pl-1.5 min-w-0 text-left leading-tight">
+            <span className="block text-white text-[11px] font-bold whitespace-nowrap">{t('hud.title')}</span>
+            <span className="block text-white/80 text-[10px] tabular truncate">{t('hud.chapter_day', { c: game.chapter.id, d: chapterDay, n: days })}</span>
+            <span className="mt-0.5 block h-1.5 w-20 rounded-full bg-white/20 overflow-hidden" aria-hidden>
+              <span className="block h-full bg-[#2bc183]" style={{ width: `${(chapterDay / days) * 100}%` }} />
+            </span>
+          </span>
+        </button>
+        <HudPill
+          label={t('hud.add_cash')}
+          onClick={() => {
+            setView('finance');
+            setSheet(null);
+          }}
+        >
+          <img src={spriteUrl('ic_coin')} alt="" className="size-6" />
+          <span className={game.organization.cashSatang < 0 ? 'text-red-300' : ''}>{money(game.organization.cashSatang).replace('฿', '')}</span>
+          <span className="size-5 rounded-full bg-[#22b45f] text-white grid place-items-center text-sm leading-none" aria-hidden>
+            +
+          </span>
+        </HudPill>
+        <span className="flex-1" />
+        <RoundButton onClick={() => setSheet('info')} label={t('m.info')} dot={alertCount} tour="m-info">
+          <svg viewBox="0 0 24 24" className="size-5" fill="currentColor" aria-hidden>
+            <path d="M12 2a6 6 0 00-6 6v4.5L4 16v1h16v-1l-2-3.5V8a6 6 0 00-6-6zm-2.5 17a2.5 2.5 0 005 0h-5z" />
           </svg>
-          {alertCount > 0 && <span className="absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-full bg-coral text-[11px] font-bold grid place-items-center">{alertCount}</span>}
-        </button>
-        <button type="button" onClick={() => setSheet('menu')} className="size-9 grid place-items-center rounded-lg bg-white/10 text-lg" aria-label={t('m.menu')}>
-          ⋯
-        </button>
+        </RoundButton>
+        <RoundButton onClick={() => setSheet('menu')} label={t('m.menu')}>
+          <svg viewBox="0 0 24 24" className="size-5" fill="currentColor" aria-hidden>
+            <path d="M19.4 13a7.5 7.5 0 000-2l2.1-1.6-2-3.4-2.5 1a7.6 7.6 0 00-1.7-1L15 3.3h-4l-.4 2.7a7.6 7.6 0 00-1.7 1l-2.5-1-2 3.4L6.6 11a7.5 7.5 0 000 2l-2.2 1.6 2 3.4 2.5-1a7.6 7.6 0 001.7 1l.4 2.7h4l.4-2.7a7.6 7.6 0 001.7-1l2.5 1 2-3.4L19.4 13zM12 15.5a3.5 3.5 0 110-7 3.5 3.5 0 010 7z" />
+          </svg>
+        </RoundButton>
       </div>
-      <div className="flex items-center gap-3 text-[11px] tabular overflow-hidden">
-        <img src={spriteUrl('ic_coin')} alt="" className="size-4 -mr-2" />
-        <span className="font-semibold text-sm">{money(game.organization.cashSatang)}</span>
-        {h.cashDelta !== 0 && <span className={h.cashDelta > 0 ? 'text-emerald-300' : 'text-red-300'}>{(h.cashDelta > 0 ? '+' : '') + money(h.cashDelta)}</span>}
-        <span className="ml-auto text-white/85 inline-flex items-center gap-1">
-          <img src={spriteUrl('ic_people')} alt={t('top.occupancy')} className="size-4" />
-          {h.residents}/{h.beds}
-        </span>
-        <span className="text-white/85 inline-flex items-center gap-1">
-          <img src={spriteUrl('ic_smile')} alt={t('top.satisfaction')} className="size-4" />
-          {h.satisfaction === null ? '—' : Math.round(h.satisfaction)}
-        </span>
-        <span className="text-white/85 inline-flex items-center gap-1">
-          <img src={spriteUrl('ic_star')} alt={t('top.reputation')} className="size-4" />
-          {game.organization.reputation}
-        </span>
+      <div className="flex items-center gap-1.5">
+        <div className="pointer-events-auto flex items-center rounded-full bg-[#14365f]/85 border border-white/25 shadow h-8 pl-2.5 pr-0.5 gap-1.5 text-white">
+          <span className="text-[13px] font-bold tabular" title={t('top.day', { day: dayOf(game.minute) })}>
+            {formatClock(game.minute)}
+          </span>
+          <span className="flex" role="group" aria-label="speed">
+            {SPEEDS.map((x) => (
+              <button
+                key={x.speed}
+                type="button"
+                data-tour={`speed-${x.speed}`}
+                onClick={() => dispatch({ type: 'setSpeed', speed: x.speed })}
+                aria-pressed={game.speed === x.speed}
+                className={`h-7 min-w-7 px-1 rounded-full text-[12px] font-bold ${game.speed === x.speed ? (x.speed === 0 ? 'bg-coral text-white' : 'bg-white text-[#14365f]') : 'text-white/80'}`}
+              >
+                {x.label}
+              </button>
+            ))}
+          </span>
+        </div>
+        <span className="flex-1" />
+        <div className="pointer-events-auto flex items-center gap-1.5 rounded-full bg-[#14365f]/85 border border-white/25 shadow h-8 px-2 text-white text-[12px] font-bold tabular shrink-0">
+          <span className="inline-flex items-center gap-1" title={t('top.occupancy')}>
+            <img src={spriteUrl('ic_people')} alt={t('top.occupancy')} className="size-4" />
+            {h.residents}/{h.beds}
+          </span>
+          <span className="inline-flex items-center gap-1" title={t('top.satisfaction')}>
+            <img src={spriteUrl('ic_smile')} alt={t('top.satisfaction')} className="size-4" />
+            {h.satisfaction === null ? '—' : Math.round(h.satisfaction)}
+          </span>
+          <span className="inline-flex items-center gap-1" title={t('top.reputation')}>
+            <img src={spriteUrl('ic_star')} alt={t('top.reputation')} className="size-4" />
+            {game.organization.reputation}
+          </span>
+        </div>
       </div>
     </header>
+  );
+}
+
+/** Square floating map button with a concept-art icon and a caption. */
+function FloatButton({ icon, label, onClick, badge, className = '' }: { icon: string; label: string; onClick: () => void; badge?: boolean; className?: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`pointer-events-auto relative w-[3.9rem] rounded-2xl bg-gradient-to-b from-[#2a5d93] to-[#173f6b] border-2 border-white/80 shadow-lg pt-1 pb-1 flex flex-col items-center ${className}`}
+    >
+      <img src={icon} alt="" className="h-8 object-contain" />
+      <span className="text-[10px] font-bold text-white leading-tight">{label}</span>
+      {badge && <span className="absolute -top-1.5 -right-1.5 size-5 rounded-full bg-coral border-2 border-white text-white text-[11px] font-black grid place-items-center">!</span>}
+    </button>
+  );
+}
+
+/** The latest happenings (scripted events, admissions, chapter news), newest first. */
+function EventLog() {
+  const t = useT();
+  const log = useGame((s) => s.game.log);
+  const items = [...log].reverse().slice(0, 40);
+  if (!items.length) return <p className="text-sm text-ink-soft">{t('hud.events_empty')}</p>;
+  return (
+    <ul className="flex flex-col gap-1.5">
+      {items.map((l) => (
+        <li key={l.id} className={`rounded-xl bg-white border px-3 py-2 text-sm flex gap-2 ${l.level === 'good' ? 'border-ok/40' : l.level === 'warn' ? 'border-warn/40' : 'border-line'}`}>
+          <span className="text-[11px] text-ink-soft tabular shrink-0 pt-0.5">
+            D{dayOf(l.at)} {formatClock(l.at)}
+          </span>
+          <span className={l.level === 'good' ? 'text-ok' : l.level === 'warn' ? 'text-warn' : ''}>{t(l.key, l.params)}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** Build / Residents / Report shortcut cards above the tab bar (map view). */
+function ActionCards() {
+  const t = useT();
+  const residents = useGame((s) => s.game.residents.length);
+  const setSheet = useGame((s) => s.setSheet);
+  const setLeftTab = useGame((s) => s.setLeftTab);
+  const setView = useGame((s) => s.setView);
+  return (
+    <div className="shrink-0 bg-white/95 border-t border-line px-2 py-1.5 grid grid-cols-3 gap-1.5">
+      <button
+        type="button"
+        data-tour="m-build"
+        onClick={() => {
+          setLeftTab('build');
+          setSheet('tools');
+        }}
+        className="relative h-14 rounded-xl bg-gradient-to-b from-[#26b383] to-[#138a62] text-white shadow flex items-center gap-1 pl-1 pr-2 overflow-hidden"
+      >
+        <img src={hatIcon} alt="" className="h-8 shrink-0" />
+        <span className="text-left leading-tight min-w-0">
+          <span className="block font-black text-[15px]">{t('hud.build')}</span>
+          <span className="block text-[10px] text-white/85 truncate">{t('hud.build_sub')}</span>
+        </span>
+      </button>
+      <button type="button" onClick={() => setView('residents')} className="relative h-14 rounded-xl bg-[#e3f0fb] text-[#14365f] flex items-center gap-1 pl-0.5 pr-1.5 overflow-visible">
+        <img src={peopleIcon} alt="" className="h-9 shrink-0" />
+        <span className="text-left leading-tight min-w-0">
+          <span className="block font-bold text-[12px] truncate">{t('hud.residents')}</span>
+          <span className="block text-[10px] text-ink-soft truncate">{t('hud.residents_sub')}</span>
+        </span>
+        {residents > 0 && <span className="absolute -top-1.5 right-1 min-w-5 h-5 px-1 rounded-full bg-coral text-white text-[11px] font-bold grid place-items-center tabular">{residents}</span>}
+      </button>
+      <button type="button" onClick={() => setSheet('report')} className="h-14 rounded-xl bg-[#e3f0fb] text-[#14365f] flex items-center gap-1 pl-1 pr-1.5">
+        <img src={chartIcon} alt="" className="h-9 shrink-0" />
+        <span className="text-left leading-tight min-w-0">
+          <span className="block font-bold text-[12px] truncate">{t('hud.report')}</span>
+          <span className="block text-[10px] text-ink-soft truncate">{t('hud.report_sub')}</span>
+        </span>
+      </button>
+    </div>
   );
 }
 
@@ -161,6 +309,10 @@ export function MobileShell() {
   const tool = useGame((s) => s.tool);
   const setTool = useGame((s) => s.setTool);
   const setLeftTab = useGame((s) => s.setLeftTab);
+  const showLabels = useGame((s) => s.showLabels);
+  const setShowLabels = useGame((s) => s.setShowLabels);
+  const nextChapter = useGame((s) => nextChapterAvailable(s.game));
+  const missionBadge = useGame((s) => !!s.game.chapter.result) && !nextChapter;
 
   const summary = useMemo(() => summarize(game), [game]);
   const alertCount = useMemo(() => {
@@ -190,40 +342,92 @@ export function MobileShell() {
   ];
   const placing = tool.kind !== 'select';
   const toolName =
-    tool.kind === 'room' ? t(`room.${tool.roomType}`) : tool.kind === 'decor' ? t(`decor.${tool.decor}`) : tool.kind === 'corridor' ? t('tool.corridor') : t('tool.bulldoze');
+    tool.kind === 'room'
+      ? t(`room.${tool.roomType}`)
+      : tool.kind === 'decor'
+        ? t(`decor.${tool.decor}`)
+        : tool.kind === 'prefab'
+          ? t(`prefab.${tool.prefab}`)
+          : tool.kind === 'corridor'
+            ? t('tool.corridor')
+            : t('tool.bulldoze');
 
   return (
     <div className="h-[100dvh] flex flex-col overflow-hidden">
-      <MobileTopBar alertCount={alertCount} />
+      {view !== 'map' && <MobileTopBar alertCount={alertCount} overlay={false} />}
 
       <main className="relative flex-1 min-h-0">
         <CenterArea showTabs={false} />
+        {view === 'map' && <MobileTopBar alertCount={alertCount} overlay />}
         {view === 'map' && (
-          <div className="absolute left-2 right-2 top-2 z-10 flex items-start gap-2 pointer-events-none">
-            {placing ? (
-              <div className="pointer-events-auto flex items-center gap-2 rounded-xl bg-teal text-white pl-3 pr-1 py-1 shadow-lg">
-                <span className="text-sm font-semibold">{t('m.placing', { what: toolName })}</span>
-                <button type="button" onClick={() => setTool({ kind: 'select' })} className="px-3 py-1.5 rounded-lg bg-white text-teal text-sm font-bold">
-                  {t('m.done')}
-                </button>
-              </div>
-            ) : (
+          <>
+            <div className="absolute left-2 right-2 top-[5.6rem] z-10 flex items-start gap-2 pointer-events-none">
+              {placing ? (
+                <div className="pointer-events-auto flex items-center gap-2 rounded-xl bg-teal text-white pl-3 pr-1 py-1 shadow-lg">
+                  <span className="text-sm font-semibold">{t('m.placing', { what: toolName })}</span>
+                  {tool.kind === 'prefab' && (
+                    <button type="button" onClick={() => setTool({ ...tool, rotated: !tool.rotated })} className="px-2.5 py-1.5 rounded-lg bg-white/20 text-sm font-bold" aria-label={t('prefab.rotate')}>
+                      ⟳
+                    </button>
+                  )}
+                  <button type="button" onClick={() => setTool({ kind: 'select' })} className="px-3 py-1.5 rounded-lg bg-white text-teal text-sm font-bold">
+                    {t('m.done')}
+                  </button>
+                </div>
+              ) : (
+                <div className="min-w-0 flex-1">
+                  <MissionCard />
+                </div>
+              )}
+            </div>
+            {!placing && (
+              <>
+                <div className="absolute left-2 top-[11.2rem] z-10 flex flex-col gap-2 pointer-events-none">
+                  <FloatButton icon={clipIcon} label={t('hud.missions')} onClick={() => setSheet('missions')} badge={missionBadge} />
+                </div>
+                <div className="absolute right-2 top-[11.2rem] z-10 flex flex-col gap-2 pointer-events-none">
+                  <FloatButton icon={eventsIcon} label={t('hud.events')} onClick={() => setSheet('events')} />
+                  <FloatButton icon={trophyIcon} label={t('hud.rewards')} onClick={() => useGame.getState().setChaptersOpen(true)} badge={!!nextChapter} />
+                  <FloatButton
+                    icon={shopIcon}
+                    label={t('hud.shop')}
+                    onClick={() => {
+                      setLeftTab('build');
+                      setSheet('tools');
+                    }}
+                  />
+                </div>
+              </>
+            )}
+            <div className="absolute left-2 bottom-2 z-10 pointer-events-none">
               <button
                 type="button"
-                data-tour="m-build"
-                onClick={() => {
-                  setLeftTab('build');
-                  setSheet('tools');
-                }}
-                className="pointer-events-auto rounded-xl bg-teal text-white px-4 py-2.5 text-sm font-bold shadow-lg"
+                onClick={() => window.dispatchEvent(new Event('he:recenter'))}
+                className="pointer-events-auto w-[4.4rem] rounded-2xl bg-gradient-to-b from-[#26b383] to-[#138a62] border-2 border-white/85 shadow-lg pt-1 pb-1 flex flex-col items-center"
               >
-                🏗 {t('m.build')}
+                <img src={mapIcon} alt="" className="h-8" />
+                <span className="text-[10px] font-bold text-white leading-tight">{t('hud.overview')}</span>
               </button>
-            )}
-            {!placing && <TutorialCard compact />}
-          </div>
+            </div>
+            <div className="absolute right-2 bottom-2 z-10 pointer-events-none">
+              <button
+                type="button"
+                onClick={() => setShowLabels(!showLabels)}
+                aria-pressed={showLabels}
+                title={t('hud.labels')}
+                aria-label={t('hud.labels')}
+                className={`pointer-events-auto size-12 rounded-2xl border-2 shadow-lg grid place-items-center ${showLabels ? 'bg-white border-white text-[#14365f]' : 'bg-[#14365f]/85 border-white/60 text-white'}`}
+              >
+                <svg viewBox="0 0 24 24" className="size-6" fill="none" stroke="currentColor" strokeWidth={2} strokeLinejoin="round" aria-hidden>
+                  <path d="M12 3l9 5-9 5-9-5 9-5z M3 13l9 5 9-5" />
+                </svg>
+              </button>
+            </div>
+          </>
         )}
       </main>
+
+      {view === 'map' && !placing && <ActionCards />}
 
       <nav className="shrink-0 grid grid-cols-5 bg-paper border-t border-line" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }} aria-label="views">
         {tabs.map((x) => {
@@ -263,6 +467,21 @@ export function MobileShell() {
       {sheet === 'info' && (
         <Sheet title={t('m.info')} onClose={() => setSheet(null)}>
           <SidePanel />
+          <Dashboard />
+        </Sheet>
+      )}
+      {sheet === 'missions' && (
+        <Sheet title={t('hud.missions_title', { c: game.chapter.id })} onClose={() => setSheet(null)}>
+          <ObjectiveList />
+        </Sheet>
+      )}
+      {sheet === 'events' && (
+        <Sheet title={t('hud.events_title')} onClose={() => setSheet(null)}>
+          <EventLog />
+        </Sheet>
+      )}
+      {sheet === 'report' && (
+        <Sheet title={t('hud.report')} onClose={() => setSheet(null)}>
           <Dashboard />
         </Sheet>
       )}

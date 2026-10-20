@@ -1,5 +1,6 @@
 import { Application, Container, Graphics, Sprite, Text, type Texture } from 'pixi.js';
-import { DECOR_SPRITE, EQUIP_SPRITE, loadSpriteTextures } from './sprites';
+import { DECOR_SPRITE, EQUIP_SPRITE, ROOM_BADGE, PERSON_SPRITE_WIDTH, loadSpriteTextures } from './sprites';
+import { WORLD_MARGIN, drawWorld, worldBounds } from './WorldBackdrop';
 import { EQUIPMENT, ROOMS } from '../data/rooms';
 import { cellIndex } from '../domain/grid';
 import type { RoomStatus } from '../domain/rules/rooms';
@@ -21,6 +22,8 @@ export interface PersonMarker {
   bed?: number;
   /** Spot index for idle staff inside a room. */
   spot?: number;
+  /** Standing sprite (staff); falls back to the vector figure when missing. */
+  sprite?: string;
 }
 
 export interface RenderInput {
@@ -36,6 +39,10 @@ export interface RenderInput {
   hint?: Cell[] | null;
   hoverTint: 'neutral' | 'danger';
   leftDragPans: boolean;
+  /** Sign on the plot for sale next door, or null when there is none. */
+  sale: { toX: number; label: string } | null;
+  /** Room name pills on the map (the layers button hides them). Default on. */
+  showLabels?: boolean;
 }
 
 export interface RendererCallbacks {
@@ -73,15 +80,34 @@ const PROP: Record<EquipmentId, PropStyle> = {
   parallel_bars: { s: 0.6, h: 18 },
   lockers: { s: 0.4, h: 28 },
   rest_sofa: { s: 0.6, h: 10 },
+  door_sensor: { s: 0.2, h: 20 },
+  feeding_pump: { s: 0.25, h: 18 },
+  suction_unit: { s: 0.3, h: 18 },
+  care_van: { s: 0.85, h: 22 },
+  training_manikin: { s: 0.5, h: 7 },
+  whiteboard: { s: 0.5, h: 26 },
+  exam_desk: { s: 0.62, h: 13 },
+  waiting_chairs: { s: 0.55, h: 9 },
+  vital_monitor: { s: 0.24, h: 22 },
 };
 
 export class IsoRenderer {
   private app = new Application();
   private world = new Container();
+  private backdropLayer = new Container();
+  private lastBackdrop = '';
+  private carsLayer = new Container();
+  private cars: Array<{ g: Graphics; x: number; speed: number; row: number }> = [];
+  private night = new Graphics();
+  private lastNight = '';
+  /** Smallest zoom at which the town still covers the whole screen. */
+  private minScale = 0.2;
   private staticLayer = new Container();
   private overlay = new Graphics();
   private labelLayer = new Container();
-  private peopleLayer = new Graphics();
+  private labelScale = 1;
+  private peopleLayer = new Container();
+  private peopleShapes = new Graphics();
   private lastPeople = '';
   /** Per room: cells holding beds (in bed order) and free floor cells, for placing people. */
   private roomCells = new Map<string, { beds: Cell[]; free: Cell[] }>();
@@ -116,7 +142,7 @@ export class IsoRenderer {
   async init(host: HTMLElement): Promise<void> {
     await this.app.init({
       resizeTo: host,
-      background: 0xe9e4d8,
+      background: 0x8ea86b,
       antialias: true,
       autoDensity: true,
       resolution: Math.min(window.devicePixelRatio || 1, 2),
@@ -129,8 +155,13 @@ export class IsoRenderer {
     host.appendChild(this.app.canvas);
     this.app.canvas.style.display = 'block';
     this.app.canvas.style.touchAction = 'none';
-    this.world.addChild(this.staticLayer, this.overlay, this.peopleLayer, this.labelLayer);
-    this.app.stage.addChild(this.world);
+    this.world.addChild(this.backdropLayer, this.staticLayer, this.carsLayer, this.overlay, this.peopleLayer, this.labelLayer);
+    this.night.eventMode = 'none';
+    this.app.stage.addChild(this.world, this.night);
+    this.app.ticker.add((tk) => {
+      this.driveCars(tk.deltaMS);
+      this.syncLabelScale();
+    });
     this.app.stage.eventMode = 'static';
     this.app.stage.hitArea = this.app.screen;
     this.app.stage.on('pointerdown', (e) => {
@@ -167,6 +198,9 @@ export class IsoRenderer {
     this.app.canvas.addEventListener('wheel', this.onWheel, { passive: false });
     this.app.canvas.addEventListener('contextmenu', this.onContext);
     this.app.renderer.on('resize', () => {
+      this.lastNight = '';
+      this.updateMinScale();
+      if (this.input) this.drawNight(this.input.game.minute);
       if (!this.userMovedCamera) this.recenter();
     });
     // resizeTo only listens to window resizes; also follow the host element (phone layouts settle late).
@@ -201,14 +235,16 @@ export class IsoRenderer {
   }
 
   private fitTo(w: number, h: number): void {
-    const worldW = (w + h) * (TILE_W / 2) + 80;
+    const lotW = (w + h) * (TILE_W / 2);
+    const worldW = lotW + 80;
     const worldH = (w + h) * (TILE_H / 2) + 140;
     const sw = this.app.screen.width;
     const sh = this.app.screen.height;
-    let scale = Math.min(sw / worldW, sh / worldH);
-    // Portrait phones: zoom in a little so tiles are big enough for fingers (the lot's side corners crop).
-    if (sh > sw * 1.2) scale *= 1.35;
-    scale = Math.max(0.2, Math.min(2.2, scale));
+    this.updateMinScale();
+    // Portrait phones: the lot spans the full screen width (its side corners crop slightly);
+    // wider screens show the whole lot with a little of the town around it.
+    let scale = sh > sw * 1.2 ? (sw / lotW) * 1.12 : Math.min(sw / worldW, sh / worldH) * 1.08;
+    scale = Math.max(this.minScale, Math.min(2.2, scale));
     this.world.scale.set(scale);
     const centre = cellToWorld(w / 2, h / 2);
     this.world.position.set(sw / 2 - centre.x * scale, sh / 2 - centre.y * scale + 10 * scale);
@@ -224,7 +260,7 @@ export class IsoRenderer {
     if (!this.ready) return;
     this.userMovedCamera = true;
     const old = this.world.scale.x;
-    const next = Math.max(0.2, Math.min(3, old * factor));
+    const next = Math.max(this.minScale, Math.min(3, old * factor));
     const wx = (sx - this.world.x) / old;
     const wy = (sy - this.world.y) / old;
     this.world.scale.set(next);
@@ -259,7 +295,7 @@ export class IsoRenderer {
     const dist = Math.max(1, Math.hypot(a.x - b.x, a.y - b.y));
     const midX = (a.x + b.x) / 2;
     const midY = (a.y + b.y) / 2;
-    const next = Math.max(0.2, Math.min(3, (pz.scale * dist) / pz.dist));
+    const next = Math.max(this.minScale, Math.min(3, (pz.scale * dist) / pz.dist));
     // Keep the world point under the starting midpoint under the fingers' current midpoint.
     const worldX = (pz.midX - pz.wx) / pz.scale;
     const worldY = (pz.midY - pz.wy) / pz.scale;
@@ -332,10 +368,72 @@ export class IsoRenderer {
     p.mode = 'none';
   }
 
+  /** Zooming out stops once the town spans the screen (the grass-coloured background fills its far corners). */
+  private updateMinScale(): void {
+    if (!this.input) return;
+    const b = worldBounds(this.input.game.site, this.input.sale?.toX ?? null);
+    const span = b.maxX - b.minX + (b.maxY - b.minY);
+    const W = span * (TILE_W / 2);
+    const H = span * (TILE_H / 2);
+    this.minScale = Math.max(0.2, this.app.screen.width / W, this.app.screen.height / H);
+  }
+
+  /** Ambient traffic on the front street; it pauses with the game. */
+  private driveCars(dtMs: number): void {
+    if (!this.input || !this.cars.length) return;
+    const speed = this.input.game.speed;
+    if (!speed) return;
+    const { site } = this.input.game;
+    const east = (this.input.sale?.toX ?? site.width) + WORLD_MARGIN;
+    for (const car of this.cars) {
+      car.x += car.speed * speed * (dtMs / 1000);
+      if (car.x > east) car.x = -WORLD_MARGIN;
+      if (car.x < -WORLD_MARGIN) car.x = east;
+      const c = cellCenter(car.x, car.row + 0.5);
+      car.g.position.set(c.x, c.y + SLAB_DEPTH - TILE_H / 2);
+    }
+  }
+
+  private makeCars(site: GameState['site']): void {
+    for (const c of this.carsLayer.removeChildren()) c.destroy();
+    const colors = [0xd9534f, 0x2f6aa5, 0xf2f2f2, 0x3f8f86, 0xe0a23b];
+    this.cars = colors.map((color, i) => {
+      const g = new Graphics();
+      // a small iso car: body, roof and windows
+      g.poly([-12, 0, 0, -6, 12, 0, 0, 6]).fill(shade(color, 0.7));
+      g.poly([-12, 0, 0, 6, 0, 1, -12, -5]).fill(shade(color, 0.85));
+      g.poly([0, 6, 12, 0, 12, -5, 0, 1]).fill(shade(color, 0.7));
+      g.poly([-12, -5, 0, -11, 12, -5, 0, 1]).fill(color);
+      g.poly([-6, -6, 0, -9, 6, -6, 0, -3]).fill({ color: 0x9cc3cf, alpha: 0.9 });
+      this.carsLayer.addChild(g);
+      return { g, x: -WORLD_MARGIN + i * 9, speed: (i % 2 ? -1 : 1) * (1.4 + (i % 3) * 0.5), row: site.height };
+    });
+  }
+
+  /** Morning glow, clear day, evening amber and a blue night, from the game clock (screen-space tint). */
+  private drawNight(minute: number): void {
+    const hour = Math.floor((minute % 1440) / 60);
+    const [color, alpha] = hour >= 20 || hour < 5 ? [0x14223f, 0.34] : hour < 7 ? [0xf2a65a, 0.1] : hour >= 18 ? [0xe5904a, 0.14] : [0, 0];
+    const key = `${hour >= 20 || hour < 5 ? 'n' : hour < 7 ? 'd' : hour >= 18 ? 'e' : 'x'}|${this.app.screen.width}x${this.app.screen.height}`;
+    if (key === this.lastNight) return;
+    this.lastNight = key;
+    this.night.clear();
+    if (alpha) this.night.rect(0, 0, this.app.screen.width, this.app.screen.height).fill({ color, alpha });
+  }
+
   // ---------- drawing ----------
   update(input: RenderInput): void {
     this.input = input;
     if (!this.ready) return;
+    this.drawNight(input.game.minute);
+    this.labelLayer.visible = input.showLabels !== false;
+    const backdropKey = `${input.game.site.width}x${input.game.site.height}|${input.sale?.label ?? ''}|${this.tex.size}`;
+    if (backdropKey !== this.lastBackdrop) {
+      this.lastBackdrop = backdropKey;
+      drawWorld(this.backdropLayer, input.game.site, { sale: input.sale ? { fromX: input.game.site.width, toX: input.sale.toX, label: input.sale.label } : null, textures: this.tex });
+      this.makeCars(input.game.site);
+      this.updateMinScale();
+    }
     const staticKey = `${input.labelFor({ id: '', type: 'ward', rect: { x: 0, y: 0, w: 1, h: 1 }, equipment: {}, builtAt: 0 })}|${input.entranceLabel}`;
     if (input.game.site !== this.lastSite || staticKey !== this.lastStatic) {
       this.lastSite = input.game.site;
@@ -365,15 +463,7 @@ export class IsoRenderer {
     g.poly([B.x, B.y, R.x, R.y, R.x, R.y + SLAB_DEPTH, B.x, B.y + SLAB_DEPTH]).fill(0x7a845c);
     void T;
 
-    // Street in front of the lot (row y = height), purely decorative
-    for (let x = -2; x < site.width + 2; x++) {
-      const d = cellDiamond(x, site.height);
-      g.poly(d.map((v, i) => (i % 2 ? v + SLAB_DEPTH : v))).fill(0x6f7378);
-    }
-    for (let x = -2; x < site.width + 2; x += 2) {
-      const c = cellCenter(x, site.height);
-      g.poly([c.x - 8, c.y + SLAB_DEPTH - 2, c.x + 8, c.y + SLAB_DEPTH + 2, c.x + 6, c.y + SLAB_DEPTH + 3, c.x - 10, c.y + SLAB_DEPTH - 1]).fill(0xe8e3c9);
-    }
+    // The street, the town and the plot for sale are drawn by the world backdrop.
 
     // Ground tiles
     for (let y = 0; y < site.height; y++)
@@ -382,6 +472,29 @@ export class IsoRenderer {
         const color = corridor ? ((x + y) % 2 ? 0xf3ede0 : 0xeee6d5) : (x + y) % 2 ? 0xa9bf86 : 0xa2b97f;
         g.poly(cellDiamond(x, y)).fill(color).stroke({ width: 1, color: corridor ? 0xd8cdb6 : 0x93aa71, alpha: 0.7 });
       }
+
+    // A low white fence around the lot, with a gap at the entrance, so the home reads apart from the town.
+    const fence = new Graphics();
+    const corners = [cellToWorld(0, 0), cellToWorld(site.width, 0), cellToWorld(site.width, site.height), cellToWorld(0, site.height)];
+    for (let i = 0; i < 4; i++) {
+      const a = corners[i];
+      const b = corners[(i + 1) % 4];
+      fence.moveTo(a.x, a.y - 5).lineTo(b.x, b.y - 5);
+    }
+    fence.stroke({ width: 2.5, color: 0xfbf8f2, alpha: 0.95 });
+    for (let x = 0; x <= site.width; x += 2) for (const yy of [0, site.height]) {
+      const p = cellToWorld(x, yy);
+      fence.rect(p.x - 1.2, p.y - 8, 2.4, 8).fill(0xfbf8f2);
+    }
+    for (let y = 0; y <= site.height; y += 2) for (const xx of [0, site.width]) {
+      const p = cellToWorld(xx, y);
+      fence.rect(p.x - 1.2, p.y - 8, 2.4, 8).fill(0xfbf8f2);
+    }
+    // keep the gate open
+    const gateL = cellToWorld(site.entrance.x, site.height);
+    const gateR = cellToWorld(site.entrance.x + 1, site.height);
+    fence.moveTo(gateL.x, gateL.y - 5).lineTo(gateR.x, gateR.y - 5).stroke({ width: 4, color: 0xf6d58e });
+    this.staticLayer.addChild(fence);
 
     // Entrance gate
     const e = site.entrance;
@@ -485,7 +598,9 @@ export class IsoRenderer {
 
     // label
     const c = cellToWorld(x + w / 2, y + h / 2);
-    this.addLabel(status?.operational ? label : `⚠ ${label}`, c.x, c.y - WALL_H - 8, status?.operational ? wall : 0xc0392b, false);
+    const badge = ROOM_BADGE[room.type];
+    if (status?.operational) this.addBadge(label, badge.glyph, c.x, c.y - WALL_H - 14, badge.color);
+    else this.addBadge(`⚠ ${label}`, null, c.x, c.y - WALL_H - 14, 0xc0392b);
   }
 
   /** Place a sprite with its base at a world point; width in world px. */
@@ -504,8 +619,10 @@ export class IsoRenderer {
     const key = people.map((p) => `${p.key}:${p.roomId}:${p.bed ?? ''}:${p.spot ?? ''}`).join('|');
     if (key === this.lastPeople) return;
     this.lastPeople = key;
-    const g = this.peopleLayer;
+    const g = this.peopleShapes;
     g.clear();
+    for (const child of this.peopleLayer.removeChildren()) if (child !== g) child.destroy();
+    this.peopleLayer.addChild(g);
     const items: Array<{ x: number; y: number; p: PersonMarker }> = [];
     for (const p of people) {
       const rc = p.roomId ? this.roomCells.get(p.roomId) : undefined;
@@ -527,6 +644,15 @@ export class IsoRenderer {
         g.ellipse(x + 1, y - 9, 13, 6.5).fill({ color: p.color, alpha: 0.95 }).stroke({ width: 1, color: shade(p.color, 0.7) });
         g.circle(x - 12, y - 14, 6).fill(0xf1c9a5).stroke({ width: 1.2, color: 0x9b7653 });
         g.ellipse(x - 12, y - 18.5, 6, 3).fill(0xe2ddd4);
+      } else if (p.sprite && this.tex.has(p.sprite)) {
+        // Role-coloured ground ring, then the character standing on it (sprites sort by depth).
+        g.ellipse(x, y, 11, 5).fill({ color: p.color, alpha: 0.45 }).stroke({ width: 1.2, color: shade(p.color, 0.7), alpha: 0.8 });
+        const t = this.tex.get(p.sprite)!;
+        const sp = new Sprite(t);
+        sp.anchor.set(0.5, 0.97);
+        sp.scale.set(PERSON_SPRITE_WIDTH / t.width);
+        sp.position.set(x, y + 1);
+        this.peopleLayer.addChild(sp);
       } else {
         g.ellipse(x, y, 10, 4.5).fill({ color: 0x000000, alpha: 0.2 });
         g.roundRect(x - 7, y - 25, 14, 24, 6).fill(p.color).stroke({ width: 1.2, color: shade(p.color, 0.65) });
@@ -554,6 +680,51 @@ export class IsoRenderer {
       g.poly([c.x, z - hh * 0.0, c.x + hw, z, c.x, z + hh, c.x - hw * 0.0, z]).fill({ color: 0x5aa39a, alpha: 0.9 });
       g.ellipse(c.x - hw * 0.45, z - hh * 0.15, 6, 3.5).fill(0xffffff).stroke({ width: 1, color: 0xcfd6d4 });
     }
+  }
+
+  /** Keep room pills readable when zoomed out: never smaller on screen than at 60% zoom. */
+  private syncLabelScale(): void {
+    const k = Math.max(1, 0.6 / this.world.scale.x);
+    if (Math.abs(k - this.labelScale) < 0.01) return;
+    this.labelScale = k;
+    for (const c of this.labelLayer.children) c.scale.set(k);
+  }
+
+  /** Room name pill: coloured, white-edged, with the room's glyph on the left (concept-art style). */
+  private addBadge(text: string, glyph: string | null, x: number, y: number, color: number): void {
+    const t = new Text({ text, style: { fontFamily: FONT, fontSize: 15, fontWeight: '700', fill: 0xffffff }, resolution: 3 });
+    t.anchor.set(0, 0.5);
+    const tex = glyph ? this.tex.get(glyph) : undefined;
+    const gh = 18;
+    const gw = tex ? (tex.width / tex.height) * gh : 0;
+    const padX = 10;
+    const gap = tex ? 7 : 0;
+    const width = padX * 2 + gw + gap + t.width;
+    const height = Math.max(t.height, gh) + 12;
+    const box = new Container();
+    const bg = new Graphics()
+      .roundRect(-width / 2, -height / 2 + 3, width, height, height / 2)
+      .fill({ color: 0x000000, alpha: 0.22 })
+      .roundRect(-width / 2, -height / 2, width, height, height / 2)
+      .fill(color)
+      .stroke({ width: 2, color: 0xffffff, alpha: 0.9 })
+      .roundRect(-width / 2 + 3, -height / 2 + 2, width - 6, height / 2 - 2, height / 3)
+      .fill({ color: 0xffffff, alpha: 0.14 });
+    box.addChild(bg);
+    let left = -width / 2 + padX;
+    if (tex) {
+      const sp = new Sprite(tex);
+      sp.anchor.set(0, 0.5);
+      sp.scale.set(gh / tex.height);
+      sp.position.set(left, 0);
+      box.addChild(sp);
+      left += gw + gap;
+    }
+    t.position.set(left, 0);
+    box.addChild(t);
+    box.position.set(x, y);
+    box.scale.set(this.labelScale);
+    this.labelLayer.addChild(box);
   }
 
   private addLabel(text: string, x: number, y: number, color: number, small: boolean): void {

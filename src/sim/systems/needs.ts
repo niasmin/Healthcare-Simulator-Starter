@@ -5,8 +5,11 @@ import { gardenAppeal } from '../../data/decor';
 import type { CareGroup, GameState, NeedKey, Needs, Resident } from '../../domain/types';
 import { clamp, r2 } from '../helpers';
 
+/** Per-tick satisfaction pull on premium (villa) residents, offset by garden appeal. */
+export const PREMIUM_EXPECTATION = 0.03;
+
 /** Per-tick decay rates (fictional balancing). */
-const MOBILITY_DECAY: Record<CareGroup, number> = { active_aging: 0.01, stroke_rehab: 0.04, bedridden: 0.03 };
+const MOBILITY_DECAY: Record<CareGroup, number> = { active_aging: 0.01, stroke_rehab: 0.04, bedridden: 0.03, dementia: 0.015, tube_feeding: 0.03, airway: 0.03 };
 
 export function applyNeedDelta(needs: Needs, delta: Partial<Record<NeedKey, number>>, scale = 1): Needs {
   const out = { ...needs };
@@ -31,6 +34,8 @@ function decayResident(r: Resident, minute: number, priceDrift: number, appeal: 
     happiness: -0.07 + appeal * 0.0015,
   };
   if (priceDrift) d.satisfaction = (d.satisfaction ?? 0) + priceDrift;
+  // Villa families expect more: satisfaction slips unless the garden is lovely (appeal 20 breaks even).
+  if (r.premium) d.satisfaction = (d.satisfaction ?? 0) - PREMIUM_EXPECTATION + appeal * 0.0015;
   if (!r.carePlan) {
     // Without a care plan residents feel unattended.
     d.happiness! -= 0.05;

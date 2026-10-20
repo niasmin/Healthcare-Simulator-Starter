@@ -24,7 +24,7 @@ export interface Rect {
   h: number;
 }
 
-export type RoomType = 'ward' | 'nursing_station' | 'therapy' | 'staff_room';
+export type RoomType = 'ward' | 'nursing_station' | 'therapy' | 'staff_room' | 'villa' | 'homecare_office' | 'training_room' | 'neuro_clinic' | 'stroke_unit';
 
 export type EquipmentId =
   | 'care_bed'
@@ -34,7 +34,16 @@ export type EquipmentId =
   | 'exercise_mat'
   | 'parallel_bars'
   | 'lockers'
-  | 'rest_sofa';
+  | 'rest_sofa'
+  | 'door_sensor'
+  | 'feeding_pump'
+  | 'suction_unit'
+  | 'care_van'
+  | 'training_manikin'
+  | 'whiteboard'
+  | 'exam_desk'
+  | 'waiting_chairs'
+  | 'vital_monitor';
 
 export interface Room {
   id: string;
@@ -89,7 +98,8 @@ export type LedgerCategory =
   | 'fee_refund'
   | 'food'
   | 'supplies'
-  | 'event';
+  | 'event'
+  | 'training';
 
 // ---------------------------------------------------------------------------
 // Billing (Phase 3). Fees are FICTIONAL game balancing values.
@@ -98,7 +108,7 @@ export type LedgerCategory =
 export type PriceLevel = 'value' | 'standard' | 'premium';
 
 /** Revenue streams, used for invoice lines and the revenue-mix chart. */
-export type RevenueStream = 'room_care' | 'therapy' | 'activity' | 'special';
+export type RevenueStream = 'room_care' | 'therapy' | 'activity' | 'special' | 'homecare' | 'workforce' | 'hospital';
 
 export interface InvoiceLine {
   stream: RevenueStream;
@@ -112,8 +122,8 @@ export interface InvoiceLine {
 
 export interface Invoice {
   id: string;
-  /** admission = pro-rated first month; monthly = start of month; final = services at discharge. */
-  kind: 'admission' | 'monthly' | 'final';
+  /** admission = pro-rated first month; monthly = start of month; final = services at discharge; homecare = a day of home visits. */
+  kind: 'admission' | 'monthly' | 'final' | 'homecare' | 'b2b' | 'opd' | 'ipd';
   /** Resident billed (the family pays). */
   clientId: string;
   clientName: PersonName;
@@ -166,13 +176,13 @@ export interface PersonName {
   gender?: 'f' | 'm';
 }
 
-export type StaffRole = 'rn' | 'pn' | 'caregiver' | 'pt' | 'ot';
+export type StaffRole = 'rn' | 'pn' | 'caregiver' | 'pt' | 'ot' | 'doctor';
 
 /**
  * Abstract qualifications. Clinical work is modelled only as "who is allowed
  * to do which kind of task" — never as treatment advice.
  */
-export type Skill = 'assessment' | 'vital_signs' | 'med_round' | 'personal_care' | 'feeding' | 'mobility' | 'activity';
+export type Skill = 'assessment' | 'vital_signs' | 'med_round' | 'personal_care' | 'feeding' | 'mobility' | 'activity' | 'tube_feeding' | 'airway_care' | 'consult';
 
 export type ShiftSlot = 'morning' | 'afternoon' | 'night';
 
@@ -200,6 +210,10 @@ export interface Employee {
   /** Busy with a task until this minute (exclusive). */
   busyUntil: SimMinute;
   taskId: string | null;
+  /** Training certificates earned (Chapter 5). */
+  certs?: CourseId[];
+  /** Placed with a partner organisation on this contract (Chapter 5): off the home's roster. */
+  placement?: string;
 }
 
 export interface StaffCandidate {
@@ -209,7 +223,8 @@ export interface StaffCandidate {
   experienceYears: number;
 }
 
-export type CareGroup = 'active_aging' | 'stroke_rehab' | 'bedridden';
+/** Chapter 1 groups plus the Chapter 2 specialised programmes (abstract care categories, never treatments). */
+export type CareGroup = 'active_aging' | 'stroke_rehab' | 'bedridden' | 'dementia' | 'tube_feeding' | 'airway';
 
 export type NeedKey = 'physical' | 'mobility' | 'mental' | 'happiness' | 'satisfaction' | 'nutrition';
 export type Needs = Record<NeedKey, number>;
@@ -231,6 +246,8 @@ export interface Resident {
   bedId: string;
   admittedAt: SimMinute;
   carePlan: CarePlan | null;
+  /** Premium (Tranquila) resident living in a private villa (Chapter 3). */
+  premium?: boolean;
 }
 
 export interface ResidentCandidate {
@@ -242,9 +259,21 @@ export interface ResidentCandidate {
   needs: Needs;
   /** Set for hospital referrals: must be admitted by this day or the partner is let down. */
   referralDeadline?: number;
+  /** Wants a private villa (Chapter 3 premium tier). */
+  premium?: boolean;
 }
 
-export type TaskKind = 'vital_signs' | 'med_round' | 'personal_care' | 'meal_assist' | 'repositioning' | 'mobility_session' | 'activity';
+export type TaskKind =
+  | 'vital_signs'
+  | 'med_round'
+  | 'personal_care'
+  | 'meal_assist'
+  | 'repositioning'
+  | 'mobility_session'
+  | 'activity'
+  | 'tube_feed'
+  | 'airway_care'
+  | 'safety_round';
 export type TaskStatus = 'pending' | 'in_progress' | 'done' | 'missed';
 
 export interface CareTask {
@@ -314,7 +343,24 @@ export interface LogItem {
 // Chapter challenge (Phase 4): the 30-day story goal, judged once by the engine.
 // ---------------------------------------------------------------------------
 
-export type ChapterCheckId = 'solvent' | 'beds' | 'residents' | 'cashflow' | 'quality';
+export type ChapterCheckId =
+  | 'solvent'
+  | 'beds'
+  | 'residents'
+  | 'cashflow'
+  | 'quality'
+  | 'rn'
+  | 'programmes'
+  | 'premium'
+  | 'premium_sat'
+  | 'appeal'
+  | 'clients'
+  | 'visit_rate'
+  | 'certified'
+  | 'contracts'
+  | 'opd_visits'
+  | 'opd_rate'
+  | 'discharges';
 
 export interface ChapterCheck {
   id: ChapterCheckId;
@@ -324,6 +370,8 @@ export interface ChapterCheck {
 }
 
 export interface ChapterResult {
+  /** Chapter number (1 = First Care Home). */
+  chapter: number;
   outcome: 'won' | 'failed';
   /** Day the verdict was reached. */
   day: number;
@@ -332,8 +380,167 @@ export interface ChapterResult {
   checks: ChapterCheck[];
 }
 
+// ---------------------------------------------------------------------------
+// Home care (Chapter 4). Clients live at home; staff visit them by van.
+// ---------------------------------------------------------------------------
+
+/** caregiver = personal care visit; nurse = health check visit (vital signs). */
+export type VisitPlan = 'caregiver' | 'nurse';
+
+export interface HomeClient {
+  id: string;
+  name: PersonName;
+  age: number;
+  plan: VisitPlan;
+  /** 0..100: drops when visits are missed; the family cancels below the churn line. */
+  satisfaction: number;
+  joinedAt: SimMinute;
+  /** Daily appointment time (minute of day). */
+  visitAt: number;
+}
+
+export interface HomeLead {
+  id: string;
+  name: PersonName;
+  age: number;
+  plan: VisitPlan;
+}
+
+export interface HomeVisit {
+  id: string;
+  clientId: string;
+  skill: Skill;
+  dueAt: SimMinute;
+  /** Minutes away from the home, travel included. */
+  duration: number;
+  status: TaskStatus;
+  assigneeId: string | null;
+  finishAt: SimMinute | null;
+}
+
+export interface HomeCareState {
+  clients: HomeClient[];
+  leads: HomeLead[];
+  visits: HomeVisit[];
+  /** Visits completed today, per client, billed at midnight. */
+  doneToday: Record<string, number>;
+  /** Closed days (last 14): visits done and missed. */
+  history: Array<{ day: number; done: number; missed: number }>;
+  today: { done: number; missed: number };
+}
+
+// ---------------------------------------------------------------------------
+// Workforce (Chapter 5): training courses and staff placements with partner organisations.
+// ---------------------------------------------------------------------------
+
+/** Abstract training courses: each grants a certificate, some also a qualification (never clinical advice). */
+export type CourseId = 'care_cert' | 'tube_cert' | 'airway_cert';
+
+export interface TrainingSession {
+  id: string;
+  employeeId: string;
+  course: CourseId;
+  /** Class minutes still to attend. */
+  remaining: number;
+}
+
+/** A partner organisation asking for one staff member for a number of working days. */
+export interface WorkforceOffer {
+  id: string;
+  org: PersonName;
+  /** Kind of partner, for the icon and wording. */
+  orgKind: 'clinic' | 'hospital' | 'company' | 'school';
+  role: StaffRole;
+  /** Certificate the partner requires, if any. */
+  cert: CourseId | null;
+  days: number;
+  ratePerDay: Satang;
+  /** Last day the offer can be accepted. */
+  expiresDay: number;
+}
+
+export interface WorkforceContract extends Omit<WorkforceOffer, 'expiresDay'> {
+  employeeId: string;
+  /** First working day. */
+  startDay: number;
+  done: number;
+  missed: number;
+  /** Working days completed today, billed at midnight. */
+  doneToday: number;
+}
+
+export interface WorkforceState {
+  training: TrainingSession[];
+  offers: WorkforceOffer[];
+  contracts: WorkforceContract[];
+  /** Finished contracts (last 20): completed on time or ended early. */
+  past: Array<{ id: string; org: PersonName; outcome: 'completed' | 'ended'; done: number; missed: number; day: number }>;
+}
+
+// ---------------------------------------------------------------------------
+// Neuro hospital (Chapter 6): outpatient clinic and a short-stay stroke unit.
+// Everything is abstract: who may do which kind of work and when, never what treatment to give.
+// ---------------------------------------------------------------------------
+
+/** One unit of hospital work: an outpatient consultation, or a round for an inpatient. */
+export interface HospitalTask {
+  id: string;
+  kind: 'consult' | 'nurse_round' | 'doctor_round';
+  /** Outpatient name for consultations; the inpatient's id for rounds. */
+  patientId: string;
+  skill: Skill;
+  dueAt: SimMinute;
+  duration: number;
+  grace: number;
+  status: TaskStatus;
+  assigneeId: string | null;
+  finishAt: SimMinute | null;
+}
+
+/** A clinic patient the doctor referred for a short stay in the stroke unit. */
+export interface IpdReferral {
+  id: string;
+  name: PersonName;
+  age: number;
+  stayDays: number;
+  /** Last day a bed can be offered. */
+  expiresDay: number;
+}
+
+export interface Inpatient {
+  id: string;
+  name: PersonName;
+  age: number;
+  bedId: string;
+  admittedDay: number;
+  stayDays: number;
+  roundsDone: number;
+  roundsMissed: number;
+}
+
+export interface HospitalState {
+  tasks: HospitalTask[];
+  referrals: IpdReferral[];
+  inpatients: Inpatient[];
+  /** Consultations completed today (billed at midnight). */
+  today: { consults: number; missed: number };
+  /** Closed days (last 120, enough to judge a whole chapter). */
+  history: Array<{ day: number; consults: number; missed: number }>;
+  /** Discharges (last 200): a smooth stay, or one with too many missed rounds. */
+  discharged: Array<{ id: string; day: number; outcome: 'recovered' | 'complicated' }>;
+}
+
+/** The running chapter. Each chapter is judged once, over days startDay .. startDay + days − 1. */
+export interface ChapterState {
+  id: number;
+  startDay: number;
+  result: ChapterResult | null;
+  /** Verdicts of earlier chapters, oldest first. */
+  past: ChapterResult[];
+}
+
 export interface GameState {
-  schemaVersion: 5;
+  schemaVersion: 9;
   seed: number;
   /** Current PRNG state (mulberry32). Advancing the RNG updates this. */
   rngState: number;
@@ -367,7 +574,12 @@ export interface GameState {
   unbilled: Record<string, { therapy: number; activity: number; special: number }>;
   events: EventsState;
   // Phase 4
-  chapter: { result: ChapterResult | null };
+  chapter: ChapterState;
+  // Phase 5 part 2
+  homecare: HomeCareState;
+  // Phase 6
+  workforce: WorkforceState;
+  hospital: HospitalState;
 }
 
 export type ReasonCode =
@@ -393,7 +605,20 @@ export type ReasonCode =
   | 'plan_exists'
   | 'no_event'
   | 'invalid_choice'
-  | 'needs_rn_on_shift';
+  | 'needs_rn_on_shift'
+  | 'needs_ward_equipment'
+  | 'chapter_locked'
+  | 'already_done'
+  | 'no_homecare_office'
+  | 'no_training_room'
+  | 'no_seat'
+  | 'course_not_allowed'
+  | 'already_certified'
+  | 'employee_busy'
+  | 'role_mismatch'
+  | 'needs_cert'
+  | 'employee_placed'
+  | 'no_stroke_bed';
 
 export type CommandResult =
   | { ok: true; id?: string; costSatang?: Satang }

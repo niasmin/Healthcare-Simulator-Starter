@@ -96,6 +96,6 @@ describe('tutorial pointers', () => {
   });
 
   it('long goals carry no pointer', () => {
-    expect(tourPointer({ id: 'chapter', key: 'goal.chapter', done: false, action: { kind: 'view', view: 'finance' } }, { game: createInitialState(1), tool: { kind: 'select' }, selectedRoomId: null })).toEqual({ targets: [], hint: null });
+    expect(tourPointer({ id: 'chapter', key: 'goal.chapter', hint: 'tut.chapter1', done: false, action: { kind: 'view', view: 'finance' } }, { game: createInitialState(1), tool: { kind: 'select' }, selectedRoomId: null })).toEqual({ targets: [], hint: null });
   });
 });
