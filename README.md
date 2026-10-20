@@ -195,7 +195,7 @@ The plots down the street are sold one after another. Each grows the lot east, a
 | 1 | 32×20 | ฿300,000 | 3 |
 | 2 | 44×20 | ฿500,000 | 4 |
 | 3 | 56×20 | ฿800,000 | 5 |
-| 4 and on | +12 columns each | 30% more each time (฿1,040,000, ฿1,350,000, …) | 5 |
+| 4 and on | +12 columns each | 30% more each time (฿1,040,000, ฿1,352,000, …) | 5 |
 
 The street ends at 152 columns.
 
