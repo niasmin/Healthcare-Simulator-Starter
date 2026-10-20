@@ -119,7 +119,16 @@ export function refreshCandidates(state: GameState): GameState {
   const [lo, hi] = WAITLIST_ARRIVALS[s.priceLevel];
   let add: number;
   [s, add] = randInt(s, lo, hi);
+  // Word of mouth: a strong reputation brings extra enquiries, a poor one dries them up.
   if (s.organization.reputation >= 70) add++;
+  if (s.organization.reputation < 30) add = Math.max(0, add - 1);
+  if (s.organization.reputation < 15) add = 0;
+  // ...and families already waiting look elsewhere (the oldest leave first; urgent referrals are separate).
+  const drop = s.organization.reputation < 15 ? 2 : s.organization.reputation < 30 ? 1 : 0;
+  if (drop) {
+    const leaving = new Set(s.waitlist.filter((c) => !c.referralDeadline).slice(0, drop).map((c) => c.id));
+    s = { ...s, waitlist: s.waitlist.filter((c) => !leaving.has(c.id)) };
+  }
   // From Chapter 3, when the list is full the longest-waiting candidate finds another home, so new families keep arriving.
   if (s.chapter.id >= 3 && add > 0) {
     const open = s.waitlist.filter((c) => !c.referralDeadline);

@@ -34,6 +34,7 @@ function AddPopover({ role, slot, onClose }: { role: StaffRole; slot: ShiftSlot;
           <button
             key={e.id}
             type="button"
+            data-tour="roster-pick"
             onClick={() => {
               dispatch({ type: 'assignShift', employeeId: e.id, slot });
               onClose();
@@ -218,6 +219,7 @@ export function RosterView() {
                         <button
                           type="button"
                           aria-label={t('roster.pick', { role: `${role}.short`, slot })}
+                          data-tour={`roster-add-${role}-${slot}`}
                           onClick={() => setOpen(open === key ? null : key)}
                           className="size-7 rounded-full border border-dashed border-ink-soft/40 text-ink-soft hover:border-teal hover:text-teal"
                         >

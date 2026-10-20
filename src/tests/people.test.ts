@@ -195,11 +195,17 @@ describe('30-day deterministic care simulation', () => {
     }
   });
 
-  it('an unstaffed home misses care and residents decline', () => {
-    const good = advance(staffedHome(3), TICKS_PER_DAY * 10);
-    const bad = advance(staffedHome(3, false), TICKS_PER_DAY * 10);
+  it('an unstaffed home misses care, residents decline, then families leave', () => {
+    const good = advance(staffedHome(3), TICKS_PER_DAY * 3);
+    const bad = advance(staffedHome(3, false), TICKS_PER_DAY * 3);
     const avg = (s: GameState) => s.residents.reduce((a, r) => a + wellbeing(r.needs), 0) / s.residents.length;
     expect(bad.history.reduce((a, d) => a + d.done, 0)).toBe(0);
+    expect(bad.residents).toHaveLength(3);
     expect(avg(bad)).toBeLessThan(avg(good) - 15);
+    expect(bad.organization.reputation).toBeLessThan(good.organization.reputation);
+    const later = advance(bad, TICKS_PER_DAY * 10);
+    expect(later.residents.length).toBeLessThan(3);
+    const kept = new Set(advance(good, TICKS_PER_DAY * 10).residents.map((r) => r.id));
+    for (const r of good.residents) expect(kept.has(r.id)).toBe(true);
   });
 });

@@ -71,13 +71,14 @@ function BuildTools() {
   const site = useGame((s) => s.game.site);
   const dispatch = useGame((s) => s.dispatch);
 
-  const item = (target: Tool, title: string, sub: string, swatch?: string, art?: string, lockedUntil?: number) => {
+  const item = (target: Tool, title: string, sub: string, swatch?: string, art?: string, tour?: string, lockedUntil?: number) => {
     const active = sameTool(tool, target);
     return (
       <button
         key={title}
         type="button"
         disabled={lockedUntil !== undefined}
+        data-tour={tour}
         onClick={() => choose(target)}
         aria-pressed={active}
         className={`w-full text-left rounded-xl border px-3 py-2 transition-colors disabled:opacity-50 ${
@@ -101,7 +102,7 @@ function BuildTools() {
   return (
     <>
       {item({ kind: 'select' }, `🖐 ${t('tool.select')}`, t('tool.select.hint'))}
-      {item({ kind: 'corridor' }, t('tool.corridor'), `${money(CORRIDOR_COST_PER_TILE)}${t('tool.per_tile')}`, '#d8cdb6')}
+      {item({ kind: 'corridor' }, t('tool.corridor'), `${money(CORRIDOR_COST_PER_TILE)}${t('tool.per_tile')}`, '#d8cdb6', undefined, 'tool-corridor')}
       {item({ kind: 'bulldoze' }, `⛏ ${t('tool.bulldoze')}`, t('tool.bulldoze.hint', { pct: REFUND_PERCENT }))}
       <h3 className="text-xs font-semibold text-ink-soft uppercase tracking-wide mt-1">⚡ {t('prefab.section')}</h3>
       <p className="text-[11px] text-ink-soft leading-snug -mt-1">{t('prefab.hint')}</p>
@@ -157,6 +158,7 @@ function BuildTools() {
           `${t(`room.${rt}.desc`)} · ${money(d.baseCostSatang)} ${t('tool.base')} + ${money(d.costPerTileSatang)}${t('tool.per_tile')}`,
           SWATCH[rt],
           spriteUrl(ROOM_ART[rt]),
+          `tool-room-${rt}`,
           locked,
         );
       })}
@@ -215,6 +217,7 @@ function HireList() {
             </div>
             <button
               type="button"
+              data-tour={`hire-${a.role}`}
               onClick={() => dispatch({ type: 'hireStaff', candidateId: a.id })}
               className="px-3 py-1 rounded-lg bg-teal text-white text-sm font-semibold hover:bg-teal-dark"
             >
@@ -279,6 +282,7 @@ function AdmitList() {
             <button
               type="button"
               disabled={!freeBeds(game, c.group, !!c.premium).length}
+              data-tour="admit"
               onClick={() => {
                 const r = dispatch({ type: 'admitResident', candidateId: c.id });
                 if (r.ok) setView('residents');
@@ -373,6 +377,7 @@ export function LeftPanel() {
             key={x.id}
             type="button"
             role="tab"
+            data-tour={`tab-${x.id}`}
             aria-selected={tab === x.id}
             onClick={() => setTab(x.id)}
             className={`flex-1 px-2 py-2.5 text-center border-b-2 ${tab === x.id ? 'font-semibold border-teal text-teal' : 'border-transparent text-ink-soft hover:text-ink'}`}

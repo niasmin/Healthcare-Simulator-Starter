@@ -4,7 +4,7 @@ import { ChaptersModal } from './components/ChaptersModal';
 import { useAutosave } from './saveService';
 import { EventModal } from './components/EventModal';
 import { ChapterResultModal } from './components/ChapterResultModal';
-import { TutorialCard, useTutorialToasts } from './components/Tutorial';
+import { TourSpotlight, TutorialCard, useTutorialToasts } from './components/Tutorial';
 import { TitleScreen } from './components/TitleScreen';
 import { LeftPanel } from './components/BuildPanel';
 import { Dashboard } from './components/Dashboard';
@@ -41,6 +41,7 @@ export function App() {
       <Toast />
       {started ? <EventModal /> : <TitleScreen />}
       {started && <ChapterResultModal />}
+      {started && <TourSpotlight />}
       {started && saveOpen && <SaveModal mode="game" onClose={() => setSaveOpen(false)} />}
       {chaptersOpen && <ChaptersModal onClose={() => setChaptersOpen(false)} />}
     </>
@@ -56,6 +57,7 @@ export function App() {
 }
 
 function DesktopLayout() {
+  const view = useGame((s) => s.view);
   return (
     <div className="h-full flex flex-col">
       <TopBar />
@@ -65,7 +67,8 @@ function DesktopLayout() {
         </div>
         <div className="min-h-0 flex flex-col relative">
           <CenterArea />
-          <div className="absolute left-3 bottom-14 z-10 max-w-[calc(100%-1.5rem)] pointer-events-none">
+          {/* Keep the card off the entrance area of the map, where the first build steps happen. */}
+          <div className={`absolute z-10 max-w-[calc(100%-1.5rem)] pointer-events-none ${view === 'map' ? 'left-3 top-14' : 'right-3 bottom-3'}`}>
             <TutorialCard />
           </div>
         </div>

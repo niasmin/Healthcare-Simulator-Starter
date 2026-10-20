@@ -52,6 +52,7 @@ export function TopBar() {
             key={s.speed}
             type="button"
             title={s.speed === 0 ? t('top.pause') : s.label}
+            data-tour={`speed-${s.speed}`}
             onClick={() => dispatch({ type: 'setSpeed', speed: s.speed })}
             className={`min-w-10 px-2.5 py-1 rounded-md text-sm font-semibold transition-colors ${
               speed === s.speed ? (s.speed === 0 ? 'bg-coral text-white' : 'bg-white text-ink') : 'text-white/80 hover:bg-white/15'

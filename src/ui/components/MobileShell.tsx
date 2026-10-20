@@ -69,9 +69,9 @@ function HudPill({ children, onClick, label }: { children: ReactNode; onClick?: 
   );
 }
 
-function RoundButton({ onClick, label, children, dot }: { onClick: () => void; label: string; children: ReactNode; dot?: number }) {
+function RoundButton({ onClick, label, children, dot, tour }: { onClick: () => void; label: string; children: ReactNode; dot?: number; tour?: string }) {
   return (
-    <button type="button" onClick={onClick} className="pointer-events-auto relative size-9 shrink-0 grid place-items-center rounded-xl bg-[#14365f]/85 border border-white/25 text-white shadow" aria-label={label}>
+    <button type="button" data-tour={tour} onClick={onClick} className="pointer-events-auto relative size-9 shrink-0 grid place-items-center rounded-xl bg-[#14365f]/85 border border-white/25 text-white shadow" aria-label={label}>
       {children}
       {dot ? <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1 rounded-full bg-coral text-[10px] font-bold grid place-items-center">{dot}</span> : null}
     </button>
@@ -125,7 +125,7 @@ function MobileTopBar({ alertCount, overlay }: { alertCount: number; overlay: bo
           </span>
         </HudPill>
         <span className="flex-1" />
-        <RoundButton onClick={() => setSheet('info')} label={t('m.info')} dot={alertCount}>
+        <RoundButton onClick={() => setSheet('info')} label={t('m.info')} dot={alertCount} tour="m-info">
           <svg viewBox="0 0 24 24" className="size-5" fill="currentColor" aria-hidden>
             <path d="M12 2a6 6 0 00-6 6v4.5L4 16v1h16v-1l-2-3.5V8a6 6 0 00-6-6zm-2.5 17a2.5 2.5 0 005 0h-5z" />
           </svg>
@@ -146,6 +146,7 @@ function MobileTopBar({ alertCount, overlay }: { alertCount: number; overlay: bo
               <button
                 key={x.speed}
                 type="button"
+                data-tour={`speed-${x.speed}`}
                 onClick={() => dispatch({ type: 'setSpeed', speed: x.speed })}
                 aria-pressed={game.speed === x.speed}
                 className={`h-7 min-w-7 px-1 rounded-full text-[12px] font-bold ${game.speed === x.speed ? (x.speed === 0 ? 'bg-coral text-white' : 'bg-white text-[#14365f]') : 'text-white/80'}`}
@@ -221,6 +222,7 @@ function ActionCards() {
     <div className="shrink-0 bg-white/95 border-t border-line px-2 py-1.5 grid grid-cols-3 gap-1.5">
       <button
         type="button"
+        data-tour="m-build"
         onClick={() => {
           setLeftTab('build');
           setSheet('tools');
@@ -434,6 +436,7 @@ export function MobileShell() {
             <button
               key={x.id}
               type="button"
+              data-tour={`nav-${x.id}`}
               onClick={() => {
                 if (x.id === 'manage') setSheet(sheet === 'tools' ? null : 'tools');
                 else {

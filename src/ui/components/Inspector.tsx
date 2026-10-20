@@ -7,9 +7,13 @@ import { useMemo } from 'react';
 import { EQUIP_SPRITE, spriteUrl } from '../../render/sprites';
 import { rosterView } from '../../sim/selectors';
 import { EXHAUSTED_ENERGY } from '../../sim/systems/staffing';
+import { WITHDRAW_SATISFACTION } from '../../sim/engine';
 import { useMoney, useSummary, useT } from '../hooks';
 import { useGame } from '../store';
 import { useName } from './people';
+
+/** Warn before families start considering a move-out. */
+const UNHAPPY_ALERT = WITHDRAW_SATISFACTION + 5;
 
 function RoomInspector({ roomId }: { roomId: string }) {
   const t = useT();
@@ -93,6 +97,7 @@ function RoomInspector({ roomId }: { roomId: string }) {
                 <button
                   type="button"
                   aria-label="+"
+                  data-tour={`equip-${slot.id}`}
                   disabled={have >= max || cash < price}
                   onClick={() => dispatch({ type: 'installEquipment', roomId: room.id, equipment: slot.id })}
                   className="size-7 rounded-md bg-teal text-white disabled:opacity-30 hover:bg-teal-dark"
@@ -227,6 +232,7 @@ function Alerts() {
   const roster = useMemo(() => rosterView(game), [game]);
   const problems = rooms.filter((r) => !summary.statuses.get(r.id)?.operational);
   const noPlan = game.residents.filter((r) => !r.carePlan);
+  const unhappy = game.residents.filter((r) => r.needs.satisfaction < UNHAPPY_ALERT);
   const badSlots = game.residents.length ? roster.slots.filter((x) => !x.ready) : [];
   const tired = game.employees.filter((e) => e.energy < EXHAUSTED_ENERGY);
   const items = [...log].reverse().slice(0, 12);
@@ -236,6 +242,11 @@ function Alerts() {
       {noPlan.map((r) => (
         <button key={r.id} type="button" onClick={() => setView('residents')} className={chip}>
           ⚠ {t('alert.no_plan', { name: r.name.th, nameEn: r.name.en })}
+        </button>
+      ))}
+      {unhappy.map((r) => (
+        <button key={`u-${r.id}`} type="button" onClick={() => setView('residents')} className="text-left text-xs rounded-lg bg-bad/10 border border-bad/30 px-2 py-1.5 hover:bg-bad/20">
+          ⚠ {t('alert.unhappy', { name: r.name.th, nameEn: r.name.en })}
         </button>
       ))}
       {badSlots.map((x) => (
@@ -258,7 +269,7 @@ function Alerts() {
           ⚠ {t(`room.${r.type}`)} — {t('inspector.not_operational')}
         </button>
       ))}
-      {items.length === 0 && problems.length === 0 && noPlan.length === 0 && <p className="text-xs text-ink-soft">{t('alerts.empty')}</p>}
+      {items.length === 0 && problems.length === 0 && noPlan.length === 0 && unhappy.length === 0 && <p className="text-xs text-ink-soft">{t('alerts.empty')}</p>}
       {items.map((l) => (
         <div key={l.id} className="text-xs flex gap-2">
           <span className="text-ink-soft tabular shrink-0">

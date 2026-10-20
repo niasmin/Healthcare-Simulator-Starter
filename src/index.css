@@ -27,3 +27,11 @@ body {
 .tabular { font-variant-numeric: tabular-nums; }
 .panel { background: var(--color-paper); border: 1px solid var(--color-line); border-radius: 14px; }
 .scroll-thin { scrollbar-width: thin; }
+
+/* Tutorial spotlight ring */
+@keyframes tour-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgb(224 97 75 / 0.55); }
+  50% { box-shadow: 0 0 0 8px rgb(224 97 75 / 0); }
+}
+.tour-ring { animation: tour-pulse 1.4s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .tour-ring { animation: none; } }

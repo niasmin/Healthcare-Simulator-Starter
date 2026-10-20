@@ -26,6 +26,7 @@ export function CenterArea({ showTabs = true }: { showTabs?: boolean }) {
             key={x.id}
             type="button"
             role="tab"
+            data-tour={`view-${x.id}`}
             aria-selected={view === x.id}
             onClick={() => setView(x.id)}
             className={`px-3 py-1.5 rounded-lg text-sm whitespace-nowrap ${view === x.id ? 'bg-ink text-white font-semibold' : 'text-ink-soft hover:bg-sand'}`}
