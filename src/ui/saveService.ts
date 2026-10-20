@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { START_MINUTE } from '../sim/constants';
 import { dayOf } from '../sim/systems/time';
 import { connectCloud } from '../storage/cloudStore';
+import { connectSupabase, type SupabaseAccount, type SupabaseConnection } from '../storage/supabaseStore';
 import { LocalStore } from '../storage/localStore';
 import { SaveManager, type CloudStatus } from '../storage/saves';
 import type { GameState } from '../domain/types';
@@ -11,17 +12,35 @@ import { create } from 'zustand';
 /** One save manager per page: this browser's IndexedDB plus the player's cloud space when available. */
 export const saves = new SaveManager(new LocalStore());
 
-export const useSaveStatus = create<{ cloud: CloudStatus; lastAutoAt: number | null; version: number }>(() => ({
+export const useSaveStatus = create<{ cloud: CloudStatus; lastAutoAt: number | null; version: number; provider: 'claude' | 'supabase' | null; account: SupabaseAccount | null }>(() => ({
   cloud: 'connecting',
   lastAutoAt: null,
   version: 0,
+  provider: null,
+  account: null,
 }));
+
+/** The Supabase connection on the deployed site (null inside the Claude artifact or without config). */
+export let supabase: SupabaseConnection | null = null;
 
 let cloudInit: Promise<void> | null = null;
 export function initCloud(): Promise<void> {
-  cloudInit ??= connectCloud().then((store) => {
-    saves.attachCloud(store);
-    useSaveStatus.setState((s) => ({ cloud: saves.cloudStatus, version: s.version + 1 }));
+  // Inside the Claude artifact its own per-person db; on the deployed site, Supabase.
+  cloudInit ??= connectCloud().then(async (store) => {
+    if (store) {
+      saves.attachCloud(store);
+      useSaveStatus.setState((s) => ({ cloud: saves.cloudStatus, version: s.version + 1, provider: 'claude' }));
+      return;
+    }
+    supabase = await connectSupabase();
+    saves.attachCloud(supabase?.store ?? null);
+    useSaveStatus.setState((s) => ({ cloud: saves.cloudStatus, version: s.version + 1, provider: supabase ? 'supabase' : null, account: supabase?.account ?? null }));
+    supabase?.onChange((next, account) => {
+      saves.attachCloud(next);
+      useSaveStatus.setState((s) => ({ cloud: saves.cloudStatus, version: s.version + 1, account }));
+      // Bring this browser's newest game into the newly signed-in account.
+      void autosave();
+    });
   });
   return cloudInit;
 }
