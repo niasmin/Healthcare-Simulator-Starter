@@ -1,3 +1,4 @@
+import { PrefsList } from "./Prefs";
 import { useEffect, useState, type ReactNode } from "react";
 import hero from "../../assets/title/hero.jpg";
 import ceoFace from "../../assets/faces/owner_f_smile.png";
@@ -795,6 +796,7 @@ export function TitleScreen() {
               )}
             </span>
           </button>
+          <PrefsList />
           <p className="text-[11px] text-ink-soft">{t("title.note")}</p>
         </Modal>
       )}

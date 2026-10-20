@@ -54,6 +54,17 @@ export interface SupabaseConnection {
   signOut(): Promise<void>;
   /** Called when the signed-in player changes (after following an email link). */
   onChange(fn: (store: CloudStore | null, account: SupabaseAccount | null) => void): void;
+  /** Add anonymous play statistics (insert-only table; see the game_events migration). */
+  logEvents(rows: GameEventRow[]): Promise<boolean>;
+}
+
+export const EVENTS_TABLE = 'game_events';
+export interface GameEventRow {
+  session: string;
+  kind: 'game_start' | 'chapter_result' | 'goal_done' | 'autopilot' | 'session_ping';
+  chapter?: number;
+  day?: number;
+  data?: Record<string, unknown>;
 }
 
 /** The project URL and publishable key come from the build environment; without them there is no Supabase. */
@@ -98,6 +109,12 @@ export async function connectSupabase(): Promise<SupabaseConnection | null> {
         await sb.auth.signOut();
       },
       onChange: (fn) => listeners.push(fn),
+      logEvents: async (rows) => {
+        if (!currentId || !rows.length) return false;
+        // `returning: minimal` (no select): players may add events but never read them back.
+        const { error } = await sb.from(EVENTS_TABLE).insert(rows.map((r) => ({ ...r, user_id: currentId })));
+        return !error;
+      },
     };
   } catch {
     return null;
