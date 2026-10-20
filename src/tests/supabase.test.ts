@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { CloudStore, CHUNK } from '../storage/cloudStore';
-import { SAVES_TABLE, SupabaseDB, supabaseConfig } from '../storage/supabaseStore';
+import { SAVES_TABLE, SupabaseDB, authReason, supabaseConfig } from '../storage/supabaseStore';
 import { encodeSave } from '../storage/format';
 import { createInitialState } from '../sim/state';
 
@@ -64,5 +64,16 @@ describe('Supabase cloud saves', () => {
 
   it('is off without the project URL and key in the build environment', () => {
     expect(supabaseConfig()).toBeNull();
+  });
+
+  it('turns Supabase auth messages into reasons the sign-in window can explain', () => {
+    expect(authReason('Invalid login credentials')).toBe('invalid_login');
+    expect(authReason('Email not confirmed')).toBe('not_confirmed');
+    expect(authReason('User already registered')).toBe('already_registered');
+    expect(authReason('Password should be at least 6 characters.')).toBe('weak_password');
+    expect(authReason('Unable to validate email address: invalid format')).toBe('invalid_email');
+    expect(authReason('For security purposes, you can only request this after 30 seconds. Too many requests')).toBe('rate_limited');
+    expect(authReason('Failed to fetch')).toBe('network');
+    expect(authReason('something else')).toBe('unknown');
   });
 });

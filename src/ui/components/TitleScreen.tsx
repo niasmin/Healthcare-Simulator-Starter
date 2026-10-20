@@ -1,3 +1,4 @@
+import { AccountChip } from "./AccountModal";
 import { PrefsList } from "./Prefs";
 import { useEffect, useState, type ReactNode } from "react";
 import hero from "../../assets/title/hero.jpg";
@@ -327,6 +328,7 @@ export function TitleScreen() {
                   {meta ? Math.round(meta.reputation) : "—"}
                 </span>
               </div>
+              <AccountChip className="shrink-0" />
               <button
                 type="button"
                 onClick={() => setPanel("settings")}

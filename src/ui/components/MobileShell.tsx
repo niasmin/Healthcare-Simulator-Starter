@@ -1,4 +1,4 @@
-import { PrefsList } from './Prefs';
+import { AccountRow, PrefsList } from './Prefs';
 import { useAutoOn } from './AutoModal';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { GameSpeed } from '../../domain/types';
@@ -289,6 +289,7 @@ function MenuSheet() {
       <button type="button" onClick={() => setLang(lang === 'th' ? 'en' : 'th')} className="rounded-xl bg-white border border-line px-4 py-3 text-left">
         {t('m.language')}: <span className="font-semibold">{lang === 'th' ? 'ไทย → English' : 'English → ไทย'}</span>
       </button>
+      <AccountRow />
       <PrefsList />
       <button
         type="button"

@@ -1,6 +1,7 @@
 import { useT } from '../hooks';
 import { useGame } from '../store';
 import { playSfx } from '../sound';
+import { useSaveStatus } from '../saveService';
 
 /** Per-browser preferences: sound effects, music, anonymous statistics. */
 export function PrefsList() {
@@ -49,6 +50,25 @@ export function MuteButton() {
       className="px-2.5 py-1 rounded-md bg-white/15 border border-white/30 text-sm hover:bg-white/25"
     >
       {on ? '🔊' : '🔇'}
+    </button>
+  );
+}
+
+/** Menu row: who is signed in, or a prompt to sign in for cloud saves (deployed site only). */
+export function AccountRow() {
+  const t = useT();
+  const { account, provider } = useSaveStatus();
+  if (provider !== 'supabase') return null;
+  const signedIn = !!account && !account.anonymous && !!account.email;
+  return (
+    <button type="button" onClick={() => useGame.getState().setAccountOpen(true)} className="rounded-xl bg-white border border-line px-4 py-3 text-left flex items-center gap-3">
+      <span className="text-xl" aria-hidden>
+        👤
+      </span>
+      <span className="flex-1 min-w-0">
+        <span className="block text-sm font-semibold truncate">{signedIn ? account.name || account.email : t('auth.mode.signin')}</span>
+        <span className="block text-xs text-ink-soft">{t(signedIn ? 'auth.synced_short' : 'auth.guest_short')}</span>
+      </span>
     </button>
   );
 }
