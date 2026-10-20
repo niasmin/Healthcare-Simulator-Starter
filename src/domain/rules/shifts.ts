@@ -45,7 +45,7 @@ export function slotAt(minute: number): ShiftSlot {
   return 'night';
 }
 
-export type ShiftCheck = { ok: true } | { ok: false; reason: 'not_found' | 'shift_overlap' | 'shift_too_long' | 'employee_placed' };
+export type ShiftCheck = { ok: true } | { ok: false; reason: 'not_found' | 'shift_overlap' | 'shift_too_long' | 'employee_placed' | 'employee_branch' };
 
 /** GDD rule: no overlapping shifts for an employee. Also caps daily hours (max double shift). */
 export function validateShift(state: GameState, employeeId: string, window: { start: number; end: number }): ShiftCheck {
@@ -53,6 +53,8 @@ export function validateShift(state: GameState, employeeId: string, window: { st
   if (!emp) return { ok: false, reason: 'not_found' };
   // Staff placed with a partner (Chapter 5) are off the home's roster until the contract ends.
   if (emp.placement) return { ok: false, reason: 'employee_placed' };
+  // Branch managers (Chapter 7) run their branch and are off headquarters' roster.
+  if (emp.branch) return { ok: false, reason: 'employee_branch' };
   const existing = shiftsOf(state, employeeId);
   if (existing.some((s) => windowsOverlap(s, window))) return { ok: false, reason: 'shift_overlap' };
   const total = existing.reduce((a, s) => a + shiftMinutes(s.start, s.end), 0) + shiftMinutes(window.start, window.end);

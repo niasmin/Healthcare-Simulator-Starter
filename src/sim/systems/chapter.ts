@@ -7,6 +7,7 @@ import { makeResidentCandidate } from './staffing';
 import { visitRate } from './homecare';
 import { certifiedCount, contractsCompleted } from './workforce';
 import { consultRate, consultsSince, smoothDischarges } from './hospital';
+import { networkStats } from './network';
 import { makeApplicant } from './staffing';
 import { gardenAppeal } from '../../data/decor';
 import { dayOf } from './time';
@@ -97,6 +98,22 @@ export function chapterChecks(state: GameState, def: ChapterDef = chapterDef(sta
   if (def.targetDischarges) {
     const n = smoothDischarges(state, start);
     checks.push({ id: 'discharges', have: n, need: def.targetDischarges, ok: n >= def.targetDischarges });
+  }
+  if (def.targetBranches) {
+    const bs = state.network.branches;
+    const kinds = new Set(bs.map((b) => b.kind)).size;
+    const st = networkStats(state);
+    checks.push({ id: 'branches', have: bs.length, need: def.targetBranches, ok: bs.length >= def.targetBranches });
+    if (def.targetBranchKinds) checks.push({ id: 'branch_kinds', have: kinds, need: def.targetBranchKinds, ok: kinds >= def.targetBranchKinds });
+    if (def.targetNetworkQuality) {
+      const q = st.quality ?? 0;
+      checks.push({ id: 'network_quality', have: q, need: def.targetNetworkQuality, ok: q >= def.targetNetworkQuality });
+    }
+    if (def.targetNetworkOccupancy) {
+      const pct = Math.round((st.occupancy ?? 0) * 100);
+      const need = Math.round(def.targetNetworkOccupancy * 100);
+      checks.push({ id: 'network_occupancy', have: pct, need, ok: pct >= need });
+    }
   }
   checks.push({ id: 'cashflow', have: net, need: 1, ok: net > 0 }, { id: 'quality', have: quality, need: def.targetQuality, ok: quality >= def.targetQuality });
   return checks;

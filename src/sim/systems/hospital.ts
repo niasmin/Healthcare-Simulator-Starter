@@ -135,6 +135,11 @@ function makeReferral(state: GameState): GameState {
   return { ...s, hospital: { ...s.hospital, referrals: [...s.hospital.referrals, r] } };
 }
 
+/** A referral sent by a clinic branch (Chapter 7). */
+export function makeReferralFromBranch(state: GameState): GameState {
+  return makeReferral(state);
+}
+
 export function admitInpatient(state: GameState, referralId: string): { state: GameState; id: string } | { reason: 'not_found' | 'no_stroke_bed' } {
   const r = state.hospital.referrals.find((x) => x.id === referralId);
   if (!r) return { reason: 'not_found' };

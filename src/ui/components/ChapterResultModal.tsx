@@ -1,3 +1,4 @@
+import { ROADMAP_CHAPTERS } from '../../data/chapters';
 import { chapterDef } from '../../data/chapters';
 import { nextChapterAvailable } from '../../sim/systems/chapter';
 import { useT } from '../hooks';
@@ -39,7 +40,7 @@ export function ChapterResultModal() {
           </h2>
           <p className="text-sm text-white/90 mt-1 leading-relaxed">
             {won
-              ? `${t(`chapter.won.body${c}`, { n })} ${next ? t('chapter.won.next', { c: next, name: t(`chapters.c${next}.title`) }) : t('chapter.won.later')}`
+              ? `${t(`chapter.won.body${c}`, { n })} ${next ? t('chapter.won.next', { c: next, name: t(`chapters.c${next}.title`) }) : t(c >= ROADMAP_CHAPTERS ? 'chapter.won.final' : 'chapter.won.later')}`
               : t(`chapter.failed.${result.reason}`, { day: result.day, n })}
           </p>
         </div>

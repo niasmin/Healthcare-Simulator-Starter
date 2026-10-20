@@ -8,7 +8,7 @@ import { applyTemplate, type GameTemplate } from '../sim/templates';
 export type Tool = { kind: 'select' } | { kind: 'corridor' } | { kind: 'bulldoze' } | { kind: 'room'; roomType: RoomType } | { kind: 'decor'; decor: DecorType } | { kind: 'prefab'; prefab: string; rotated: boolean };
 
 export type View = 'map' | 'residents' | 'roster' | 'finance';
-export type LeftTab = 'build' | 'hire' | 'admit';
+export type LeftTab = 'build' | 'hire' | 'admit' | 'network';
 /** Phone layout: which bottom sheet is open. */
 export type Sheet = 'tools' | 'info' | 'menu' | 'missions' | 'events' | 'report' | null;
 

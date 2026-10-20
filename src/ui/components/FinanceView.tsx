@@ -16,6 +16,7 @@ const STREAM_COLOR: Record<RevenueStream, string> = {
   homecare: '#2f6aa5',
   workforce: '#6a7d2a',
   hospital: '#7a4fa0',
+  network: '#b0882a',
 };
 const REVENUE = '#138a78';
 const EXPENSE = '#d9822b';

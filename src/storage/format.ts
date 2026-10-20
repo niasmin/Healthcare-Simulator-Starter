@@ -4,6 +4,7 @@ import { ROLES } from '../data/staff';
 import { emptyHomecare } from '../sim/systems/homecare';
 import { emptyWorkforce } from '../sim/systems/workforce';
 import { emptyHospital } from '../sim/systems/hospital';
+import { emptyNetwork } from '../sim/systems/network';
 import { dayOf } from '../sim/systems/time';
 
 /**
@@ -13,7 +14,7 @@ import { dayOf } from '../sim/systems/time';
  * CompressionStream, so even long games stay far below storage limits.
  */
 export const SAVE_FORMAT = 1;
-export const CURRENT_SCHEMA = 9;
+export const CURRENT_SCHEMA = 10;
 
 export type SlotId = 'auto' | 'slot1' | 'slot2' | 'slot3';
 export const SLOTS: SlotId[] = ['auto', 'slot1', 'slot2', 'slot3'];
@@ -141,6 +142,10 @@ export function migrate(state: GameState): GameState {
   if (s.schemaVersion === 8) {
     // v9 adds the Chapter 6 neuro hospital: clinic work, referrals and stroke-unit inpatients.
     s = { ...s, schemaVersion: 9, hospital: emptyHospital() };
+  }
+  if (s.schemaVersion === 9) {
+    // v10 adds the Chapter 7 branch network.
+    s = { ...s, schemaVersion: 10, network: emptyNetwork() };
   }
   return s as GameState;
 }

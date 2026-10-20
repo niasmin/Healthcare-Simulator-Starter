@@ -7,7 +7,7 @@ import { buildObjectives, peopleMarkers } from '../sim/selectors';
 import { STARTER_SCENARIO } from '../data/scenarios';
 import { EXPANDED_WIDTH, LAND_PRICE } from '../data/chapters';
 import { VISIT_PRICE } from '../data/finance';
-import { CHURN_SATISFACTION, VISIT_DURATION, emptyHomecare, homecareTick, visitRate } from '../sim/systems/homecare';
+import { CHURN_SATISFACTION, VISIT_DURATION, VISIT_SLOTS, emptyHomecare, homecareTick, visitRate } from '../sim/systems/homecare';
 import { TICKS_PER_DAY } from '../sim/constants';
 import { validate } from '../storage/format';
 import { DICTS } from '../ui/i18n';
@@ -153,8 +153,8 @@ describe('chapter 4 rules (home care)', () => {
     [s] = hire(s, 'caregiver', ['morning']);
     s = addLeads(s, ['caregiver', 'caregiver']);
     s = ok(ok(s, { type: 'admitClient', leadId: 'lead-t0' }), { type: 'admitClient', leadId: 'lead-t1' });
-    // Both get distinct slots (08:00 and 09:00): run to 08:00 and see one van out.
-    while (s.minute % 1440 !== 8 * 60 + 10) s = step(s);
+    // Both get distinct slots (the first two appointment times): run to the first and see one van out.
+    while (s.minute % 1440 !== VISIT_SLOTS[0] + 10) s = step(s);
     expect(s.homecare.visits.filter((v) => v.status === 'in_progress')).toHaveLength(1);
     s = advance(s, (VISIT_DURATION + 120) / 10);
     expect(s.homecare.visits.filter((v) => v.status === 'done')).toHaveLength(2);

@@ -99,7 +99,8 @@ export type LedgerCategory =
   | 'food'
   | 'supplies'
   | 'event'
-  | 'training';
+  | 'training'
+  | 'branch';
 
 // ---------------------------------------------------------------------------
 // Billing (Phase 3). Fees are FICTIONAL game balancing values.
@@ -108,7 +109,7 @@ export type LedgerCategory =
 export type PriceLevel = 'value' | 'standard' | 'premium';
 
 /** Revenue streams, used for invoice lines and the revenue-mix chart. */
-export type RevenueStream = 'room_care' | 'therapy' | 'activity' | 'special' | 'homecare' | 'workforce' | 'hospital';
+export type RevenueStream = 'room_care' | 'therapy' | 'activity' | 'special' | 'homecare' | 'workforce' | 'hospital' | 'network';
 
 export interface InvoiceLine {
   stream: RevenueStream;
@@ -123,7 +124,7 @@ export interface InvoiceLine {
 export interface Invoice {
   id: string;
   /** admission = pro-rated first month; monthly = start of month; final = services at discharge; homecare = a day of home visits. */
-  kind: 'admission' | 'monthly' | 'final' | 'homecare' | 'b2b' | 'opd' | 'ipd';
+  kind: 'admission' | 'monthly' | 'final' | 'homecare' | 'b2b' | 'opd' | 'ipd' | 'branch';
   /** Resident billed (the family pays). */
   clientId: string;
   clientName: PersonName;
@@ -214,6 +215,8 @@ export interface Employee {
   certs?: CourseId[];
   /** Placed with a partner organisation on this contract (Chapter 5): off the home's roster. */
   placement?: string;
+  /** Manages this branch (Chapter 7): moved off the home's roster for good. */
+  branch?: string;
 }
 
 export interface StaffCandidate {
@@ -360,7 +363,11 @@ export type ChapterCheckId =
   | 'contracts'
   | 'opd_visits'
   | 'opd_rate'
-  | 'discharges';
+  | 'discharges'
+  | 'branches'
+  | 'branch_kinds'
+  | 'network_quality'
+  | 'network_occupancy';
 
 export interface ChapterCheck {
   id: ChapterCheckId;
@@ -530,6 +537,33 @@ export interface HospitalState {
   discharged: Array<{ id: string; day: number; outcome: 'recovered' | 'complicated' }>;
 }
 
+// ---------------------------------------------------------------------------
+// Network (Chapter 7): branch sites run at portfolio level from headquarters.
+// ---------------------------------------------------------------------------
+
+export type BranchKind = 'nursing' | 'homecare' | 'clinic';
+
+export interface Branch {
+  id: string;
+  kind: BranchKind;
+  /** Fictional district name. */
+  name: PersonName;
+  openedDay: number;
+  managerId: string | null;
+  /** Units in use: residents, clients, or daily visits. */
+  occupancy: number;
+  /** 0..100: drifts toward a target set by the manager and headquarters' support. */
+  quality: number;
+  /** Day a support visit may be paid for again. */
+  supportReadyDay: number;
+}
+
+export interface NetworkState {
+  branches: Branch[];
+  /** Closed days (last 120): total network quality and occupancy, for the dashboard. */
+  history: Array<{ day: number; quality: number; occupancy: number; capacity: number; net: number }>;
+}
+
 /** The running chapter. Each chapter is judged once, over days startDay .. startDay + days − 1. */
 export interface ChapterState {
   id: number;
@@ -540,7 +574,7 @@ export interface ChapterState {
 }
 
 export interface GameState {
-  schemaVersion: 9;
+  schemaVersion: 10;
   seed: number;
   /** Current PRNG state (mulberry32). Advancing the RNG updates this. */
   rngState: number;
@@ -580,6 +614,7 @@ export interface GameState {
   // Phase 6
   workforce: WorkforceState;
   hospital: HospitalState;
+  network: NetworkState;
 }
 
 export type ReasonCode =
@@ -618,7 +653,11 @@ export type ReasonCode =
   | 'role_mismatch'
   | 'needs_cert'
   | 'employee_placed'
-  | 'no_stroke_bed';
+  | 'no_stroke_bed'
+  | 'manager_role'
+  | 'employee_branch'
+  | 'support_cooldown'
+  | 'branch_limit';
 
 export type CommandResult =
   | { ok: true; id?: string; costSatang?: Satang }
