@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { rectCells, rectContains, rectFromCorners } from '../../domain/grid';
 import { validateCorridor, validateDecor, validateRoomPlacement, type PlacementCheck } from '../../domain/rules/placement';
-import type { Cell, GameState, Rect } from '../../domain/types';
+import type { Cell, GameState, Rect, Resident } from '../../domain/types';
+import { MEAL_TIMES } from '../../data/patients';
 import { IsoRenderer } from '../../render/IsoRenderer';
 import { ROLES } from '../../data/staff';
 import { peopleMarkers } from '../../sim/selectors';
@@ -25,20 +26,26 @@ const strollHour = (minute: number) => {
   return (h >= 9 && h < 11.5) || (h >= 14.5 && h < 17.5);
 };
 
-/** The sim's people as map markers: colours, sprites, and residents out for a stroll (looks only). */
+/** Meal times when residents who get about sit in the dining room (if the home has one). */
+const mealTime = (minute: number) => MEAL_TIMES.some((t) => Math.abs((minute % 1440) - t) <= 40);
+
+/** The sim's people as map markers: colours, sprites, and residents up and about (looks only). */
 export function mapMarkers(game: GameState) {
   const residents = new Map(game.residents.map((r) => [r.id, r]));
   const markers = peopleMarkers(game);
   // Nobody strolls in the rain, and a resident with a carer at the bedside stays put.
-  const outside = strollHour(game.minute) && weatherFor(game.seed, dayOf(game.minute)) !== 'rain';
+  const dining = game.site.rooms.some((r) => r.type === 'dining_room');
+  const outside = (strollHour(game.minute) && weatherFor(game.seed, dayOf(game.minute)) !== 'rain') || (dining && mealTime(game.minute));
   const tended = new Set(markers.filter((m) => m.kind === 'staff' && m.bed !== undefined).map((m) => `${m.roomId}#${m.bed}`));
+  const look = (r: Resident) => (r.needs.mobility < 65 ? RESIDENT_SPRITE.chair : r.name.gender === 'm' ? RESIDENT_SPRITE.m : RESIDENT_SPRITE.f);
   return markers.map((m) => {
     if (m.kind === 'staff') return { ...m, color: ROLES[m.role as StaffRole].color, sprite: STAFF_SPRITE[m.role as StaffRole] };
     const r = residents.get(m.key);
     const color = GROUP_HEX[m.group as CareGroup];
+    // In a therapy session: standing (or in a chair) in the therapy room.
+    if (r && m.bed === undefined) return { ...m, color, sprite: look(r) };
     if (!r || !outside || !STROLLERS.has(r.group) || r.needs.mobility < 40 || tended.has(`${m.roomId}#${m.bed}`)) return { ...m, color };
-    const sprite = r.needs.mobility < 65 ? RESIDENT_SPRITE.chair : r.name.gender === 'm' ? RESIDENT_SPRITE.m : RESIDENT_SPRITE.f;
-    return { ...m, color, stroll: true, sprite };
+    return { ...m, color, stroll: true, sprite: look(r) };
   });
 }
 

@@ -235,6 +235,16 @@ All of this is in the renderer only (`src/render/Ambience.ts` and `IsoRenderer`)
   - a strolling grandfather.
   - A wheelchair sprite is planned (the generator was rate-limited). Until it arrives, less mobile strollers use the grandfather.
 
+### Using every room
+
+- **Beds:** a new resident goes to the emptiest ward (by share of beds taken; ties go to the ward built first), so a new ward fills alongside the old one instead of after it. This is a sim change. Specialised beds are still kept for the residents who need them, and the same rule applies to villas.
+- **Where staff stand (map only):**
+  - **Idle nurses and caregivers** spread over every open nursing station in turn.
+  - **Departments:** therapists wait in the therapy room and doctors in the clinic. Support staff wait in their own room: pharmacy, dining room, laundry, reception, accounting office.
+  - **Breaks:** anyone with energy under 40 takes a break in a staff room. With several staff rooms, they share them out.
+  - **Therapy:** a mobility or activity session brings both the therapist and the resident to the therapy room. Other care happens at the bedside.
+- **Mealtimes:** around each meal (08:00, 12:00, 18:00, within 40 minutes), residents who get about sit in the dining room, if the home has one.
+
 ### Town life
 
 The town around the home is busy (`src/render/TownLife.ts`). It is looks only and deterministic, like the backdrop.
@@ -684,7 +694,7 @@ src/
   - Food, supplies, upkeep and payroll are each charged once per day.
   - An event's cost is charged once, and a resolved event can't be resolved again.
 
-## Tests (260 passing)
+## Tests (264 passing)
 
 | File | Covers |
 |---|---|
@@ -711,6 +721,7 @@ src/
 | `autoextras.test.ts` | The autopilot builds an accounting office at 30 beds and rosters an accountant, never in a small home; staff care takes low-morale staff for coffee and unhappy residents for cake and the park at 10:00, and leaves content people home |
 | `ambience.test.ts` | The map light is clear by day, dark at night and warm at dawn and dusk; it changes by at most a few percent per 10-minute tick and wraps at midnight |
 | `strolls.test.ts` | Weather is repeatable per seed and day and mostly clear, with some rain and cloud; mobile residents stroll in the strolling hours, not at night or in the rain, and bedridden ones stay in bed; stroll spots are on the dining floor or lawn, never in other rooms or on paths, without duplicates |
+| `balance-rooms.test.ts` | New residents go to the emptiest ward so two wards fill evenly; idle nurses and caregivers spread over every station; tired staff rest in the staff room and therapists wait in the therapy room; a therapy session brings resident and therapist to the therapy room |
 | `shop.test.ts` | Upgrades are bought once, for their price, from their chapter (all at once in the sandbox); the central kitchen and laundry cut food and supplies by their percentages; staff welfare adds morale; online marketing adds an enquiry; the family app lifts reputation while residents are content; the smart call system keeps late routine care pending 30 minutes longer |
 | `modes.test.ts` | Campaign games are unchanged; sandbox books ฿50M as capital, unlocks every room, has no tutorial steps and is never judged after 70 days; each challenge opens with its own cash, reputation or chapter; each challenge is won by the scripted player and ends without a next chapter |
 | `chapter7.test.ts` | **Full 390-day campaign:** all 7 chapters won on schedule and solvent, ledger reconciles; one branch of each kind, each manager of the right role and off the roster; branch invoices exact; network occupancy ≥ 70%. **Opening:** locked before chapter 7; manager role checked; full opening cost charged; managers can’t take shifts or a second branch; cap of 5. **Running:** good branches fill and bill daily, poor ones empty, a poor name at headquarters stops growth; certificates raise the quality target; a lost manager leaves the branch leaderless until one is appointed; support visits lift quality, cost money and have a cooldown; closing refunds 30% and frees the manager; busy clinic branches refer to the stroke unit. Guide order; v9→v10 migration |
