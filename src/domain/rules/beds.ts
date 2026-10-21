@@ -25,21 +25,26 @@ export function freeBeds(state: GameState, group?: CareGroup, premium = false): 
   const statuses = allRoomStatuses(state.site);
   const taken = new Set(state.residents.map((r) => r.bedId));
   const needs = group ? GROUP_WARD_EQUIPMENT[group] : undefined;
-  const out: string[] = [];
-  const secured: string[] = [];
-  for (const room of state.site.rooms) {
-    if (room.type !== (premium ? 'villa' : 'ward')) continue;
+  const open: Array<{ ids: string[]; share: number; order: number; secured: boolean }> = [];
+  state.site.rooms.forEach((room, order) => {
+    if (room.type !== (premium ? 'villa' : 'ward')) return;
     const st = statuses.get(room.id)!;
-    if (!st.operational) continue;
-    if (needs && !premium && !needs.every((k) => (room.equipment[k] ?? 0) > 0)) continue;
+    if (!st.operational) return;
+    if (needs && !premium && !needs.every((k) => (room.equipment[k] ?? 0) > 0)) return;
     // Other residents fill ordinary wards first, keeping specialised beds for those who need them.
-    const list = !needs && PROGRAMME_EQUIPMENT.some((k) => (room.equipment[k] ?? 0) > 0) ? secured : out;
+    const secured = !needs && PROGRAMME_EQUIPMENT.some((k) => (room.equipment[k] ?? 0) > 0);
+    const ids: string[] = [];
+    let used = 0;
     for (let i = 0; i < st.capacity; i++) {
       const id = bedId(room.id, i);
-      if (!taken.has(id)) list.push(id);
+      if (taken.has(id)) used++;
+      else ids.push(id);
     }
-  }
-  return [...out, ...secured];
+    if (ids.length) open.push({ ids, share: used / st.capacity, order, secured });
+  });
+  // The emptiest ward first (ties in building order), so every ward is used and none sits idle.
+  open.sort((a, b) => Number(a.secured) - Number(b.secured) || a.share - b.share || a.order - b.order);
+  return open.flatMap((w) => w.ids);
 }
 
 export function roomOfResident(state: GameState, residentBedId: string): Room | undefined {

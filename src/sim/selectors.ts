@@ -453,20 +453,63 @@ export function staffActivity(state: GameState, e: Employee): StaffActivity {
 }
 
 /** People markers for the renderer (pure). Off-duty staff are not drawn. */
-export function peopleMarkers(state: GameState): Array<{ key: string; kind: 'resident' | 'staff'; roomId: string | null; bed?: number; spot?: number; group?: string; role?: string }> {
-  const out: Array<{ key: string; kind: 'resident' | 'staff'; roomId: string | null; bed?: number; spot?: number; group?: string; role?: string }> = [];
+/** Where each role waits between tasks (the first of these rooms the home has open). */
+const HOME_ROOM: Partial<Record<StaffRole, RoomType[]>> = {
+  pt: ['therapy'],
+  ot: ['therapy'],
+  doctor: ['neuro_clinic'],
+  pharmacist: ['pharmacy'],
+  nutritionist: ['dining_room'],
+  cleaner: ['laundry_room'],
+  receptionist: ['reception'],
+  security: ['reception'],
+  accountant: ['accounting_office'],
+};
+/** Idle staff this tired take their break in a staff room, when there is one. */
+export const BREAK_ENERGY = 40;
+/** Therapy-room tasks: resident and therapist go to the therapy room for them. */
+const THERAPY_TASKS = new Set(['mobility_session', 'activity']);
+
+export type PeopleMarker = { key: string; kind: 'resident' | 'staff'; roomId: string | null; bed?: number; spot?: number; group?: string; role?: string };
+
+/**
+ * Where everyone is on the map (for drawing only). Residents lie in their beds unless they are in
+ * a therapy session; staff stand where they work: at the bedside for a task, in the therapy room
+ * for therapy, in their own department when idle (support staff, therapists, doctors), spread
+ * over every nursing station (nurses and caregivers), or in a staff room when tired.
+ */
+export function peopleMarkers(state: GameState): PeopleMarker[] {
+  const out: PeopleMarker[] = [];
+  const statuses = allRoomStatuses(state.site);
+  const open = (t: RoomType) => state.site.rooms.filter((r) => r.type === t && statuses.get(r.id)?.operational);
+  const stations = open('nursing_station');
+  const staffRooms = open('staff_room');
+  const therapy = open('therapy')[0];
+  const fallback = stations[0] ?? staffRooms[0] ?? state.site.rooms.find((r) => r.type === 'nursing_station') ?? state.site.rooms.find((r) => r.type === 'staff_room');
+  // Spots handed out per room, so people in one room fan out over its floor.
+  const spots = new Map<string, number>();
+  const spotIn = (roomId: string) => {
+    const n = spots.get(roomId) ?? 0;
+    spots.set(roomId, n + 1);
+    return n;
+  };
+  // Residents in a therapy session are in the therapy room.
+  const inTherapy = new Set<string>();
+  if (therapy)
+    for (const e of state.employees) {
+      const t = e.taskId ? state.tasks.find((x) => x.id === e.taskId) : undefined;
+      if (t && THERAPY_TASKS.has(t.kind)) inTherapy.add(t.residentId);
+    }
   const bedOf = new Map<string, { roomId: string; index: number }>();
   for (const r of state.residents) {
     const i = r.bedId.lastIndexOf('#');
     const loc = { roomId: r.bedId.slice(0, i), index: Number(r.bedId.slice(i + 1)) };
     bedOf.set(r.id, loc);
-    out.push({ key: r.id, kind: 'resident', roomId: loc.roomId, bed: loc.index, group: r.group });
+    if (therapy && inTherapy.has(r.id)) out.push({ key: r.id, kind: 'resident', roomId: therapy.id, spot: spotIn(therapy.id), group: r.group });
+    else out.push({ key: r.id, kind: 'resident', roomId: loc.roomId, bed: loc.index, group: r.group });
   }
-  const station = state.site.rooms.find((r) => r.type === 'nursing_station') ?? state.site.rooms.find((r) => r.type === 'staff_room');
-  let spot = 0;
   const classroom = state.site.rooms.find((r) => r.type === 'training_room');
   const clinic = state.site.rooms.find((r) => r.type === 'neuro_clinic');
-  let desk = 0;
   // Stroke-unit inpatients lie in their beds like residents.
   const inpatientBed = new Map<string, { roomId: string; index: number }>();
   for (const p of state.hospital.inpatients) {
@@ -475,29 +518,43 @@ export function peopleMarkers(state: GameState): Array<{ key: string; kind: 'res
     inpatientBed.set(p.id, loc);
     out.push({ key: p.id, kind: 'resident', roomId: loc.roomId, bed: loc.index, group: 'stroke_rehab' });
   }
-  let seat = 0;
+  let nurse = 0;
+  let rest = 0;
   for (const e of state.employees) {
     const act = staffActivity(state, e);
     // Off duty, out on a home visit, or working at a partner: not in the building.
     if (act.kind === 'off' || act.kind === 'away' || act.kind === 'placed' || act.kind === 'branch') continue;
+    const at = (roomId: string | null) => out.push({ key: e.id, kind: 'staff', roomId, spot: roomId ? spotIn(roomId) : 0, role: e.role });
     if (act.kind === 'hospital') {
       const loc = act.task === 'consult' ? undefined : inpatientBed.get(act.patientId);
       if (loc) out.push({ key: e.id, kind: 'staff', roomId: loc.roomId, bed: loc.index, role: e.role });
-      else out.push({ key: e.id, kind: 'staff', roomId: clinic?.id ?? station?.id ?? null, spot: desk++, role: e.role });
+      else at(clinic?.id ?? fallback?.id ?? null);
       continue;
     }
     if (act.kind === 'training' && classroom) {
-      out.push({ key: e.id, kind: 'staff', roomId: classroom.id, spot: seat++, role: e.role });
+      at(classroom.id);
       continue;
     }
     if (act.kind === 'busy') {
+      if (therapy && THERAPY_TASKS.has(act.taskKind)) {
+        at(therapy.id);
+        continue;
+      }
       const loc = bedOf.get(act.residentId);
       if (loc) {
         out.push({ key: e.id, kind: 'staff', roomId: loc.roomId, bed: loc.index, role: e.role });
         continue;
       }
     }
-    out.push({ key: e.id, kind: 'staff', roomId: station?.id ?? null, spot: spot++, role: e.role });
+    // Idle: a tired person takes a break; otherwise their department, or the next station in turn.
+    if (staffRooms.length && e.energy < BREAK_ENERGY) {
+      at(staffRooms[rest++ % staffRooms.length].id);
+      continue;
+    }
+    const own = (HOME_ROOM[e.role] ?? []).flatMap((t) => open(t))[0];
+    if (own) at(own.id);
+    else if (stations.length) at(stations[nurse++ % stations.length].id);
+    else at(fallback?.id ?? null);
   }
   return out;
 }

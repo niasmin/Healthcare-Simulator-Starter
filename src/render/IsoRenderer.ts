@@ -865,7 +865,7 @@ export class IsoRenderer {
     let strolling = 0;
     for (const raw of people) {
       // A stroller whose sprite isn't drawn yet (the wheelchair) walks with the grandfather's.
-      const p = raw.stroll && raw.sprite && !this.tex.has(raw.sprite) ? { ...raw, sprite: 'ch_elder_m' } : raw;
+      const p = raw.kind === 'resident' && raw.sprite && !this.tex.has(raw.sprite) ? { ...raw, sprite: 'ch_elder_m' } : raw;
       if (p.stroll && p.sprite && this.tex.has(p.sprite) && this.strollSpots.length) {
         const spot = this.strollSpots[(strolling++ * 7) % this.strollSpots.length];
         const c = cellCenter(spot.x, spot.y);
@@ -889,7 +889,7 @@ export class IsoRenderer {
     items.sort((a, b) => a.y - b.y);
     const snap = this.input?.effects === 'low';
     for (const { x, y, p } of items) {
-      if (p.kind === 'resident' && !(p.stroll && p.sprite && this.tex.has(p.sprite))) {
+      if (p.kind === 'resident' && !((p.stroll || p.bed === undefined) && p.sprite && this.tex.has(p.sprite))) {
         // Lying in bed: head on the pillow, blanket in the care-group colour.
         g.ellipse(x + 1, y - 9, 13, 6.5).fill({ color: p.color, alpha: 0.95 }).stroke({ width: 1, color: shade(p.color, 0.7) });
         g.circle(x - 12, y - 14, 6).fill(0xf1c9a5).stroke({ width: 1.2, color: 0x9b7653 });
