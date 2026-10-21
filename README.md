@@ -233,7 +233,7 @@ All of this is in the renderer only (`src/render/Ambience.ts` and `IsoRenderer`)
   - the accountant, who no longer borrows the receptionist's look, with a matching portrait;
   - a grandmother with a cane, whose face now gives female residents a chibi portrait like the men's;
   - a strolling grandfather.
-  - A wheelchair sprite is planned (the generator was rate-limited). Until it arrives, less mobile strollers use the grandfather.
+  - Wheelchair: until generated art arrives (the ElevenLabs free plan's daily image limit kept refusing), the renderer draws the wheelchair itself. It has wheels, a seat, a backrest and a blanket, and the grandfather sits in it, his sprite cropped at the waist. Strollers with mobility under 65 use it. A `ch_wheelchair` sprite replaces it automatically once added.
 
 ### Specialist care, the star shop and seasons
 
