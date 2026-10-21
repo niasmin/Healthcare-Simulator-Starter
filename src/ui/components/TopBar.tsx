@@ -1,3 +1,4 @@
+import { lowStock } from './InventoryModal';
 import { useOpenMissions } from './GoalsModal';
 import { MuteButton } from './Prefs';
 import { useAutoOn } from './AutoModal';
@@ -19,6 +20,7 @@ const SPEEDS: { speed: GameSpeed; label: string }[] = [
 
 export function TopBar() {
   const openMissions = useOpenMissions();
+  const lowItems = useGame((s) => lowStock(s.game));
   const t = useT();
   const autoOn = useAutoOn();
   const money = useMoney();
@@ -124,6 +126,14 @@ export function TopBar() {
         >
           🎯 {t('hud.daily')}
           {openMissions > 0 && <span className="absolute -top-1.5 -right-1.5 min-w-4 h-4 px-1 rounded-full bg-coral text-white text-[10px] font-black grid place-items-center">{openMissions}</span>}
+        </button>
+        <button
+          type="button"
+          onClick={() => useGame.getState().setStockOpen(true)}
+          className="relative px-3 py-1 rounded-md bg-white/15 border border-white/30 text-sm hover:bg-white/25 font-semibold"
+        >
+          📦 {t('stock.short')}
+          {lowItems > 0 && <span className="absolute -top-1.5 -right-1.5 min-w-4 h-4 px-1 rounded-full bg-coral text-white text-[10px] font-black grid place-items-center">{lowItems}</span>}
         </button>
         <button
           type="button"

@@ -1,3 +1,4 @@
+import { InventoryModal } from './components/InventoryModal';
 import { AccountModal } from './components/AccountModal';
 import { useSound } from './sound';
 import { useTelemetry } from './telemetry';
@@ -44,6 +45,7 @@ export function App() {
   const shopOpen = useGame((s) => s.shopOpen);
   const cityOpen = useGame((s) => s.cityOpen);
   const goalsOpen = useGame((s) => s.goalsOpen);
+  const stockOpen = useGame((s) => s.stockOpen);
   const communityOpen = useGame((s) => s.communityOpen);
   const autoOpen = useGame((s) => s.autoOpen);
   const accountOpen = useGame((s) => s.accountOpen);
@@ -70,6 +72,7 @@ export function App() {
       {chaptersOpen && <ChaptersModal onClose={() => setChaptersOpen(false)} />}
       {shopOpen && <ShopModal onClose={() => useGame.getState().setShopOpen(false)} />}
       {started && goalsOpen && <GoalsModal onClose={() => useGame.getState().setGoalsOpen(false)} />}
+      {started && stockOpen && <InventoryModal onClose={() => useGame.getState().setStockOpen(false)} />}
       {communityOpen && <CommunityModal tab={communityOpen} onClose={() => useGame.getState().setCommunityOpen(null)} />}
       {cityOpen && <CityModal tab={cityOpen} onClose={() => useGame.getState().setCityOpen(null)} />}
       {autoOpen && <AutoModal onClose={() => useGame.getState().setAutoOpen(false)} />}

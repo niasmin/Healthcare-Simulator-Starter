@@ -9,7 +9,7 @@ import { SHIFT_SLOTS } from '../data/staff';
 import { freeBeds, parseBedId, residentsInRoom } from '../domain/rules/beds';
 import { roomStatus } from '../domain/rules/rooms';
 import { validateShift } from '../domain/rules/shifts';
-import type { CityPlace, UpgradeId, BranchKind, Cell, CommandResult, CourseId, DayStats, DecorType, EquipmentId, GameSpeed, GameState, PriceLevel, Rect, Resident, Room, RoomType, ShiftSlot, AutoSettings } from '../domain/types';
+import type { CityPlace, UpgradeId, BranchKind, Cell, CommandResult, CourseId, DayStats, DecorType, EquipmentId, GameSpeed, GameState, PriceLevel, Rect, Resident, Room, RoomType, ShiftSlot, AutoSettings, StockItem } from '../domain/types';
 import { dayInMonth, monthOfDay, PRICE_LEVELS } from '../data/finance';
 import { billAdmission, billFinal, billMonth, chargeDailyResidentCosts, collectPayments, refundUnusedDays } from './systems/billing';
 import { eventCheck, eventExpiryTick, expireReferrals, resolveEvent } from './systems/events';
@@ -31,6 +31,8 @@ import { admitInpatient, hospitalDayEnd, hospitalTick } from './systems/hospital
 import { supportDayEnd } from './systems/support';
 import { cityBlocker, cityCost, visitPlace } from './systems/city';
 import { goalsDayEnd, goalsTick } from './systems/goals';
+import { inventoryDayEnd, inventoryTick, orderBlocker, orderCost, orderStock, setInventory } from './systems/inventory';
+import { STOCK } from '../data/inventory';
 import { assignManager, closeBranch, networkDayEnd, openBranch, supportBranch } from './systems/network';
 import { acceptOffer, endContract, startTraining, workforceDayEnd, workforceTick } from './systems/workforce';
 
@@ -73,7 +75,11 @@ export type Command =
   | { type: 'closeBranch'; branchId: string }
   | { type: 'buyUpgrade'; upgrade: UpgradeId }
   | { type: 'visitPlace'; place: CityPlace }
-  | { type: 'setAuto'; settings: Partial<AutoSettings> };
+  | { type: 'setAuto'; settings: Partial<AutoSettings> }
+  | { type: 'setInventory'; on: boolean }
+  | { type: 'orderStock'; item: StockItem; packs: number; express?: boolean }
+  | { type: 'setStockAuto'; on: boolean }
+  | { type: 'setStockLevel'; item: StockItem; levels: { min: number; max: number } | null };
 
 export interface CommandOutcome {
   state: GameState;
@@ -394,6 +400,33 @@ export function applyCommand(state: GameState, cmd: Command): CommandOutcome {
       return { state: { ...state, auto }, result: { ok: true } };
     }
 
+    case 'setInventory':
+      return { state: setInventory(state, cmd.on), result: { ok: true } };
+
+    case 'orderStock': {
+      const express = !!cmd.express;
+      const blocker = orderBlocker(state, cmd.item, cmd.packs, express);
+      if (blocker) return fail(state, blocker);
+      const costSatang = orderCost(state, cmd.item, cmd.packs, express);
+      return { state: orderStock(state, cmd.item, cmd.packs, express), result: { ok: true, costSatang } };
+    }
+
+    case 'setStockAuto':
+      if (!state.inventory) return fail(state, 'inventory_off');
+      return { state: { ...state, inventory: { ...state.inventory, auto: cmd.on } }, result: { ok: true } };
+
+    case 'setStockLevel': {
+      if (!state.inventory) return fail(state, 'inventory_off');
+      if (!STOCK[cmd.item]) return fail(state, 'invalid_choice');
+      const levels = { ...state.inventory.levels };
+      if (cmd.levels) {
+        const { min, max } = cmd.levels;
+        if (!Number.isInteger(min) || !Number.isInteger(max) || min < 0 || max < min || max > 999) return fail(state, 'invalid_choice');
+        levels[cmd.item] = { min, max };
+      } else delete levels[cmd.item];
+      return { state: { ...state, inventory: { ...state.inventory, levels } }, result: { ok: true } };
+    }
+
     case 'visitPlace': {
       const blocker = cityBlocker(state, cmd.place);
       if (blocker) return fail(state, blocker);
@@ -546,6 +579,7 @@ export function step(state: GameState): GameState {
         s = networkDayEnd(s, closingDay);
         s = supportDayEnd(s);
         s = goalsDayEnd(s, closingDay);
+        s = inventoryDayEnd(s, closingDay);
         s = closeDay(s);
         s = residentDepartures(s);
         s = judgeChapter(s, closingDay);
@@ -576,6 +610,7 @@ export function step(state: GameState): GameState {
   s = hospitalTick(s);
   // Placements and classes take their people before in-house tasks are handed out.
   s = workforceTick(s);
+  s = inventoryTick(s);
   s = careTick(s);
   s = needsTick(s);
   s = staffEnergyTick(s);
