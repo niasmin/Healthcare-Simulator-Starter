@@ -46,3 +46,17 @@ describe('residents out for a stroll', () => {
     expect(new Set(spots.map((c) => `${c.x},${c.y}`)).size).toBe(spots.length);
   });
 });
+
+describe('the town around the home', () => {
+  it('has a ring road and two streets clear of the lot and the plot for sale', async () => {
+    const { townRoads } = await import('../render/WorldBackdrop');
+    const s = createInitialState(8);
+    const r = townRoads(s.site, 32);
+    expect(r.front).toBe(s.site.height);
+    expect(r.front2).toBeGreaterThan(r.front);
+    expect(r.west).toBeLessThan(0);
+    expect(r.north).toBeLessThan(0);
+    expect(r.east).toBeGreaterThan(32);
+    expect(r.maxX - r.minX).toBeGreaterThan(32);
+  });
+});

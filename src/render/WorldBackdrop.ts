@@ -11,7 +11,7 @@ import { cellCenter, cellDiamond, cellToWorld } from './iso';
 /** Cells of town drawn around the lot on every side. */
 export const WORLD_MARGIN = 24;
 /** Ground level of the town relative to the raised lot slab. */
-const DROP = 14;
+export const DROP = 14;
 
 const FONT = '"IBM Plex Sans Thai", "Noto Sans Thai", "Leelawadee UI", Tahoma, sans-serif';
 
@@ -93,23 +93,29 @@ function tree(container: Container, textures: Map<string, Texture>, x: number, y
   container.addChild(sp);
 }
 
-/** Draw the whole town into `container` (cleared first). */
-export function drawWorld(container: Container, site: Site, opts: WorldOptions): void {
-  for (const c of container.removeChildren()) c.destroy({ children: true });
-  const M = WORLD_MARGIN;
-  const eastEdge = opts.sale ? opts.sale.toX : site.width;
-  const minX = -M;
-  const maxX = eastEdge + M;
-  const minY = -M;
-  const maxY = site.height + M;
-  const roads = {
-    // The front street (row = height) already exists; add a ring road around the block.
+/** The town's road grid (cells): a ring road round the block, the front street and a second street south. */
+export function townRoads(site: Site, saleToX: number | null) {
+  const eastEdge = saleToX ?? site.width;
+  return {
+    eastEdge,
+    minX: -WORLD_MARGIN,
+    maxX: eastEdge + WORLD_MARGIN,
+    minY: -WORLD_MARGIN,
+    maxY: site.height + WORLD_MARGIN,
     west: -3,
     north: -3,
     east: eastEdge + 2,
     front: site.height,
+    front2: site.height + 9,
   };
-  const isRoad = (x: number, y: number) => x === roads.west || y === roads.north || x === roads.east || y === roads.front || y === roads.front + 9;
+}
+
+/** Draw the whole town into `container` (cleared first). */
+export function drawWorld(container: Container, site: Site, opts: WorldOptions): void {
+  for (const c of container.removeChildren()) c.destroy({ children: true });
+  const roads = townRoads(site, opts.sale ? opts.sale.toX : null);
+  const { minX, maxX, minY, maxY, eastEdge } = roads;
+  const isRoad = (x: number, y: number) => x === roads.west || y === roads.north || x === roads.east || y === roads.front || y === roads.front2;
   const inLot = (x: number, y: number) => x >= 0 && y >= 0 && x < site.width && y < site.height;
   const inSale = (x: number, y: number) => !!opts.sale && x >= opts.sale.fromX && x < opts.sale.toX && y >= 0 && y < site.height;
   const pond = { x: -10, y: 4, w: 5, h: 4 };
@@ -135,7 +141,7 @@ export function drawWorld(container: Container, site: Site, opts: WorldOptions):
     }
   // lane markings on the ring road and the front street
   for (let x = minX; x < maxX; x += 2) {
-    for (const ry of [roads.north, roads.front, roads.front + 9]) {
+    for (const ry of [roads.north, roads.front, roads.front2]) {
       const c = cellCenter(x, ry);
       ground.poly([c.x - 8, c.y + DROP - 2, c.x + 8, c.y + DROP + 2, c.x + 6, c.y + DROP + 3, c.x - 10, c.y + DROP - 1]).fill({ color: 0xe8e3c9, alpha: 0.8 });
     }
