@@ -1,6 +1,8 @@
 import { rectCells } from '../domain/grid';
 import { validateCorridor, validateRoomPlacement } from '../domain/rules/placement';
-import type { Cell, GameState, Rect, RoomType } from '../domain/types';
+import type { Cell, GameState, Rect, RoomType, ShiftSlot, StaffRole } from '../domain/types';
+import { SHIFT_SLOTS, SKILL_OWNER } from '../data/staff';
+import { validateShift } from '../domain/rules/shifts';
 import { rosterView, type Objective } from '../sim/selectors';
 
 /**
@@ -74,15 +76,36 @@ export function tourPointer(goal: Objective | null, c: TourCtx): TourPointer {
     case 'staff_room':
       return buildStep(c, 'staff_room', ['lockers']);
     case 'hire_rn':
-      return { targets: ['hire-rn', 'tab-hire', 'nav-manage'], hint: null };
+      return { targets: ['hire-rn', 'tab-hire', 'm-hire', 'nav-manage'], hint: null };
     case 'admit':
       return { targets: ['admit', 'tab-admit', 'nav-manage'], hint: null };
     case 'care_plan':
       return { targets: ['create-plan', 'view-residents', 'nav-residents'], hint: null };
     case 'roster': {
-      // Ring the first under-staffed role × shift cell (any visible one; phones show one shift).
-      const short = rosterView(c.game).cells.filter((x) => x.staff.length < x.need);
-      return { targets: ['roster-pick', ...short.map((x) => `roster-add-${x.role}-${x.slot}`), 'view-roster', 'nav-roster'], hint: null };
+      // Every shift must be ready: its short roles filled, its missing skills and RN covered, and
+      // somebody on it at all. Ring a "+" for a role someone can still take (that shift's tab on
+      // phones), or send the player to hire when nobody can.
+      const view = rosterView(c.game);
+      const wanted: Array<{ role: StaffRole; slot: ShiftSlot }> = [];
+      for (const sl of view.slots) {
+        if (sl.ready && sl.staffCount > 0) continue;
+        const roles = new Set<StaffRole>(view.cells.filter((x) => x.slot === sl.slot && x.staff.length < x.need).map((x) => x.role));
+        for (const skill of sl.missingSkills) roles.add(SKILL_OWNER[skill]);
+        if (sl.missingRn) roles.add('rn');
+        if (!roles.size) roles.add('caregiver');
+        for (const role of roles) wanted.push({ role, slot: sl.slot });
+      }
+      const canTake = (role: StaffRole, slot: ShiftSlot) => c.game.employees.some((e) => e.role === role && !e.placement && validateShift(c.game, e.id, SHIFT_SLOTS[slot]).ok);
+      const fillable = wanted.filter((w) => canTake(w.role, w.slot));
+      // Nobody can take the open shifts: hire first (the roles that are missing).
+      if (wanted.length && !fillable.length) {
+        const hireable = [...new Set(wanted.map((w) => w.role))].filter((role) => c.game.applicants.some((a) => a.role === role));
+        // No applicant for the missing role yet: new ones come every day, so let time run.
+        if (!hireable.length) return { targets: ['speed-1', 'speed-2'], hint: null };
+        return { targets: [...hireable.map((role) => `hire-${role}`), 'tab-hire', 'm-hire', 'nav-manage'], hint: null };
+      }
+      // Phones show one shift at a time: the shift's tab comes after its cells.
+      return { targets: ['roster-pick', ...fillable.map((w) => `roster-add-${w.role}-${w.slot}`), ...new Set(fillable.map((w) => `roster-slot-${w.slot}`)), 'view-roster', 'nav-roster'], hint: null };
     }
     case 'run':
       return { targets: ['speed-1', 'speed-2'], hint: null };
@@ -92,4 +115,25 @@ export function tourPointer(goal: Objective | null, c: TourCtx): TourPointer {
       // Long goals (first payment, the 30-day chapter) need no pointer.
       return none;
   }
+}
+
+/**
+ * One plain sentence for the coach bubble beside the ring: what to tap next for this step.
+ * Build steps say "tap the build button", then "tap the glowing tiles to place it", then
+ * "tap the glowing room" (to buy its equipment), following the pointer.
+ */
+export function coachLine(goal: Objective | null, c: TourCtx, p: TourPointer): string | null {
+  if (!goal) return null;
+  const build: Partial<Record<string, RoomType>> = { ward: 'ward', beds: 'ward', station: 'nursing_station', therapy: 'therapy', staff_room: 'staff_room' };
+  const type = build[goal.id];
+  if (goal.id === 'corridor') return p.targets.length ? 'coach.corridor' : 'coach.corridor_draw';
+  if (type) {
+    const room = c.game.site.rooms.find((r) => r.type === type);
+    if (!room) return p.targets.length ? `coach.build_${type}` : 'coach.place';
+    if (c.selectedRoomId !== room.id) return 'coach.tap_room';
+    return 'coach.equip';
+  }
+  if (goal.id === 'roster' && p.targets[0] === 'speed-1') return 'coach.wait_applicants';
+  if (goal.id === 'roster' && p.targets.some((t) => t.startsWith('hire-'))) return 'coach.hire_more';
+  return p.targets.length ? `coach.${goal.id}` : null;
 }

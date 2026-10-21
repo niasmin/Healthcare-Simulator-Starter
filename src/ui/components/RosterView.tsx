@@ -183,6 +183,7 @@ export function RosterView() {
                 key={slot}
                 type="button"
                 role="tab"
+                data-tour={`roster-slot-${slot}`}
                 aria-selected={mSlot === slot}
                 onClick={() => setPickedSlot(slot)}
                 className={`rounded-lg py-2 text-sm ${mSlot === slot ? 'bg-ink text-white font-semibold' : 'bg-sand text-ink-soft'}`}

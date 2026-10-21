@@ -70,6 +70,9 @@ interface UIStore {
   stockOpen: boolean;
   setStockOpen: (v: boolean) => void;
   /** The supply-room guide has been read (per browser). */
+  /** The first-game welcome (how to play) has been seen (per browser). */
+  introSeen: boolean;
+  setIntroSeen: (v: boolean) => void;
   /** The owner's statistics window. */
   ownerOpen: boolean;
   setOwnerOpen: (v: boolean) => void;
@@ -281,6 +284,8 @@ export const useGame = create<UIStore>((set, get) => ({
   setGoalsOpen: (goalsOpen) => set({ goalsOpen }),
   stockOpen: false,
   setStockOpen: (stockOpen) => set({ stockOpen }),
+  introSeen: initialFlag('he.intro', false),
+  setIntroSeen: (v) => set({ introSeen: remember('he.intro', v) }),
   ownerOpen: false,
   setOwnerOpen: (ownerOpen) => set({ ownerOpen }),
   stockGuideSeen: initialFlag('he.stockGuide', false),

@@ -727,11 +727,21 @@ export function TitleScreen() {
             <button
               type="button"
               autoFocus
-              onClick={() => begin("starter")}
+              onClick={() => begin("ready")}
               className="rounded-xl bg-coral text-white p-3 text-left shadow hover:brightness-110"
             >
-              <span className="block font-bold">🏥 {t("title.tpl_starter")}</span>
+              <span className="block font-bold">🌟 {t("title.tpl_ready")}</span>
               <span className="block text-xs text-white/90 mt-0.5 leading-snug">
+                {t("title.tpl_ready_sub")}
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => begin("starter")}
+              className="rounded-xl bg-white border border-line p-3 text-left hover:border-teal"
+            >
+              <span className="block font-bold">🏥 {t("title.tpl_starter")}</span>
+              <span className="block text-xs text-ink-soft mt-0.5 leading-snug">
                 {t("title.tpl_starter_sub")}
               </span>
             </button>

@@ -34,4 +34,6 @@ body {
   50% { box-shadow: 0 0 0 8px rgb(224 97 75 / 0); }
 }
 .tour-ring { animation: tour-pulse 1.4s ease-in-out infinite; }
-@media (prefers-reduced-motion: reduce) { .tour-ring { animation: none; } }
+@keyframes coach-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+.coach-pop { animation: coach-bob 1.6s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .tour-ring, .coach-pop { animation: none; } }

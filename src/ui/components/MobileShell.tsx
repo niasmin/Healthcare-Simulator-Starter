@@ -46,7 +46,7 @@ function Sheet({ title, onClose, children }: { title: string; onClose: () => voi
         <div className="flex items-center gap-2 px-4 pt-2 pb-1 shrink-0">
           <span className="absolute left-1/2 -translate-x-1/2 top-1.5 h-1 w-10 rounded-full bg-ink/20" aria-hidden />
           <h2 className="font-semibold text-sm mt-2 flex-1">{title}</h2>
-          <button type="button" onClick={onClose} className="mt-2 px-3 py-1 rounded-lg bg-white border border-line text-sm" aria-label={t('m.close')}>
+          <button type="button" data-tour="sheet-close" onClick={onClose} className="mt-2 px-3 py-1 rounded-lg bg-white border border-line text-sm" aria-label={t('m.close')}>
             ✕
           </button>
         </div>
@@ -244,6 +244,7 @@ function ActionCards() {
       {/* Hiring is always one tap away. */}
       <button
         type="button"
+        data-tour="m-hire"
         onClick={() => {
           setLeftTab('hire');
           setSheet('tools');
@@ -333,6 +334,8 @@ export function MobileShell() {
   const openMissions = useOpenMissions();
   const lowItems = useGame((s) => lowStock(s.game));
   const stockNew = useGame((s) => !s.stockGuideSeen);
+  // A first game keeps the screen calm: town, daily missions and stock appear with the first resident.
+  const settled = useGame((s) => s.game.residents.length > 0 || s.game.chapter.id > 1 || s.game.mode === 'sandbox');
 
   const summary = useMemo(() => summarize(game), [game]);
   const alertCount = useMemo(() => {
@@ -410,9 +413,13 @@ export function MobileShell() {
                     onClick={() => useGame.getState().setAutoOpen(true)}
                     className={autoOn ? '!from-[#f2b631] !to-[#d9901a]' : ''}
                   />
-                  <FloatButton emoji="🏙️" label={t('hud.city')} onClick={() => useGame.getState().setCityOpen('city')} />
-                  <FloatButton emoji="🎯" label={t('hud.daily')} onClick={() => useGame.getState().setGoalsOpen(true)} badge={openMissions > 0} />
-                  <FloatButton emoji="📦" label={t('stock.short')} onClick={() => useGame.getState().setStockOpen(true)} badge={lowItems > 0 || stockNew} />
+                  {settled && (
+                    <>
+                      <FloatButton emoji="🏙️" label={t('hud.city')} onClick={() => useGame.getState().setCityOpen('city')} />
+                      <FloatButton emoji="🎯" label={t('hud.daily')} onClick={() => useGame.getState().setGoalsOpen(true)} badge={openMissions > 0} />
+                      <FloatButton emoji="📦" label={t('stock.short')} onClick={() => useGame.getState().setStockOpen(true)} badge={lowItems > 0 || stockNew} />
+                    </>
+                  )}
                 </div>
                 <div className="absolute right-2 top-[11.2rem] z-10 flex flex-col gap-2 pointer-events-none">
                   <FloatButton icon={eventsIcon} label={t('hud.events')} onClick={() => setSheet('events')} />
