@@ -10,6 +10,8 @@ export interface DecorDef {
   type: DecorType;
   costSatang: number;
   appeal: number;
+  /** Star-shop items cost stars instead of cash. */
+  stars?: number;
 }
 
 export const DECOR: Record<DecorType, DecorDef> = {
@@ -23,7 +25,18 @@ export const DECOR: Record<DecorType, DecorDef> = {
   umbrella: { type: 'umbrella', costSatang: thb(8_000), appeal: 3 },
   fountain: { type: 'fountain', costSatang: thb(25_000), appeal: 5 },
   gazebo: { type: 'gazebo', costSatang: thb(30_000), appeal: 6 },
+  // Star shop: exclusive pieces bought with stars from daily missions and achievements.
+  gold_fountain: { type: 'gold_fountain', costSatang: 0, appeal: 6, stars: 40 },
+  sakura_arch: { type: 'sakura_arch', costSatang: 0, appeal: 5, stars: 30 },
+  statue: { type: 'statue', costSatang: 0, appeal: 4, stars: 20 },
+  gold_lantern: { type: 'gold_lantern', costSatang: 0, appeal: 1, stars: 8 },
 };
+export const STAR_DECOR: DecorType[] = ['gold_lantern', 'statue', 'sakura_arch', 'gold_fountain'];
+
+/** Stars a home can still spend: earned minus spent. */
+export function starsLeft(goals: { stars: number; spent?: number } | undefined): number {
+  return Math.max(0, (goals?.stars ?? 0) - (goals?.spent ?? 0));
+}
 
 export const DECOR_ORDER: DecorType[] = ['tree', 'tree2', 'sakura', 'flowers', 'hedge', 'planter', 'lamp', 'umbrella', 'fountain', 'gazebo'];
 

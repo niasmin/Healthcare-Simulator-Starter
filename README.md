@@ -235,6 +235,22 @@ All of this is in the renderer only (`src/render/Ambience.ts` and `IsoRenderer`)
   - a strolling grandfather.
   - A wheelchair sprite is planned (the generator was rate-limited). Until it arrives, less mobile strollers use the grandfather.
 
+### Specialist care, the star shop and seasons
+
+- **Specialist care levels (from chapter 3, any time in the sandbox):** two new care groups, still abstract qualification and scheduling checks only. Hospitals refer them every 3 days, but only to a home with a free bed in a ward fitted for them; an unfitted home draws nothing, so its random sequence and the campaign balance are unchanged.
+  - **Advanced dementia** needs a ward with the door sensor and a sensory kit (฿28,000). The care plan has safety rounds five times a day and night, plus two comfort rounds. The fee is +฿10,000 a month.
+  - **Post-surgery rehab** needs a ward with a bedside walking frame (฿32,000). The plan has two therapy sessions a day, which need a therapy room and a PT, and recovery checks morning and evening. After 3 weeks, a resident who walks well (mobility 55+) goes home recovered and the home's reputation rises by 1. No random roll is involved. The fee is +฿8,000 a month.
+  - Tracheostomy care was already in the game (the airway programme).
+- **Star shop (⭐ in the Daily window):** four exclusive garden pieces, paid with stars and never with cash:
+  - golden lantern ⭐8 (glows at night);
+  - gilded statue ⭐20 (drawn);
+  - sakura arch ⭐30;
+  - golden fountain ⭐40.
+
+  They add garden appeal. Stars spent are tracked separately, so spending never lowers the ranking score, and bulldozing a star piece refunds nothing.
+- **Town seasons:** each game month is a season. On its last day, a home in the town's top three wins a trophy it keeps (🥇🥈🥉), plus ⭐15, ⭐10 or ⭐5. The Daily window lists the trophies, and the Ranking tab shows the month and the days left.
+- **Online seasons:** the real-player ranking resets each UTC calendar month. Each row carries its season. When a player's first refresh of a new month arrives, their final row for the old month is copied into `public.leaderboard_history` by the trigger, which is the only writer. `season_results(season)` returns any month's top ten. The Ranking tab shows the current season and days left, last season's podium, and the player's own podiums over the last six seasons. The server's star cap is now 8 a day plus 200, to make room for trophies.
+
 ### Using every room
 
 - **Beds:** a new resident goes to the emptiest ward (by share of beds taken; ties go to the ward built first), so a new ward fills alongside the old one instead of after it. This is a sim change. Specialised beds are still kept for the residents who need them, and the same rule applies to villas.
@@ -694,7 +710,7 @@ src/
   - Food, supplies, upkeep and payroll are each charged once per day.
   - An event's cost is charged once, and a resolved event can't be resolved again.
 
-## Tests (264 passing)
+## Tests (276 passing)
 
 | File | Covers |
 |---|---|
@@ -722,6 +738,9 @@ src/
 | `ambience.test.ts` | The map light is clear by day, dark at night and warm at dawn and dusk; it changes by at most a few percent per 10-minute tick and wraps at midnight |
 | `strolls.test.ts` | Weather is repeatable per seed and day and mostly clear, with some rain and cloud; mobile residents stroll in the strolling hours, not at night or in the rain, and bedridden ones stay in bed; stroll spots are on the dining floor or lawn, never in other rooms or on paths, without duplicates |
 | `balance-rooms.test.ts` | New residents go to the emptiest ward so two wards fill evenly; idle nurses and caregivers spread over every station; tired staff rest in the staff room and therapists wait in the therapy room; a therapy session brings resident and therapist to the therapy room |
+| `specialist.test.ts` | Specialist levels need their ward kit; their care plans; referrals every few days from chapter 3, only to a fitted home, never touching an unfitted one; post-surgery residents go home recovered after their stay; labels in both languages |
+| `starshop.test.ts` | Star pieces cost stars not cash; refused without enough stars; spending never lowers the ranking score and bulldozing refunds nothing; every piece is priced and named |
+| `seasons.test.ts` | A podium finish at month end wins a trophy and its stars; none mid-month or for an empty home; online seasons are UTC months and step back across years |
 | `shop.test.ts` | Upgrades are bought once, for their price, from their chapter (all at once in the sandbox); the central kitchen and laundry cut food and supplies by their percentages; staff welfare adds morale; online marketing adds an enquiry; the family app lifts reputation while residents are content; the smart call system keeps late routine care pending 30 minutes longer |
 | `modes.test.ts` | Campaign games are unchanged; sandbox books ฿50M as capital, unlocks every room, has no tutorial steps and is never judged after 70 days; each challenge opens with its own cash, reputation or chapter; each challenge is won by the scripted player and ends without a next chapter |
 | `chapter7.test.ts` | **Full 390-day campaign:** all 7 chapters won on schedule and solvent, ledger reconciles; one branch of each kind, each manager of the right role and off the roster; branch invoices exact; network occupancy ≥ 70%. **Opening:** locked before chapter 7; manager role checked; full opening cost charged; managers can’t take shifts or a second branch; cap of 5. **Running:** good branches fill and bill daily, poor ones empty, a poor name at headquarters stops growth; certificates raise the quality target; a lost manager leaves the branch leaderless until one is appointed; support visits lift quality, cost money and have a cooldown; closing refunds 30% and frees the manager; busy clinic branches refer to the stroke unit. Guide order; v9→v10 migration |

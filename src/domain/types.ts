@@ -36,6 +36,8 @@ export type EquipmentId =
   | 'lockers'
   | 'rest_sofa'
   | 'door_sensor'
+  | 'sensory_kit'
+  | 'rehab_frame'
   | 'feeding_pump'
   | 'suction_unit'
   | 'care_van'
@@ -63,7 +65,7 @@ export interface Room {
   name?: string;
 }
 
-export type DecorType = 'tree' | 'sakura' | 'tree2' | 'flowers' | 'hedge' | 'planter' | 'lamp' | 'umbrella' | 'fountain' | 'gazebo';
+export type DecorType = 'tree' | 'sakura' | 'tree2' | 'flowers' | 'hedge' | 'planter' | 'lamp' | 'umbrella' | 'fountain' | 'gazebo' | 'gold_fountain' | 'sakura_arch' | 'statue' | 'gold_lantern';
 
 export interface Decor {
   id: string;
@@ -139,6 +141,10 @@ export interface GoalsState {
   streak: number;
   /** Stars earned from missions and achievements (they count towards the ranking score). */
   stars: number;
+  /** Stars spent in the star shop (spending never lowers the ranking score). */
+  spent?: number;
+  /** Town-season podium finishes: the game month and the rank (1–3). */
+  trophies?: Array<{ month: number; rank: number }>;
   achievements: Partial<Record<AchievementId, number>>;
 }
 
@@ -275,7 +281,7 @@ export interface StaffCandidate {
 }
 
 /** Chapter 1 groups plus the Chapter 2 specialised programmes (abstract care categories, never treatments). */
-export type CareGroup = 'active_aging' | 'stroke_rehab' | 'bedridden' | 'dementia' | 'tube_feeding' | 'airway';
+export type CareGroup = 'active_aging' | 'stroke_rehab' | 'bedridden' | 'dementia' | 'tube_feeding' | 'airway' | 'advanced_dementia' | 'post_surgery';
 
 export type NeedKey = 'physical' | 'mobility' | 'mental' | 'happiness' | 'satisfaction' | 'nutrition';
 export type Needs = Record<NeedKey, number>;
@@ -324,7 +330,9 @@ export type TaskKind =
   | 'activity'
   | 'tube_feed'
   | 'airway_care'
-  | 'safety_round';
+  | 'safety_round'
+  | 'comfort_round'
+  | 'recovery_check';
 export type TaskStatus = 'pending' | 'in_progress' | 'done' | 'missed';
 
 export interface CareTask {
@@ -760,6 +768,7 @@ export type ReasonCode =
   | 'branch_limit'
   | 'already_owned'
   | 'already_today'
+  | 'not_enough_stars'
   | 'nobody_to_treat';
 
 export type CommandResult =

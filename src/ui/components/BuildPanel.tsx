@@ -9,7 +9,7 @@ import { monthlyFee, PROGRAMME_FEE, VISIT_PRICE } from '../../data/finance';
 import { nextPlot } from '../../data/chapters';
 import { PREFABS, prefabCost } from '../../data/prefabs';
 import { vansAvailable, visitRate } from '../../sim/systems/homecare';
-import { GROUP_WARD_EQUIPMENT } from '../../data/patients';
+import { SPECIALIST_GROUPS, GROUP_WARD_EQUIPMENT } from '../../data/patients';
 import type { RoomType } from '../../domain/types';
 import { careKpis } from '../../sim/selectors';
 import { useMoney, useT } from '../hooks';
@@ -322,6 +322,19 @@ function AdmitList() {
         </div>
       ))}
       <p className="text-[11px] text-ink-soft/80 leading-snug">{t('admit.note')}</p>
+      {(game.chapter.id >= 3 || game.mode === 'sandbox') && (
+        <details className="rounded-xl border border-line bg-white p-2.5 text-[11px] leading-snug" data-testid="specialist-care">
+          <summary className="font-semibold text-sm cursor-pointer">★ {t('spec.title')}</summary>
+          <p className="text-ink-soft mt-1">{t('spec.hint')}</p>
+          {SPECIALIST_GROUPS.map((g) => (
+            <p key={g} className="mt-1.5">
+              <span className="inline-block size-2 rounded-full mr-1 align-middle" style={{ background: GROUP_COLOR[g] }} />
+              {t(`spec.${g}`)}
+              <span className={`ml-1 font-semibold ${freeBeds(game, g).length ? 'text-ok' : 'text-ink-soft'}`}>{freeBeds(game, g).length ? `✓ ${t('admit.free_beds', { n: freeBeds(game, g).length })}` : ''}</span>
+            </p>
+          ))}
+        </details>
+      )}
       {(game.chapter.id >= 6 || game.hospital.inpatients.length > 0) && <HospitalPanel />}
       {(game.chapter.id >= 4 || game.homecare.clients.length > 0) && <HomeCareList />}
     </>

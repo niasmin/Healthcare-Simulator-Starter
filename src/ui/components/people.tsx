@@ -9,6 +9,8 @@ export const GROUP_COLOR: Record<CareGroup, string> = {
   dementia: '#b5537a',
   tube_feeding: '#3f8f86',
   airway: '#2f6aa5',
+  advanced_dementia: '#9c3f6a',
+  post_surgery: '#3a8fb7',
 };
 
 /** First Thai consonant (skips leading vowels like เ แ โ) or first Latin letter. */

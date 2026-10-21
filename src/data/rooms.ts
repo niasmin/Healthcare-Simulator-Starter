@@ -24,6 +24,8 @@ export const EQUIPMENT: Record<EquipmentId, EquipmentDef> = {
   lockers: { id: 'lockers', costSatang: thb(15_000), color: 0x7c86a8 },
   rest_sofa: { id: 'rest_sofa', costSatang: thb(12_000), color: 0xd98a6c },
   door_sensor: { id: 'door_sensor', costSatang: thb(35_000), color: 0x8a5a9e },
+  sensory_kit: { id: 'sensory_kit', costSatang: thb(28_000), color: 0xb5537a },
+  rehab_frame: { id: 'rehab_frame', costSatang: thb(32_000), color: 0x4a6aa5 },
   feeding_pump: { id: 'feeding_pump', costSatang: thb(12_000), color: 0xe8eef2 },
   suction_unit: { id: 'suction_unit', costSatang: thb(20_000), color: 0xdfe8f0 },
   care_van: { id: 'care_van', costSatang: thb(180_000), color: 0xf4f6f8 },
@@ -86,6 +88,9 @@ export const ROOMS: Record<RoomType, RoomDef> = {
       // Optional: let the ward take tube-feeding (pump) and tracheostomy (pump + suction) residents.
       { id: 'feeding_pump', required: 0, max: () => 1 },
       { id: 'suction_unit', required: 0, max: () => 1 },
+      // Optional specialist kits (from chapter 3): advanced dementia (with the door sensor) and post-surgery rehab.
+      { id: 'sensory_kit', required: 0, max: () => 1 },
+      { id: 'rehab_frame', required: 0, max: () => 1 },
     ],
     floorColor: 0xb9d7cf,
     wallColor: 0x4f8a80,

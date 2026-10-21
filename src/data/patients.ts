@@ -5,7 +5,9 @@ import type { CareGroup, EquipmentId, NeedKey, PersonName, Skill, TaskKind } fro
  * tasks describe who may do a kind of work and when, never what treatment to give.
  */
 
-export const CARE_GROUPS: CareGroup[] = ['active_aging', 'stroke_rehab', 'bedridden', 'dementia', 'tube_feeding', 'airway'];
+export const CARE_GROUPS: CareGroup[] = ['active_aging', 'stroke_rehab', 'bedridden', 'dementia', 'tube_feeding', 'airway', 'advanced_dementia', 'post_surgery'];
+/** Specialist care levels (from chapter 3): referred only to a home with a ward fitted for them. */
+export const SPECIALIST_GROUPS: CareGroup[] = ['advanced_dementia', 'post_surgery'];
 
 export const GROUP_LEVELS: Record<CareGroup, [number, number]> = {
   active_aging: [1, 2],
@@ -14,6 +16,8 @@ export const GROUP_LEVELS: Record<CareGroup, [number, number]> = {
   dementia: [2, 3],
   tube_feeding: [3, 4],
   airway: [4, 4],
+  advanced_dementia: [4, 4],
+  post_surgery: [2, 3],
 };
 
 /** Programmes that need a ward fitted with all of this equipment. */
@@ -21,9 +25,11 @@ export const GROUP_WARD_EQUIPMENT: Partial<Record<CareGroup, EquipmentId[]>> = {
   dementia: ['door_sensor'],
   tube_feeding: ['feeding_pump'],
   airway: ['feeding_pump', 'suction_unit'],
+  advanced_dementia: ['door_sensor', 'sensory_kit'],
+  post_surgery: ['rehab_frame'],
 };
 /** Fittings that make a ward "specialised"; other residents fill ordinary wards first. */
-export const PROGRAMME_EQUIPMENT: EquipmentId[] = ['door_sensor', 'feeding_pump', 'suction_unit'];
+export const PROGRAMME_EQUIPMENT: EquipmentId[] = ['door_sensor', 'feeding_pump', 'suction_unit', 'sensory_kit', 'rehab_frame'];
 
 export interface TaskKindDef {
   kind: TaskKind;
@@ -56,6 +62,9 @@ export const TASK_KINDS: Record<TaskKind, TaskKindDef> = {
   // Chapter 2 programmes. Named only by the kind of work and the qualification it needs.
   tube_feed: { kind: 'tube_feed', skill: 'tube_feeding', duration: 20, priority: 1, effects: { nutrition: 30 }, missPenalty: { nutrition: -8, satisfaction: -4 }, grace: 90 },
   airway_care: { kind: 'airway_care', skill: 'airway_care', duration: 15, priority: 1, effects: { physical: 5, satisfaction: 1 }, missPenalty: { physical: -8, satisfaction: -4 }, grace: 90 },
+  // Specialist care levels (abstract: who may do the work, and when).
+  comfort_round: { kind: 'comfort_round', skill: 'personal_care', duration: 15, priority: 2, effects: { mental: 4, happiness: 3 }, missPenalty: { mental: -4, satisfaction: -3 }, grace: 90 },
+  recovery_check: { kind: 'recovery_check', skill: 'vital_signs', duration: 10, priority: 2, effects: { physical: 4, satisfaction: 1 }, missPenalty: { physical: -4, satisfaction: -3 }, grace: 90 },
   safety_round: { kind: 'safety_round', skill: 'personal_care', duration: 10, priority: 2, effects: { mental: 3, happiness: 2 }, missPenalty: { mental: -3, satisfaction: -2 }, grace: 90 },
 };
 
@@ -85,6 +94,16 @@ export function carePlanSchedule(group: CareGroup, level: number): Array<[TaskKi
   if (group === 'airway') for (const t of [h(3), h(9, 30), h(15, 30), h(21, 30)]) out.push(['airway_care', t]);
   // Residents living with dementia get regular safety and orientation rounds.
   if (group === 'dementia') for (const t of [h(11), h(16), h(22, 30)]) out.push(['safety_round', t]);
+  // Advanced dementia: safety rounds through the day and night, and calm one-to-one comfort rounds.
+  if (group === 'advanced_dementia') {
+    for (const t of [h(1), h(5), h(11), h(16), h(22, 30)]) out.push(['safety_round', t]);
+    for (const t of [h(13), h(17)]) out.push(['comfort_round', t]);
+  }
+  // After an operation: two therapy sessions a day and recovery checks morning and evening.
+  if (group === 'post_surgery') {
+    out.push(['mobility_session', h(10)], ['mobility_session', h(13)]);
+    for (const t of [h(11), h(19)]) out.push(['recovery_check', t]);
+  }
   // Sessions are booked from 10:00 and may run until 14:00, inside the morning shift.
   if (group === 'stroke_rehab') out.push(['mobility_session', h(10)]);
   out.push(['activity', h(10)]);
@@ -93,7 +112,7 @@ export function carePlanSchedule(group: CareGroup, level: number): Array<[TaskKi
 
 /** Residents with a plan that includes meal assistance don't self-feed. */
 export function selfFeeds(group: CareGroup, level: number): boolean {
-  return !(level >= 3 || group === 'bedridden' || group === 'dementia' || group === 'tube_feeding' || group === 'airway');
+  return !(level >= 3 || group === 'bedridden' || group === 'dementia' || group === 'advanced_dementia' || group === 'tube_feeding' || group === 'airway');
 }
 
 /** Fictional resident names (Thai, with romanisation). Many are Northern Thai names. */

@@ -27,6 +27,8 @@ export const MISSION_ORDER = Object.keys(MISSIONS) as MissionId[];
 export const MISSIONS_PER_DAY = 3;
 /** All three missions done: a bonus on top. */
 export const ALL_MISSIONS_BONUS = 1;
+/** Town season (each game month): stars for finishing first, second or third in town. */
+export const TROPHY_STARS = [15, 10, 5];
 
 export interface AchievementDef {
   id: AchievementId;
