@@ -69,6 +69,12 @@ interface UIStore {
   /** Supply room (stock) window. */
   stockOpen: boolean;
   setStockOpen: (v: boolean) => void;
+  /** The supply-room guide has been read (per browser). */
+  /** The owner's statistics window. */
+  ownerOpen: boolean;
+  setOwnerOpen: (v: boolean) => void;
+  stockGuideSeen: boolean;
+  setStockGuideSeen: (v: boolean) => void;
   /** Community window: support the creator, send feedback, privacy & terms. */
   communityOpen: 'support' | 'feedback' | 'legal' | null;
   setCommunityOpen: (v: 'support' | 'feedback' | 'legal' | null) => void;
@@ -275,6 +281,10 @@ export const useGame = create<UIStore>((set, get) => ({
   setGoalsOpen: (goalsOpen) => set({ goalsOpen }),
   stockOpen: false,
   setStockOpen: (stockOpen) => set({ stockOpen }),
+  ownerOpen: false,
+  setOwnerOpen: (ownerOpen) => set({ ownerOpen }),
+  stockGuideSeen: initialFlag('he.stockGuide', false),
+  setStockGuideSeen: (v) => set({ stockGuideSeen: remember('he.stockGuide', v) }),
   communityOpen: null,
   setCommunityOpen: (communityOpen) => set({ communityOpen }),
   setChaptersOpen: (chaptersOpen) => set({ chaptersOpen }),

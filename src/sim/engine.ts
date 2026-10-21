@@ -32,7 +32,7 @@ import { supportDayEnd } from './systems/support';
 import { cityBlocker, cityCost, visitPlace } from './systems/city';
 import { goalsDayEnd, goalsTick } from './systems/goals';
 import { inventoryDayEnd, inventoryTick, orderBlocker, orderCost, orderStock, setInventory } from './systems/inventory';
-import { STOCK } from '../data/inventory';
+import { BULK_MIN_PACKS, STOCK } from '../data/inventory';
 import { assignManager, closeBranch, networkDayEnd, openBranch, supportBranch } from './systems/network';
 import { acceptOffer, endContract, startTraining, workforceDayEnd, workforceTick } from './systems/workforce';
 
@@ -77,7 +77,7 @@ export type Command =
   | { type: 'visitPlace'; place: CityPlace }
   | { type: 'setAuto'; settings: Partial<AutoSettings> }
   | { type: 'setInventory'; on: boolean }
-  | { type: 'orderStock'; item: StockItem; packs: number; express?: boolean }
+  | { type: 'orderStock'; item: StockItem; packs: number; express?: boolean; bulk?: boolean }
   | { type: 'setStockAuto'; on: boolean }
   | { type: 'setStockLevel'; item: StockItem; levels: { min: number; max: number } | null };
 
@@ -404,11 +404,11 @@ export function applyCommand(state: GameState, cmd: Command): CommandOutcome {
       return { state: setInventory(state, cmd.on), result: { ok: true } };
 
     case 'orderStock': {
-      const express = !!cmd.express;
-      const blocker = orderBlocker(state, cmd.item, cmd.packs, express);
-      if (blocker) return fail(state, blocker);
-      const costSatang = orderCost(state, cmd.item, cmd.packs, express);
-      return { state: orderStock(state, cmd.item, cmd.packs, express), result: { ok: true, costSatang } };
+      const kind = cmd.express ? 'express' : cmd.bulk ? 'bulk' : 'standard';
+      const blocker = orderBlocker(state, cmd.item, cmd.packs, kind);
+      if (blocker) return fail(state, blocker, blocker === 'min_order' ? { n: BULK_MIN_PACKS } : undefined);
+      const costSatang = orderCost(state, cmd.item, cmd.packs, kind);
+      return { state: orderStock(state, cmd.item, cmd.packs, kind), result: { ok: true, costSatang } };
     }
 
     case 'setStockAuto':

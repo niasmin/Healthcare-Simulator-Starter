@@ -21,6 +21,7 @@ const SPEEDS: { speed: GameSpeed; label: string }[] = [
 export function TopBar() {
   const openMissions = useOpenMissions();
   const lowItems = useGame((s) => lowStock(s.game));
+  const stockNew = useGame((s) => !s.stockGuideSeen);
   const t = useT();
   const autoOn = useAutoOn();
   const money = useMoney();
@@ -133,7 +134,11 @@ export function TopBar() {
           className="relative px-3 py-1 rounded-md bg-white/15 border border-white/30 text-sm hover:bg-white/25 font-semibold"
         >
           📦 {t('stock.short')}
-          {lowItems > 0 && <span className="absolute -top-1.5 -right-1.5 min-w-4 h-4 px-1 rounded-full bg-coral text-white text-[10px] font-black grid place-items-center">{lowItems}</span>}
+          {lowItems > 0 ? (
+            <span className="absolute -top-1.5 -right-1.5 min-w-4 h-4 px-1 rounded-full bg-coral text-white text-[10px] font-black grid place-items-center">{lowItems}</span>
+          ) : (
+            stockNew && <span className="absolute -top-1.5 -right-2 h-4 px-1 rounded-full bg-[#f2b631] text-ink text-[9px] font-black grid place-items-center">{t('stock.new')}</span>
+          )}
         </button>
         <button
           type="button"

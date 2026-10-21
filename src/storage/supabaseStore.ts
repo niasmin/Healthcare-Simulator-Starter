@@ -103,6 +103,21 @@ export interface SupabaseConnection {
   rankSite(userId: string): Promise<Site | null>;
   /** Send feedback (guests too). The table is insert-only; the owner reads it in the dashboard. */
   sendFeedback(row: FeedbackRow): Promise<boolean>;
+  /** The game owner's play statistics (null for everyone else: the database function checks). */
+  ownerStats(): Promise<OwnerStats | null>;
+}
+
+/** Aggregates from public.owner_stats(): anonymous counts only, plus the latest feedback. */
+export interface OwnerStats {
+  generated_at: string;
+  totals: { accounts: number; guests: number; sessions: number; sessions_1d: number; sessions_7d: number; sessions_30d: number; play_minutes_7d: number; cloud_saves: number; ranked: number; feedback: number };
+  daily: Array<{ day: string; sessions: number; starts: number }>;
+  chapters: Array<{ chapter: number; players: number; won: number; failed: number }>;
+  furthest: Array<{ chapter: number; sessions: number }>;
+  modes: Record<string, number>;
+  tutorial: Array<{ goal: string; sessions: number }>;
+  missed: Array<{ chapter: number; check: string; n: number }>;
+  recent_feedback: Array<{ at: string; kind: string; message: string; contact: string | null; context: Record<string, unknown> | null }>;
 }
 
 export const FEEDBACK_TABLE = 'feedback';
@@ -256,6 +271,10 @@ export async function connectSupabase(): Promise<SupabaseConnection | null> {
       sendFeedback: async (row) => {
         const { error } = await sb.from(FEEDBACK_TABLE).insert({ ...row, contact: row.contact || null, user_id: currentId });
         return !error;
+      },
+      ownerStats: async () => {
+        const { data, error } = await sb.rpc('owner_stats');
+        return error || !data ? null : (data as OwnerStats);
       },
       rankSite: async (userId) => {
         const { data: row, error } = await sb.from(RANK_TABLE).select('site').eq('user_id', userId).maybeSingle();

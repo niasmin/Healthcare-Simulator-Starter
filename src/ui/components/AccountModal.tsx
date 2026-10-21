@@ -53,6 +53,16 @@ export function AccountModal({ onClose }: { onClose: () => void }) {
   };
 
   const signedIn = !!account && !account.anonymous && !!account.email;
+  // The owner's statistics button: only shown once the database says this account may read them.
+  const [owner, setOwner] = useState(false);
+  useEffect(() => {
+    if (!signedIn || !supabase) return;
+    let alive = true;
+    void supabase.ownerStats().then((x) => alive && setOwner(!!x));
+    return () => {
+      alive = false;
+    };
+  }, [signedIn]);
   const run = async (fn: () => Promise<AuthResult>, onOk: (r: Extract<AuthResult, { ok: true }>) => void) => {
     setBusy(true);
     setError(null);
@@ -121,6 +131,18 @@ export function AccountModal({ onClose }: { onClose: () => void }) {
             <p className="text-sm">{t('auth.signed_in_as', { name: account.name || account.email! })}</p>
             <p className="text-xs text-ink-soft">{account.email}</p>
             <p className="text-xs text-ink-soft leading-relaxed">{t('auth.synced')}</p>
+            {owner && (
+              <button
+                type="button"
+                className="rounded-xl bg-[#14365f] text-white px-3 py-2 text-sm font-semibold"
+                onClick={() => {
+                  onClose();
+                  useGame.getState().setOwnerOpen(true);
+                }}
+              >
+                📊 {t('owner.title')}
+              </button>
+            )}
             <button type="button" className="rounded-xl border border-line bg-white px-3 py-2 text-sm" onClick={() => setMode('newpass')}>
               🔑 {t('auth.change_password')}
             </button>

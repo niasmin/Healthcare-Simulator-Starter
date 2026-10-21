@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import { STOCK, STOCK_ITEMS } from '../../data/inventory';
-import type { GameState, StockCounts, StockItem, StockMonth } from '../../domain/types';
-import { daysLeft, incoming, onHand, orderCost, stockLevels, stockValue } from '../../sim/systems/inventory';
+import { BULK_MIN_PACKS, STOCK, STOCK_ITEMS } from '../../data/inventory';
+import type { GameState, OrderKind, StockCounts, StockItem, StockMonth } from '../../domain/types';
+import { daysLeft, incoming, onHand, orderBlocker, orderCost, shelfCapacity, shelfUsed, shortageOf, stockLevels, stockValue } from '../../sim/systems/inventory';
 import { dayOf, formatClock } from '../../sim/systems/time';
 import { useMoney, useT } from '../hooks';
 import { useGame } from '../store';
@@ -15,6 +15,8 @@ export function InventoryModal({ onClose }: { onClose: () => void }) {
   const game = useGame((s) => s.game);
   const dispatch = useGame((s) => s.dispatch);
   const [tab, setTab] = useState<Tab>('stock');
+  const guideSeen = useGame((s) => s.stockGuideSeen);
+  const setGuideSeen = useGame((s) => s.setStockGuideSeen);
   const inv = game.inventory;
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
@@ -42,7 +44,16 @@ export function InventoryModal({ onClose }: { onClose: () => void }) {
           </div>
         ) : (
           <>
-            <p className="text-xs text-ink-soft leading-relaxed">{t('stock.intro')}</p>
+            {guideSeen ? (
+              <p className="text-xs text-ink-soft leading-relaxed">
+                {t('stock.intro')}{' '}
+                <button type="button" className="underline font-semibold text-teal" onClick={() => setGuideSeen(false)}>
+                  {t('stock.guide_again')}
+                </button>
+              </p>
+            ) : (
+              <StockGuide onDone={() => setGuideSeen(true)} />
+            )}
             <label className="flex items-start gap-2 rounded-xl border border-line bg-white px-3 py-2 cursor-pointer">
               <input type="checkbox" className="mt-0.5 size-4 accent-teal" checked={inv.auto} onChange={(e) => dispatch({ type: 'setStockAuto', on: e.target.checked })} />
               <span className="min-w-0">
@@ -76,6 +87,44 @@ export function InventoryModal({ onClose }: { onClose: () => void }) {
   );
 }
 
+const GUIDE_STEPS = ['use', 'auto', 'order', 'shelves', 'news'] as const;
+
+/** First visit: how the supply room works, in five short steps. */
+function StockGuide({ onDone }: { onDone: () => void }) {
+  const t = useT();
+  return (
+    <section className="rounded-xl border-2 border-teal/40 bg-teal/5 p-3 flex flex-col gap-2" data-testid="stock-guide">
+      <h3 className="text-sm font-bold">📘 {t('stock.guide.title')}</h3>
+      <ol className="flex flex-col gap-1.5">
+        {GUIDE_STEPS.map((k, i) => (
+          <li key={k} className="flex gap-2 text-xs leading-relaxed">
+            <span className="grid place-items-center size-5 shrink-0 rounded-full bg-teal text-white text-[11px] font-bold">{i + 1}</span>
+            <span>{t(`stock.guide.${k}`)}</span>
+          </li>
+        ))}
+      </ol>
+      <button type="button" onClick={onDone} className="self-end rounded-lg bg-teal text-white text-xs font-semibold px-3 py-1.5">
+        {t('stock.guide.done')}
+      </button>
+    </section>
+  );
+}
+
+/** Toasts when the stock room runs dry or the supply news changes, so the player looks in. */
+export function useStockToasts() {
+  useEffect(
+    () =>
+      useGame.subscribe((s, prev) => {
+        if (s.game.log === prev.game.log || s.away || !s.started || !s.game.inventory?.on) return;
+        const last = prev.game.log.at(-1)?.id;
+        const fresh = s.game.log.slice(s.game.log.findIndex((l) => l.id === last) + 1);
+        const hit = fresh.find((l) => l.key === 'log.stockout' || l.key === 'log.stock_shortage' || l.key === 'log.stock_bad_news');
+        if (hit) s.notify(hit.key, hit.key === 'log.stockout' ? 'error' : 'ok', hit.params);
+      }),
+    [],
+  );
+}
+
 /** Items below their reorder point with nothing on the way (for a badge). */
 export function lowStock(game: GameState): number {
   const inv = game.inventory;
@@ -92,8 +141,23 @@ function StockList({ game }: { game: GameState }) {
   const inv = game.inventory!;
   const day = dayOf(game.minute);
   const orders = [...inv.orders].sort((a, b) => a.arriveAt - b.arriveAt);
+  const cap = shelfCapacity(game);
+  const used = shelfUsed(inv);
+  const short = shortageOf(game);
   return (
     <div className="flex flex-col gap-2">
+      <div className="rounded-xl border border-line bg-white px-3 py-2" data-testid="shelves">
+        <div className="flex flex-wrap gap-x-2 text-xs font-semibold">
+          <span className="flex-1 whitespace-nowrap">🗄️ {t('stock.shelves', { used, cap })}</span>
+          <span className="text-ink-soft font-normal text-[11px]">{t('stock.shelves_hint')}</span>
+        </div>
+        <div className="mt-1 h-1.5 rounded-full bg-sand overflow-hidden" aria-hidden>
+          <div className={`h-full ${used >= cap ? 'bg-bad' : used >= cap * 0.85 ? 'bg-[#f2b631]' : 'bg-teal'}`} style={{ width: `${Math.min(100, (used / Math.max(1, cap)) * 100)}%` }} />
+        </div>
+      </div>
+      <p className="text-[11px] text-ink-soft">{t('stock.kinds_hint', { n: BULK_MIN_PACKS })}</p>
+      {short && <p className="rounded-xl bg-[#fff1d6] border border-[#f2b631] px-3 py-2 text-xs font-semibold">📰 {t('stock.shortage_banner', { item: short, until: inv.shortage!.untilDay })}</p>}
+      {inv.badLot && <p className="rounded-xl bg-[#fde7e7] border border-bad/40 px-3 py-2 text-xs font-semibold">📰 {t('stock.badlot_banner', { item: inv.badLot })}</p>}
       <ul className="flex flex-col gap-2">
         {STOCK_ITEMS.map((item) => (
           <StockRow key={item} game={game} item={item} />
@@ -106,7 +170,7 @@ function StockList({ game }: { game: GameState }) {
             {orders.map((o) => (
               <li key={o.id} className="flex gap-2">
                 <span className="flex-1">
-                  {o.express ? '⚡ ' : ''}
+                  {o.express ? '⚡ ' : o.bulk ? '📦 ' : ''}
                   {t('stock.arrive', { item: o.item, n: o.packs, when: `${dayOf(o.arriveAt) === day ? '' : `D${dayOf(o.arriveAt)} `}${formatClock(o.arriveAt)}` })}
                 </span>
                 <span className="tabular text-ink-soft">{money(o.costSatang)}</span>
@@ -181,28 +245,32 @@ function StockRow({ game, item }: { game: GameState; item: StockItem }) {
           <span className="w-8 text-center text-sm font-bold tabular">{packs}</span>
           <MiniButton label="+" onClick={() => setPacks((p) => Math.min(99, p + 1))} flat />
         </span>
-        <button
-          type="button"
-          title={t('stock.regular_hint')}
-          onClick={() => dispatch({ type: 'orderStock', item, packs })}
-          disabled={game.organization.cashSatang < orderCost(game, item, packs)}
-          className="rounded-lg bg-teal text-white text-xs font-semibold px-2.5 py-1.5 disabled:opacity-40"
-        >
-          {t('stock.order', { n: packs })} · {money(orderCost(game, item, packs))}
-        </button>
-        <button
-          type="button"
-          title={t('stock.express_hint')}
-          onClick={() => dispatch({ type: 'orderStock', item, packs, express: true })}
-          disabled={game.organization.cashSatang < orderCost(game, item, packs, true)}
-          className="rounded-lg bg-[#f2b631] text-ink text-xs font-semibold px-2.5 py-1.5 disabled:opacity-40"
-        >
-          {t('stock.express')} · {money(orderCost(game, item, packs, true))}
-        </button>
+        {ORDER_KINDS.map((k) => {
+          const cost = orderCost(game, item, packs, k.kind);
+          const blocked = orderBlocker(game, item, packs, k.kind);
+          return (
+            <button
+              key={k.kind}
+              type="button"
+              title={t(`stock.${k.kind}_hint`, { n: BULK_MIN_PACKS })}
+              onClick={() => dispatch({ type: 'orderStock', item, packs, ...(k.kind === 'express' ? { express: true } : k.kind === 'bulk' ? { bulk: true } : {}) })}
+              disabled={!!blocked}
+              className={`rounded-lg text-xs font-semibold px-2.5 py-1.5 disabled:opacity-40 ${k.cls}`}
+            >
+              {t(`stock.kind.${k.kind}`)} · {money(cost)}
+            </button>
+          );
+        })}
       </div>
     </li>
   );
 }
+
+const ORDER_KINDS: Array<{ kind: OrderKind; cls: string }> = [
+  { kind: 'standard', cls: 'bg-teal text-white' },
+  { kind: 'bulk', cls: 'bg-[#3f7fc4] text-white' },
+  { kind: 'express', cls: 'bg-[#f2b631] text-ink' },
+];
 
 function MiniButton({ label, onClick, disabled, flat }: { label: string; onClick: () => void; disabled?: boolean; flat?: boolean }) {
   return (
