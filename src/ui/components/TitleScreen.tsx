@@ -31,7 +31,7 @@ const CARDS: Array<{ id: string; chapter: number | null }> = [
   { id: "neuro", chapter: 6 },
   { id: "rehab", chapter: 1 },
   { id: "staff", chapter: 5 },
-  { id: "inventory", chapter: null },
+  { id: "inventory", chapter: 1 },
   { id: "management", chapter: 1 },
   { id: "achievement", chapter: 1 },
 ];

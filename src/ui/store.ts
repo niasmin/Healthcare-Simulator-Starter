@@ -66,6 +66,9 @@ interface UIStore {
   /** Daily missions and achievements window. */
   goalsOpen: boolean;
   setGoalsOpen: (v: boolean) => void;
+  /** Supply room (stock) window. */
+  stockOpen: boolean;
+  setStockOpen: (v: boolean) => void;
   /** Community window: support the creator, send feedback, privacy & terms. */
   communityOpen: 'support' | 'feedback' | 'legal' | null;
   setCommunityOpen: (v: 'support' | 'feedback' | 'legal' | null) => void;
@@ -270,6 +273,8 @@ export const useGame = create<UIStore>((set, get) => ({
   setCityOpen: (cityOpen) => set({ cityOpen }),
   goalsOpen: false,
   setGoalsOpen: (goalsOpen) => set({ goalsOpen }),
+  stockOpen: false,
+  setStockOpen: (stockOpen) => set({ stockOpen }),
   communityOpen: null,
   setCommunityOpen: (communityOpen) => set({ communityOpen }),
   setChaptersOpen: (chaptersOpen) => set({ chaptersOpen }),

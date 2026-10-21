@@ -18,6 +18,7 @@ import { pctOf } from '../../domain/money';
 import { MALL_SUPPLIES_PERCENT } from '../../data/city';
 import { mallDeal } from './city';
 import { dayOf } from './time';
+import { stockCostPerDay } from './inventory';
 
 /**
  * Billing rules (fictional):
@@ -144,23 +145,33 @@ export function collectPayments(state: GameState, closingDay: number): GameState
   return s;
 }
 
-/** Daily food and care supplies, one ledger entry each per day. */
-/** Today's food and supplies for every resident. */
-export function dailyResidentCosts(state: GameState): { food: number; supplies: number } {
-  const food = FOOD_PER_RESIDENT_DAY * state.residents.length;
-  const supplies = state.residents.reduce((a, r) => a + SUPPLIES_BASE_PER_DAY + SUPPLIES_PER_LEVEL_DAY * r.careLevel + (PROGRAMME_SUPPLIES_PER_DAY[r.group] ?? 0), 0);
-  // Shop upgrades (central kitchen, supply stock system) and support rooms (pharmacy, storage) cut these costs.
-  let cut = hasUpgrade(state, 'laundry_supply') ? pctOf(supplies, LAUNDRY_SUPPLIES_PERCENT) : supplies;
+/**
+ * What supplies costing `amount` really cost this home: shop upgrades (supply stock system), support
+ * rooms (pharmacy, storage), the mall deal and the accountant's checks each take a share off.
+ */
+export function supplyPrice(state: GameState, amount: number): number {
+  let cut = hasUpgrade(state, 'laundry_supply') ? pctOf(amount, LAUNDRY_SUPPLIES_PERCENT) : amount;
   if (supportActive(state, 'pharmacist')) cut = pctOf(cut, PHARMACY_SUPPLIES_PERCENT);
   if (roomOpen(state, 'storage_room')) cut = pctOf(cut, STORAGE_SUPPLIES_PERCENT);
   // The mall's bulk-buy deal from the city map.
   if (mallDeal(state)) cut = pctOf(cut, MALL_SUPPLIES_PERCENT);
+  return supportActive(state, 'accountant') ? pctOf(cut, ACCOUNTANT_COST_PERCENT) : cut;
+}
+
+/** Today's food and supplies for every resident (with a stock room, supplies are bought as stock instead). */
+export function dailyResidentCosts(state: GameState): { food: number; supplies: number } {
+  const food = FOOD_PER_RESIDENT_DAY * state.residents.length;
   const kitchen = hasUpgrade(state, 'central_kitchen') ? pctOf(food, KITCHEN_FOOD_PERCENT) : food;
   const books = supportActive(state, 'accountant');
   return {
     food: books ? pctOf(kitchen, ACCOUNTANT_COST_PERCENT) : kitchen,
-    supplies: books ? pctOf(cut, ACCOUNTANT_COST_PERCENT) : cut,
+    supplies: state.inventory?.on ? stockCostPerDay(state) : supplyPrice(state, flatSupplies(state)),
   };
+}
+
+/** The flat daily supplies charge (no stock room). */
+function flatSupplies(state: GameState): number {
+  return state.residents.reduce((a, r) => a + SUPPLIES_BASE_PER_DAY + SUPPLIES_PER_LEVEL_DAY * r.careLevel + (PROGRAMME_SUPPLIES_PER_DAY[r.group] ?? 0), 0);
 }
 
 export function chargeDailyResidentCosts(state: GameState): GameState {
@@ -168,6 +179,7 @@ export function chargeDailyResidentCosts(state: GameState): GameState {
   const day = dayOf(state.minute - 1);
   const { food, supplies } = dailyResidentCosts(state);
   let s = post(state, -food, 'food', 'ledger.food', { ref: `food-day-${day}`, memoParams: { day, n: state.residents.length } });
-  s = post(s, -supplies, 'supplies', 'ledger.supplies', { ref: `supplies-day-${day}`, memoParams: { day } });
+  // With a stock room, supplies were paid for when they were ordered.
+  if (!state.inventory?.on) s = post(s, -supplies, 'supplies', 'ledger.supplies', { ref: `supplies-day-${day}`, memoParams: { day } });
   return s;
 }

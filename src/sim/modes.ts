@@ -3,6 +3,7 @@ import { STARTER_SCENARIO } from '../data/scenarios';
 import { PROGRAMMES } from '../data/chapters';
 import type { ChallengeId, GameMode, GameState } from '../domain/types';
 import { createInitialState } from './state';
+import { openInventory } from './systems/inventory';
 import { applyTemplate, type GameTemplate } from './templates';
 import { makeApplicant, makeResidentCandidate } from './systems/staffing';
 
@@ -39,7 +40,12 @@ export function modeOf(state: GameState): GameMode {
   return state.mode ?? 'campaign';
 }
 
+/** A new game from the title screen: the chosen mode, with the stock room open. */
 export function newGameState(template: GameTemplate = 'starter', mode: GameMode = 'campaign', challenge?: ChallengeId, seed = STARTER_SCENARIO.defaultSeed): GameState {
+  return openInventory(modeState(template, mode, challenge, seed));
+}
+
+function modeState(template: GameTemplate, mode: GameMode, challenge: ChallengeId | undefined, seed: number): GameState {
   if (mode === 'sandbox') {
     const s = applyTemplate(createInitialState(seed, { ...STARTER_SCENARIO, startingCashSatang: SANDBOX_CASH }), template);
     // Chapter 7 unlocks every room and service; sandbox games are never judged.

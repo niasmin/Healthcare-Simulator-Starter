@@ -4,7 +4,8 @@ import { carePlanSchedule, TASK_KINDS } from '../../data/patients';
 import { parseBedId } from '../../domain/rules/beds';
 import { allRoomStatuses } from '../../domain/rules/rooms';
 import { isOnShift } from '../../domain/rules/shifts';
-import type { CareTask, Employee, GameState, Resident, RolePerf, RoleWork, StaffRole } from '../../domain/types';
+import type { CareTask, Employee, GameState, Resident, RolePerf, RoleWork, StaffRole, StockItem } from '../../domain/types';
+import { noteShortage, shortOf, takeStock } from './inventory';
 import { MINUTES_PER_DAY } from '../constants';
 import { allocId } from '../helpers';
 import { applyNeedDelta } from './needs';
@@ -96,6 +97,9 @@ export function careTick(state: GameState): GameState {
   const smartCall = hasUpgrade(state, 'smart_call');
   const ehr = hasUpgrade(state, 'ehr_system');
   const billable: Array<[string, 'therapy' | 'activity']> = [];
+  // Stock room: a task takes its supplies when it starts, and cannot start without them.
+  let inv = state.inventory?.on ? state.inventory : null;
+  const short = new Set<StockItem>();
 
   // 1. Finish in-progress tasks.
   for (const t of tasks) {
@@ -151,6 +155,14 @@ export function careTick(state: GameState): GameState {
       const narrowSkills = new Set<string>(narrowest?.skills ?? []);
       const e = urgent ? candidates[0] : candidates.find((c) => c.skills.length === narrowest?.skills.length || !reservedFor(c, t, tasks, now, narrowSkills));
       if (!e) continue;
+      if (inv) {
+        const taken = takeStock(inv, t.kind);
+        if (!taken) {
+          for (const item of shortOf(inv, t.kind)) short.add(item);
+          continue;
+        }
+        inv = taken;
+      }
       let base = bathroom && t.kind === 'personal_care' ? Math.round((t.duration * BATHROOM_CARE_PERCENT) / 100) : t.duration;
       // Electronic records: medication and vital-sign checks are quicker.
       if (ehr && (t.kind === 'med_round' || t.kind === 'vital_signs')) base = Math.round((base * EHR_TASK_PERCENT) / 100);
@@ -164,9 +176,10 @@ export function careTick(state: GameState): GameState {
     }
   }
 
-  if (!changed) return state;
+  if (!changed) return short.size ? noteShortage(state, [...short]) : state;
   let out: GameState = {
     ...state,
+    ...(inv ? { inventory: inv } : {}),
     tasks,
     residents: state.residents.map((r) => residents.get(r.id)!),
     employees: state.employees.map((e) => employees.get(e.id)!),
@@ -174,5 +187,5 @@ export function careTick(state: GameState): GameState {
     perfToday: perf,
   };
   for (const [rid, stream] of billable) out = recordService(out, rid, stream);
-  return out;
+  return short.size ? noteShortage(out, [...short]) : out;
 }

@@ -667,6 +667,50 @@ export interface AutoSettings {
   staffCare?: boolean;
 }
 
+/** Care consumable groups (data/inventory.ts). */
+export type StockItem = 'gloves' | 'diapers' | 'ppe' | 'dressing' | 'feeding' | 'syringes' | 'suction' | 'medkit';
+export type StockCounts = Partial<Record<StockItem, number>>;
+/** One delivery of an item, used first-expiring-first. `expiresDay` is the last day it can be used. */
+export interface StockLot {
+  qty: number;
+  expiresDay: number;
+}
+export interface StockOrder {
+  id: string;
+  item: StockItem;
+  packs: number;
+  arriveAt: SimMinute;
+  costSatang: Satang;
+  express?: boolean;
+}
+/** Movements for one month, in uses. */
+export interface StockMonth {
+  month: number;
+  opening: StockCounts;
+  received: StockCounts;
+  used: StockCounts;
+  wasted: StockCounts;
+  spentSatang: Satang;
+}
+/** A closed month: the movements plus what was left at the end. */
+export interface StockReport extends StockMonth {
+  closing: StockCounts;
+}
+export interface InventoryState {
+  /** Stock room in use: tasks use stock, and supplies are bought instead of charged daily. */
+  on: boolean;
+  /** Reorder on its own (and send express orders when something is about to run out). */
+  auto: boolean;
+  lots: Partial<Record<StockItem, StockLot[]>>;
+  orders: StockOrder[];
+  /** Player-set reorder point and order-up-to level, in packs (missing = worked out from projected use). */
+  levels?: Partial<Record<StockItem, { min: number; max: number }>>;
+  month: StockMonth;
+  reports: StockReport[];
+  /** Day of the last out-of-stock warning per item (one a day). */
+  warned?: StockCounts;
+}
+
 export interface GameState {
   schemaVersion: 10;
   auto?: AutoSettings;
@@ -709,6 +753,8 @@ export interface GameState {
   city?: CityState;
   /** Daily missions and achievements (older saves: absent). */
   goals?: GoalsState;
+  /** Care consumables (older saves: absent = the flat daily supplies charge). */
+  inventory?: InventoryState;
   // Phase 3
   priceLevel: PriceLevel;
   invoices: Invoice[];
@@ -769,6 +815,7 @@ export type ReasonCode =
   | 'already_owned'
   | 'already_today'
   | 'not_enough_stars'
+  | 'inventory_off'
   | 'nobody_to_treat';
 
 export type CommandResult =
