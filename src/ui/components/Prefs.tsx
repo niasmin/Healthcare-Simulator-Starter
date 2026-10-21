@@ -6,7 +6,7 @@ import { useSaveStatus } from '../saveService';
 /** Per-browser preferences: sound effects, music, anonymous statistics. */
 export function PrefsList() {
   const t = useT();
-  const { sfxOn, musicOn, statsOn, setSfxOn, setMusicOn, setStatsOn } = useGame();
+  const { sfxOn, musicOn, statsOn, fxOn, setSfxOn, setMusicOn, setStatsOn, setFxOn } = useGame();
   const row = (icon: string, label: string, desc: string, on: boolean, set: (v: boolean) => void) => (
     <label className="rounded-xl bg-white border border-line px-4 py-3 flex items-start gap-3 cursor-pointer text-left">
       <span className="text-xl leading-none mt-0.5" aria-hidden>
@@ -26,6 +26,7 @@ export function PrefsList() {
         if (v) setTimeout(() => playSfx('chime'), 0);
       })}
       {row('🎵', t('prefs.music'), t('prefs.music.desc'), musicOn, setMusicOn)}
+      {row('✨', t('prefs.fx'), t('prefs.fx.desc'), fxOn, setFxOn)}
       {row('📊', t('prefs.stats'), t('prefs.stats.desc'), statsOn, setStatsOn)}
     </>
   );

@@ -1,0 +1,243 @@
+import { Container, Graphics } from 'pixi.js';
+import type { GameState, Room } from '../domain/types';
+import { cellCenter } from './iso';
+
+/**
+ * Ambient effects drawn around the map. Purely visual: they read the game clock and the site,
+ * never the sim's RNG, and use their own small deterministic jitter.
+ * - light: a smooth tint through dawn, day, dusk and night (keyframes, blended every 10 minutes);
+ * - lights: warm windows and lamp glows that fade in after dusk (additive, above the tint);
+ * - clouds: soft shadows drifting over the town by day;
+ * - petals: a few sakura petals floating down the screen by day;
+ * - puffs: a dust cloud and sparkles where a room has just been built.
+ * With effects off (low quality or reduced motion) only the tint and the lights remain.
+ */
+
+type Key = { at: number; color: number; alpha: number; night: number };
+const KEYS: Key[] = [
+  { at: 0, color: 0x0d1733, alpha: 0.5, night: 1 },
+  { at: 300, color: 0x111d3a, alpha: 0.46, night: 1 },
+  { at: 360, color: 0x8a5a7a, alpha: 0.2, night: 0.5 },
+  { at: 420, color: 0xf2a65a, alpha: 0.12, night: 0.1 },
+  { at: 480, color: 0xfff2d6, alpha: 0, night: 0 },
+  { at: 1050, color: 0xfff2d6, alpha: 0, night: 0 },
+  { at: 1110, color: 0xf0a050, alpha: 0.14, night: 0 },
+  { at: 1170, color: 0xd9704a, alpha: 0.2, night: 0.3 },
+  { at: 1230, color: 0x3a3366, alpha: 0.36, night: 0.8 },
+  { at: 1290, color: 0x111d3a, alpha: 0.46, night: 1 },
+  { at: 1440, color: 0x0d1733, alpha: 0.5, night: 1 },
+];
+
+function mix(a: number, b: number, t: number): number {
+  const ch = (s: number) => Math.round(((a >> s) & 255) + (((b >> s) & 255) - ((a >> s) & 255)) * t);
+  return (ch(16) << 16) | (ch(8) << 8) | ch(0);
+}
+
+/** The light at a time of day: tint colour, its strength, and how dark it is (0 day .. 1 night). */
+export function lightAt(minute: number): { color: number; alpha: number; night: number } {
+  const m = ((minute % 1440) + 1440) % 1440;
+  const i = KEYS.findIndex((k) => k.at > m);
+  const b = KEYS[i];
+  const a = KEYS[i - 1];
+  const t = (m - a.at) / (b.at - a.at);
+  return { color: mix(a.color, b.color, t), alpha: a.alpha + (b.alpha - a.alpha) * t, night: a.night + (b.night - a.night) * t };
+}
+
+/** A repeatable jitter in 0..1 (no Math.random, so screenshots and tests are stable). */
+const jitter = (n: number) => {
+  const s = Math.sin(n * 127.1 + 311.7) * 43758.5453;
+  return s - Math.floor(s);
+};
+
+interface Petal { g: Graphics; x: number; y: number; vy: number; sway: number; phase: number; spin: number }
+interface Cloud { g: Graphics; x: number; y: number; speed: number }
+interface Puff { g: Graphics; age: number; life: number; vx: number; vy: number; grow: number; sparkle: boolean }
+
+export class Ambience {
+  /** Screen-space tint over the world. */
+  readonly tint = new Graphics();
+  /** World-space glows, kept in step with the world's camera, drawn above the tint. */
+  readonly lights = new Container();
+  /** World-space layer for cloud shadows and building puffs (inside the world). */
+  readonly worldFx = new Container();
+  /** Screen-space petals, above everything on the map. */
+  readonly screenFx = new Container();
+
+  private lastTint = '';
+  private lastLightsSite: GameState['site'] | null = null;
+  private night = 0;
+  private petals: Petal[] = [];
+  private clouds: Cloud[] = [];
+  private cloudLayer = new Container();
+  private puffLayer = new Container();
+  private puffs: Puff[] = [];
+  private knownRooms: Set<string> | null = null;
+  private effects = true;
+  private time = 0;
+  private bounds = { minX: -600, maxX: 600, minY: -200, maxY: 600 };
+
+  constructor() {
+    this.tint.eventMode = 'none';
+    this.lights.eventMode = 'none';
+    this.worldFx.eventMode = 'none';
+    this.screenFx.eventMode = 'none';
+    this.worldFx.addChild(this.cloudLayer, this.puffLayer);
+  }
+
+  setEffects(on: boolean): void {
+    if (on === this.effects) return;
+    this.effects = on;
+    this.cloudLayer.visible = on;
+    this.screenFx.visible = on;
+    if (!on) for (const p of this.puffs.splice(0)) p.g.destroy();
+  }
+
+  /** The world's extent, for where clouds drift. */
+  setBounds(b: { minX: number; maxX: number; minY: number; maxY: number }): void {
+    this.bounds = b;
+    if (!this.clouds.length) this.makeClouds();
+  }
+
+  /** Tint for the clock (redrawn only when it changes). */
+  drawTint(minute: number, width: number, height: number): void {
+    const l = lightAt(minute);
+    this.night = l.night;
+    const key = `${l.color}|${l.alpha.toFixed(3)}|${width}x${height}`;
+    if (key === this.lastTint) return;
+    this.lastTint = key;
+    this.tint.clear();
+    if (l.alpha > 0.001) this.tint.rect(0, 0, width, height).fill({ color: l.color, alpha: l.alpha });
+    this.lights.alpha = Math.min(1, l.night * 1.1);
+    this.lights.visible = l.night > 0.02;
+  }
+
+  /** Warm windows in every room and a glow at each lamp (rebuilt when the site changes). */
+  drawLights(site: GameState['site']): void {
+    if (site === this.lastLightsSite) return;
+    this.lastLightsSite = site;
+    for (const c of this.lights.removeChildren()) c.destroy();
+    const g = new Graphics();
+    g.blendMode = 'add';
+    // A soft radial glow: stacked ellipses, brighter towards the middle.
+    const glow = (x: number, y: number, rx: number, ry: number, color: number, strength: number) => {
+      for (let i = 6; i >= 1; i--) g.ellipse(x, y, (rx * i) / 6, (ry * i) / 6).fill({ color, alpha: strength * 0.22 });
+    };
+    for (const room of site.rooms) {
+      const { x, y, w, h } = room.rect;
+      const c = cellCenter(x + (w - 1) / 2, y + (h - 1) / 2);
+      glow(c.x, c.y - 14, 14 + (w + h) * 8, 8 + (w + h) * 4, 0xffa83a, 0.5);
+    }
+    for (const d of site.decor ?? []) {
+      if (d.type !== 'lamp') continue;
+      const c = cellCenter(d.cell.x, d.cell.y);
+      glow(c.x, c.y - 22, 26, 16, 0xffd27a, 0.7);
+      glow(c.x, c.y + 4, 34, 14, 0xffc060, 0.3);
+    }
+    const e = cellCenter(site.entrance.x, site.entrance.y);
+    glow(e.x, e.y - 20, 40, 22, 0xffd27a, 0.5);
+    this.lights.addChild(g);
+  }
+
+  /** New rooms since the last call get a puff (the first call only records what is there). */
+  noticeRooms(rooms: Room[]): void {
+    const ids = new Set(rooms.map((r) => r.id));
+    const before = this.knownRooms;
+    this.knownRooms = ids;
+    if (!before || !this.effects) return;
+    for (const r of rooms) if (!before.has(r.id)) this.puffAt(r);
+  }
+
+  private puffAt(room: Room): void {
+    const { x, y, w, h } = room.rect;
+    const c = cellCenter(x + (w - 1) / 2, y + (h - 1) / 2);
+    const n = 14 + Math.min(10, w * h);
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2 + jitter(i + x * 7 + y * 13) * 0.6;
+      const g = new Graphics().circle(0, 0, 9 + jitter(i * 3 + w) * 7).fill({ color: 0xf4efe6, alpha: 0.85 });
+      g.position.set(c.x + Math.cos(a) * (w + h) * 6, c.y + Math.sin(a) * (w + h) * 3);
+      this.puffLayer.addChild(g);
+      this.puffs.push({ g, age: 0, life: 0.9 + jitter(i + 5) * 0.4, vx: Math.cos(a) * 34, vy: Math.sin(a) * 17 - 18, grow: 0.9, sparkle: false });
+    }
+    for (let i = 0; i < 10; i++) {
+      const a = (i / 10) * Math.PI * 2;
+      const g = new Graphics().star(0, 0, 4, 6, 2.5).fill(0xffe17a);
+      g.position.set(c.x, c.y - 24);
+      this.puffLayer.addChild(g);
+      this.puffs.push({ g, age: 0, life: 1.1, vx: Math.cos(a) * 70, vy: Math.sin(a) * 40 - 30, grow: 0, sparkle: true });
+    }
+  }
+
+  private makeClouds(): void {
+    for (const c of this.cloudLayer.removeChildren()) c.destroy();
+    this.clouds = [];
+    for (let i = 0; i < 5; i++) {
+      const g = new Graphics();
+      for (let k = 0; k < 4; k++) g.ellipse((k - 1.5) * 70 + jitter(i * 9 + k) * 30, jitter(i * 5 + k) * 30 - 15, 120 + jitter(k + i) * 60, 55 + jitter(k * 2 + i) * 20).fill({ color: 0x1d2a3a, alpha: 0.05 });
+      this.cloudLayer.addChild(g);
+      const { minX, maxX, minY, maxY } = this.bounds;
+      this.clouds.push({ g, x: minX + jitter(i * 11) * (maxX - minX), y: minY + jitter(i * 17) * (maxY - minY), speed: 10 + jitter(i * 23) * 10 });
+    }
+  }
+
+  private makePetals(width: number, height: number): void {
+    for (const p of this.petals) p.g.destroy();
+    this.petals = [];
+    const n = Math.round(Math.min(26, (width * height) / 42000));
+    for (let i = 0; i < n; i++) {
+      const g = new Graphics().ellipse(0, 0, 3.2, 2).fill({ color: i % 3 ? 0xf7c6d9 : 0xfbe3ec, alpha: 0.9 });
+      this.screenFx.addChild(g);
+      this.petals.push({ g, x: jitter(i * 31) * width, y: jitter(i * 37) * height, vy: 18 + jitter(i * 41) * 22, sway: 14 + jitter(i * 43) * 18, phase: jitter(i * 47) * 6.28, spin: 1 + jitter(i * 53) * 2 });
+    }
+  }
+
+  /** Per frame. `running` is false while the game is paused (petals and clouds still drift slowly). */
+  tick(dtMs: number, running: boolean, screen: { width: number; height: number }): void {
+    const dt = Math.min(0.1, dtMs / 1000);
+    this.time += dt;
+    if (!this.effects) return;
+    const day = 1 - this.night;
+    // Clouds drift east-south-east across the town, wrapping around.
+    const { minX, maxX, minY, maxY } = this.bounds;
+    for (const c of this.clouds) {
+      c.x += c.speed * dt * (running ? 1 : 0.35);
+      c.y += c.speed * 0.25 * dt * (running ? 1 : 0.35);
+      if (c.x > maxX + 300) c.x = minX - 300;
+      if (c.y > maxY + 150) c.y = minY - 150;
+      c.g.position.set(c.x, c.y);
+    }
+    this.cloudLayer.alpha = day;
+    // Petals fall and sway; they wrap at the bottom of the screen.
+    const expected = Math.round(Math.min(26, (screen.width * screen.height) / 42000));
+    if (this.petals.length !== expected) this.makePetals(screen.width, screen.height);
+    this.screenFx.alpha = day * 0.95;
+    for (const p of this.petals) {
+      p.y += p.vy * dt;
+      p.x += Math.sin(this.time * 0.9 + p.phase) * p.sway * dt + 6 * dt;
+      if (p.y > screen.height + 8) {
+        p.y = -8;
+        p.x = jitter(p.phase * 100 + this.time) * screen.width;
+      }
+      if (p.x > screen.width + 8) p.x = -8;
+      p.g.position.set(p.x, p.y);
+      p.g.rotation = this.time * p.spin + p.phase;
+    }
+    // Building puffs expand and fade; sparkles fly out and twinkle.
+    for (let i = this.puffs.length - 1; i >= 0; i--) {
+      const p = this.puffs[i];
+      p.age += dt;
+      const k = p.age / p.life;
+      if (k >= 1) {
+        p.g.destroy();
+        this.puffs.splice(i, 1);
+        continue;
+      }
+      p.g.x += p.vx * dt;
+      p.g.y += p.vy * dt;
+      p.vx *= 0.94;
+      p.vy = p.vy * 0.94 + (p.sparkle ? 40 : -4) * dt;
+      p.g.alpha = p.sparkle ? (1 - k) * (0.6 + 0.4 * Math.sin(p.age * 30)) : (1 - k) * 0.9;
+      if (!p.sparkle) p.g.scale.set(1 + k * p.grow * 1.6);
+      else p.g.rotation += dt * 6;
+    }
+  }
+}

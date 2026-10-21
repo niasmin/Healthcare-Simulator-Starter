@@ -33,6 +33,7 @@ export function GameCanvas({ controls = true }: { controls?: boolean } = {}) {
   const selectedRoomId = useGame((s) => s.selectedRoomId);
   const showLabels = useGame((s) => s.showLabels);
   const exterior = useGame((s) => s.exterior);
+  const fxOn = useGame((s) => s.fxOn);
   const roomLabel = useRoomLabel();
   const summary = useSummary();
   const tourHint = useTourPointer()?.hint ?? null;
@@ -142,9 +143,10 @@ export function GameCanvas({ controls = true }: { controls?: boolean } = {}) {
       leftDragPans: tool.kind === 'select',
       showLabels,
       exterior,
+      effects: fxOn ? 'high' : 'low',
       sale: plot ? { toX: plot.width, label: game.chapter.id >= plot.chapter ? t('world.sale_now', { price: money(plot.priceSatang) }) : t('world.sale_later', { c: plot.chapter }) } : null,
     });
-  }, [game, people, summary, selectedRoomId, hover, preview, tool, t, ready, lang, showLabels, exterior, tourHint, roomLabel]);
+  }, [game, people, summary, selectedRoomId, hover, preview, tool, t, ready, lang, showLabels, exterior, tourHint, roomLabel, fxOn]);
 
   // The phone HUD's "overview map" button recenters through this event.
   useEffect(() => {
