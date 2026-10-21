@@ -66,6 +66,9 @@ interface UIStore {
   /** Daily missions and achievements window. */
   goalsOpen: boolean;
   setGoalsOpen: (v: boolean) => void;
+  /** Community window: support the creator, send feedback, privacy & terms. */
+  communityOpen: 'support' | 'feedback' | 'legal' | null;
+  setCommunityOpen: (v: 'support' | 'feedback' | 'legal' | null) => void;
   setChaptersOpen: (v: boolean) => void;
   /** Room name pills on the map (toggled by the layers button). */
   showLabels: boolean;
@@ -267,6 +270,8 @@ export const useGame = create<UIStore>((set, get) => ({
   setCityOpen: (cityOpen) => set({ cityOpen }),
   goalsOpen: false,
   setGoalsOpen: (goalsOpen) => set({ goalsOpen }),
+  communityOpen: null,
+  setCommunityOpen: (communityOpen) => set({ communityOpen }),
   setChaptersOpen: (chaptersOpen) => set({ chaptersOpen }),
   tutorialHidden: initialTutorialHidden(),
   setTutorialHidden: (tutorialHidden) => {

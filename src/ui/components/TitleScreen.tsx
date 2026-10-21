@@ -69,12 +69,15 @@ function GlyphButton({
   onClick,
   locked,
   badge,
+  emoji,
 }: {
   name: string;
   label: string;
   onClick?: () => void;
   locked?: boolean;
   badge?: boolean;
+  /** Shown instead of the glyph art (for buttons without one). */
+  emoji?: string;
 }) {
   const t = useT();
   return (
@@ -85,12 +88,13 @@ function GlyphButton({
       title={locked ? t("home.soon") : label}
       className="relative w-[3.6rem] rounded-2xl bg-gradient-to-b from-[#3f7fc4] to-[#1d4f8f] border-2 border-white/85 shadow-lg pt-1.5 pb-1 flex flex-col items-center gap-0.5 disabled:opacity-70"
     >
-      <img
-        src={glyph(name)}
-        alt=""
-        className="h-7 object-contain"
-        draggable={false}
-      />
+      {emoji ? (
+        <span className="h-7 text-2xl leading-7" aria-hidden>
+          {emoji}
+        </span>
+      ) : (
+        <img src={glyph(name)} alt="" className="h-7 object-contain" draggable={false} />
+      )}
       <span className="text-[10px] font-bold text-white leading-tight px-0.5 text-center">
         {label}
       </span>
@@ -374,6 +378,7 @@ export function TitleScreen() {
                   label={t("home.guide")}
                   onClick={() => setPanel("help")}
                 />
+                <GlyphButton name="support" emoji="☕" label={t("comm.support_short")} onClick={() => useGame.getState().setCommunityOpen("support")} />
               </nav>
             </div>
 
@@ -576,6 +581,7 @@ export function TitleScreen() {
                   icon="📣"
                   onClick={() => setPanel("news")}
                 />
+                <SideButton label={t("comm.support_short")} icon="☕" onClick={() => useGame.getState().setCommunityOpen("support")} />
               </nav>
             </div>
 

@@ -141,6 +141,14 @@ export function TopBar() {
         </button>
         <button
           type="button"
+          onClick={() => useGame.getState().setCommunityOpen('support')}
+          title={t('comm.title')}
+          className="px-3 py-1 rounded-md bg-white/15 border border-white/30 text-sm hover:bg-white/25 font-semibold"
+        >
+          ☕
+        </button>
+        <button
+          type="button"
           onClick={() => useGame.getState().setSaveOpen(true)}
           className="px-3 py-1 rounded-md bg-white/15 border border-white/30 text-sm hover:bg-white/25 font-semibold"
         >

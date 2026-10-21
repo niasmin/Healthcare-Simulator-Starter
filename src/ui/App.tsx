@@ -5,6 +5,7 @@ import { useAlerts } from './alerts';
 import { ShopModal } from './components/ShopModal';
 import { CityModal } from './components/CityModal';
 import { GoalsModal, useGoalToasts } from './components/GoalsModal';
+import { CommunityModal } from './components/CommunityModal';
 import { AutoModal, AwayProgress, AwayReportModal } from './components/AutoModal';
 import { useEffect } from 'react';
 import { SaveModal } from './components/SaveModal';
@@ -43,6 +44,7 @@ export function App() {
   const shopOpen = useGame((s) => s.shopOpen);
   const cityOpen = useGame((s) => s.cityOpen);
   const goalsOpen = useGame((s) => s.goalsOpen);
+  const communityOpen = useGame((s) => s.communityOpen);
   const autoOpen = useGame((s) => s.autoOpen);
   const accountOpen = useGame((s) => s.accountOpen);
   const recovering = useSaveStatus((s) => s.recovering);
@@ -68,6 +70,7 @@ export function App() {
       {chaptersOpen && <ChaptersModal onClose={() => setChaptersOpen(false)} />}
       {shopOpen && <ShopModal onClose={() => useGame.getState().setShopOpen(false)} />}
       {started && goalsOpen && <GoalsModal onClose={() => useGame.getState().setGoalsOpen(false)} />}
+      {communityOpen && <CommunityModal tab={communityOpen} onClose={() => useGame.getState().setCommunityOpen(null)} />}
       {cityOpen && <CityModal tab={cityOpen} onClose={() => useGame.getState().setCityOpen(null)} />}
       {autoOpen && <AutoModal onClose={() => useGame.getState().setAutoOpen(false)} />}
       {accountOpen && <AccountModal onClose={() => useGame.getState().setAccountOpen(false)} />}
