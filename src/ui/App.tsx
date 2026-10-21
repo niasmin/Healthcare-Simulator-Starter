@@ -1,3 +1,4 @@
+import { useShowIntro, WelcomeIntro } from './components/WelcomeIntro';
 import { OwnerModal } from './components/OwnerModal';
 import { InventoryModal, useStockToasts } from './components/InventoryModal';
 import { AccountModal } from './components/AccountModal';
@@ -49,6 +50,7 @@ export function App() {
   const goalsOpen = useGame((s) => s.goalsOpen);
   const stockOpen = useGame((s) => s.stockOpen);
   const ownerOpen = useGame((s) => s.ownerOpen);
+  const showIntro = useShowIntro();
   const communityOpen = useGame((s) => s.communityOpen);
   const autoOpen = useGame((s) => s.autoOpen);
   const accountOpen = useGame((s) => s.accountOpen);
@@ -76,6 +78,7 @@ export function App() {
       {shopOpen && <ShopModal onClose={() => useGame.getState().setShopOpen(false)} />}
       {started && goalsOpen && <GoalsModal onClose={() => useGame.getState().setGoalsOpen(false)} />}
       {started && stockOpen && <InventoryModal onClose={() => useGame.getState().setStockOpen(false)} />}
+      {showIntro && <WelcomeIntro />}
       {ownerOpen && <OwnerModal onClose={() => useGame.getState().setOwnerOpen(false)} />}
       {communityOpen && <CommunityModal tab={communityOpen} onClose={() => useGame.getState().setCommunityOpen(null)} />}
       {cityOpen && <CityModal tab={cityOpen} onClose={() => useGame.getState().setCityOpen(null)} />}

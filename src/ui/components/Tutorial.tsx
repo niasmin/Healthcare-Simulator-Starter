@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { chapterDef } from '../../data/chapters';
 import { buildObjectives, type GuideAction, type Objective } from '../../sim/selectors';
 import { chapterChecks, nextChapterAvailable } from '../../sim/systems/chapter';
@@ -8,7 +8,8 @@ import { isMobileNow, useMoney, useT } from '../hooks';
 import { useGame } from '../store';
 import clipIcon from '../../assets/hud/clip.png';
 import giftIcon from '../../assets/hud/gift.png';
-import { tourPointer, type TourPointer } from '../tour';
+import { useShowIntro } from './WelcomeIntro';
+import { coachLine, tourPointer, type TourPointer } from '../tour';
 
 /** Open the part of the UI a tutorial step talks about. */
 export function runGuideAction(a: GuideAction) {
@@ -53,7 +54,7 @@ export function runGuideAction(a: GuideAction) {
 }
 
 /** Where the tutorial points right now: a control to ring and/or map tiles to suggest. */
-export function useTourPointer(): TourPointer | null {
+export function useTourPointer(): (TourPointer & { say: string | null }) | null {
   const game = useGame((s) => s.game);
   const tool = useGame((s) => s.tool);
   const selectedRoomId = useGame((s) => s.selectedRoomId);
@@ -62,18 +63,24 @@ export function useTourPointer(): TourPointer | null {
   return useMemo(() => {
     if (hidden || !started) return null;
     const goal = buildObjectives(game).find((g) => !g.done) ?? null;
-    return tourPointer(goal, { game, tool, selectedRoomId });
+    const ctx = { game, tool, selectedRoomId };
+    const p = tourPointer(goal, ctx);
+    return { ...p, say: coachLine(goal, ctx, p) };
   }, [game, tool, selectedRoomId, hidden, started]);
 }
 
 type Box = { left: number; top: number; width: number; height: number };
 
-/** First on-screen element carrying one of the data-tour ids. */
+/** First on-screen element carrying one of the data-tour ids that is not covered (by a sheet or dialog). */
 function findTarget(ids: string[]): HTMLElement | null {
   for (const id of ids)
     for (const el of document.querySelectorAll<HTMLElement>(`[data-tour="${id}"]`)) {
       const r = el.getBoundingClientRect();
-      if (r.width > 0 && r.height > 0 && r.bottom > 0 && r.right > 0 && r.top < window.innerHeight && r.left < window.innerWidth) return el;
+      if (!(r.width > 0 && r.height > 0 && r.bottom > 0 && r.right > 0 && r.top < window.innerHeight && r.left < window.innerWidth)) continue;
+      const x = Math.min(window.innerWidth - 1, Math.max(0, r.left + r.width / 2));
+      const y = Math.min(window.innerHeight - 1, Math.max(0, r.top + r.height / 2));
+      const hit = document.elementFromPoint(x, y);
+      if (!hit || el.contains(hit) || hit.contains(el)) return el;
     }
   return null;
 }
@@ -83,14 +90,39 @@ function findTarget(ids: string[]): HTMLElement | null {
  * follows sheets, tabs and scrolling; scrolls the control into view once; never blocks clicks.
  */
 export function TourSpotlight() {
+  const t = useT();
+  const intro = useShowIntro();
   const pointer = useTourPointer();
   const [box, setBox] = useState<Box | null>(null);
   const scrolled = useRef('');
+  const tried = useRef(new WeakSet<HTMLElement>());
   const sig = pointer?.targets.join('|') ?? '';
+  // When the control is hidden behind an open sheet, point at the sheet's close button instead.
+  const [closing, setClosing] = useState(false);
   useEffect(() => {
     const ids = sig ? sig.split('|') : [];
+    tried.current = new WeakSet();
     const tick = () => {
-      const el = ids.length ? findTarget(ids) : null;
+      // Rings the first control in priority order; one scrolled out of sight in a list is brought into
+      // view (once) rather than skipped for a lower-priority one.
+      let el: HTMLElement | null = null;
+      let scrolling = false;
+      for (const id of ids) {
+        el = findTarget([id]);
+        if (el) break;
+        const away = document.querySelector<HTMLElement>(`[data-tour="${id}"]`);
+        const r = away?.getBoundingClientRect();
+        // Out of sight or under a bar: scroll it to the middle once; if that did not help, try the next one.
+        if (away && r && r.width > 0 && r.height > 0 && !tried.current.has(away)) {
+          tried.current.add(away);
+          away.scrollIntoView({ block: 'center', inline: 'nearest' });
+          scrolling = true;
+          break;
+        }
+      }
+      const behind = !el && !scrolling && ids.length > 0 && !!findTarget(['sheet-close']);
+      if (behind) el = findTarget(['sheet-close']);
+      setClosing(behind);
       if (el && scrolled.current !== el.dataset.tour) {
         scrolled.current = el.dataset.tour ?? '';
         el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
@@ -106,15 +138,51 @@ export function TourSpotlight() {
     const iv = window.setInterval(tick, 200);
     return () => window.clearInterval(iv);
   }, [sig]);
-  if (!box) return null;
+  const say = closing ? t('coach.close_sheet') : pointer?.say ? t(pointer.say) : null;
+  if (intro) return null;
+  if (!box) return say && pointer?.hint ? <CoachBubble text={say} /> : null;
   const pad = 4;
   return (
-    <div
-      aria-hidden
-      data-testid="tour-ring"
-      className="fixed z-[38] pointer-events-none rounded-xl border-[3px] border-coral tour-ring"
-      style={{ left: box.left - pad, top: box.top - pad, width: box.width + pad * 2, height: box.height + pad * 2 }}
-    />
+    <>
+      <div
+        aria-hidden
+        data-testid="tour-ring"
+        className="fixed z-[38] pointer-events-none rounded-xl border-[3px] border-coral tour-ring"
+        style={{ left: box.left - pad, top: box.top - pad, width: box.width + pad * 2, height: box.height + pad * 2 }}
+      />
+      {say && <CoachBubble text={say} box={box} />}
+    </>
+  );
+}
+
+const BUBBLE_W = 240;
+
+/** A speech bubble beside the ringed control (or above the bottom bar for map taps) saying what to do. */
+function CoachBubble({ text, box }: { text: string; box?: Box }) {
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  let style: CSSProperties;
+  let arrow: 'up' | 'down' | null = null;
+  if (box) {
+    const below = box.top + box.height / 2 < vh / 2;
+    const left = Math.max(8, Math.min(vw - BUBBLE_W - 8, box.left + box.width / 2 - BUBBLE_W / 2));
+    style = below ? { left, top: box.top + box.height + 14 } : { left, bottom: vh - box.top + 14 };
+    arrow = below ? 'up' : 'down';
+  } else style = { left: Math.max(8, vw / 2 - BUBBLE_W / 2), bottom: Math.round(vh * 0.22) };
+  const ax = box ? Math.max(14, Math.min(BUBBLE_W - 14, box.left + box.width / 2 - (style.left as number))) : 0;
+  return (
+    <div role="status" data-testid="coach" className="fixed z-[39] pointer-events-none" style={{ ...style, width: BUBBLE_W }}>
+      <div className="relative rounded-xl bg-coral text-white text-[13px] font-semibold leading-snug px-3 py-2 shadow-lg coach-pop">
+        👆 {text}
+        {arrow && (
+          <span
+            aria-hidden
+            className="absolute size-3 rotate-45 bg-coral"
+            style={{ left: ax - 6, ...(arrow === 'up' ? { top: -6 } : { bottom: -6 }) }}
+          />
+        )}
+      </div>
+    </div>
   );
 }
 
