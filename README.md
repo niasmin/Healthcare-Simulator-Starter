@@ -235,6 +235,17 @@ All of this is in the renderer only (`src/render/Ambience.ts` and `IsoRenderer`)
   - a strolling grandfather.
   - A wheelchair sprite is planned (the generator was rate-limited). Until it arrives, less mobile strollers use the grandfather.
 
+### Town life
+
+The town around the home is busy (`src/render/TownLife.ts`). It is looks only and deterministic, like the backdrop.
+
+- **People on the pavements:** about 50 townsfolk walk the pavements of every road. Most stay within a dozen cells of the home, and the pavements facing it are the busiest. There are walkers, joggers, cyclists on drawn bicycles, a dog walker with a small dog on a lead, and pairs of neighbours chatting. They use the character sheet's chibi sprites and face the way they walk.
+- **Pedestrians and the home:** people on the north and west pavements pass behind the home's buildings, and people on the south and east pass in front.
+- **Night and rain:** after dark most people go home. On rainy days the cyclists and some others stay in, and everyone out carries a coloured umbrella.
+- **Traffic:** cars now drive on the ring road and the second street as well as the front street (14 in all). Cars behind the lot pass behind its buildings.
+- **Pausing:** like the cars, everyone pauses with the game and speeds up at most twofold. "Map effects" off hides the townsfolk.
+- **More townsfolk art:** the code already looks for `ch_kid`, `ch_student` and `ch_jogger` sprites and uses them when present. They could not be generated this time: the ElevenLabs free plan's daily image limit was reached.
+
 ### Daily missions and achievements
 
 The 🎯 Daily button (desktop top bar, phone map's left column, with a badge while missions are open) opens three missions for the day and the achievements.
@@ -673,7 +684,7 @@ src/
   - Food, supplies, upkeep and payroll are each charged once per day.
   - An event's cost is charged once, and a resolved event can't be resolved again.
 
-## Tests (259 passing)
+## Tests (260 passing)
 
 | File | Covers |
 |---|---|
