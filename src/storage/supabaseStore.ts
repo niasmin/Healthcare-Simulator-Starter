@@ -101,6 +101,16 @@ export interface SupabaseConnection {
   seasonResults(season: string): Promise<SeasonResult[]>;
   /** One player's published layout, for a visit. */
   rankSite(userId: string): Promise<Site | null>;
+  /** Send feedback (guests too). The table is insert-only; the owner reads it in the dashboard. */
+  sendFeedback(row: FeedbackRow): Promise<boolean>;
+}
+
+export const FEEDBACK_TABLE = 'feedback';
+export interface FeedbackRow {
+  kind: 'bug' | 'idea' | 'other';
+  message: string;
+  contact?: string;
+  context?: Record<string, string | number | boolean>;
 }
 
 export const RANK_TABLE = 'leaderboard';
@@ -242,6 +252,10 @@ export async function connectSupabase(): Promise<SupabaseConnection | null> {
       seasonResults: async (season) => {
         const { data: rows, error } = await sb.rpc('season_results', { p_season: season, p_limit: 10 });
         return error || !rows ? [] : (rows as SeasonResult[]);
+      },
+      sendFeedback: async (row) => {
+        const { error } = await sb.from(FEEDBACK_TABLE).insert({ ...row, contact: row.contact || null, user_id: currentId });
+        return !error;
       },
       rankSite: async (userId) => {
         const { data: row, error } = await sb.from(RANK_TABLE).select('site').eq('user_id', userId).maybeSingle();

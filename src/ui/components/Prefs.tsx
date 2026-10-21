@@ -28,6 +28,13 @@ export function PrefsList() {
       {row('🎵', t('prefs.music'), t('prefs.music.desc'), musicOn, setMusicOn)}
       {row('✨', t('prefs.fx'), t('prefs.fx.desc'), fxOn, setFxOn)}
       {row('📊', t('prefs.stats'), t('prefs.stats.desc'), statsOn, setStatsOn)}
+      <div className="grid grid-cols-3 gap-2">
+        {(['support', 'feedback', 'legal'] as const).map((id) => (
+          <button key={id} type="button" onClick={() => useGame.getState().setCommunityOpen(id)} className="rounded-xl bg-white border border-line px-2 py-2.5 text-xs font-semibold">
+            {t(`comm.tab.${id}`)}
+          </button>
+        ))}
+      </div>
     </>
   );
 }

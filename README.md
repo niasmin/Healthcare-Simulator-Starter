@@ -235,6 +235,17 @@ All of this is in the renderer only (`src/render/Ambience.ts` and `IsoRenderer`)
   - a strolling grandfather.
   - Wheelchair: until generated art arrives (the ElevenLabs free plan's daily image limit kept refusing), the renderer draws the wheelchair itself. It has wheels, a seat, a backrest and a blanket, and the grandfather sits in it, his sprite cropped at the waist. Strollers with mobility under 65 use it. A `ch_wheelchair` sprite replaces it automatically once added.
 
+### Launch kit: support, feedback, privacy, itch.io
+
+- **Community window (☕):** opens from the title screen (side menu on desktop and phone), the Settings and phone menu (three buttons) and the desktop top bar. It has three tabs.
+  - **Support:** links to Ko-fi, Buy Me a Coffee and Patreon, and a PromptPay QR code. The QR follows the Thai QR standard (EMVCo) with its CRC-16, and any Thai banking app can scan it.
+    - Each link shows only when it is set in `.env.production`, through `VITE_SUPPORT_KOFI`, `VITE_SUPPORT_BMC`, `VITE_SUPPORT_PATREON`, `VITE_SUPPORT_PROMPTPAY` (a phone number or national/tax ID) and `VITE_SUPPORT_PROMPTPAY_NAME`.
+    - The tab also has free ways to help: a Share button (the system share sheet, or the link copied) and an optional `VITE_COMMUNITY_URL` (a LINE OpenChat or Discord link).
+    - Support never changes anything in the game.
+  - **Feedback:** bug, idea or other, with an optional contact. It goes to Supabase `public.feedback`, which takes inserts only: guests can send too, nobody can read it through the API, and the owner reads it in the dashboard. A server throttle allows at most 30 messages a minute. A little context is attached: language, chapter, game day, mode and screen width.
+  - **Privacy & terms:** a plain-language privacy policy written with Thailand's PDPA in mind, and terms of use, in Thai and English. Set `VITE_CONTACT_EMAIL` to give players a contact for privacy requests; without it they are sent to the Feedback tab. This is a starting template and should be reviewed before a wide launch.
+- **itch.io:** run `npm run build`, zip the *contents* of `dist/` (`index.html` at the zip root), and upload it as an HTML game with "This file will be played in the browser". Everything plays from the zip. Guests' saves stay in the browser. Email sign-in links point back to the main site unless the itch.io address is added to Supabase's redirect URLs.
+
 ### Specialist care, the star shop and seasons
 
 - **Specialist care levels (from chapter 3, any time in the sandbox):** two new care groups, still abstract qualification and scheduling checks only. Hospitals refer them every 3 days, but only to a home with a free bed in a ward fitted for them; an unfitted home draws nothing, so its random sequence and the campaign balance are unchanged.
@@ -710,7 +721,7 @@ src/
   - Food, supplies, upkeep and payroll are each charged once per day.
   - An event's cost is charged once, and a resolved event can't be resolved again.
 
-## Tests (276 passing)
+## Tests (279 passing)
 
 | File | Covers |
 |---|---|
@@ -741,6 +752,7 @@ src/
 | `specialist.test.ts` | Specialist levels need their ward kit; their care plans; referrals every few days from chapter 3, only to a fitted home, never touching an unfitted one; post-surgery residents go home recovered after their stay; labels in both languages |
 | `starshop.test.ts` | Star pieces cost stars not cash; refused without enough stars; spending never lowers the ranking score and bulldozing refunds nothing; every piece is priced and named |
 | `seasons.test.ts` | A podium finish at month end wins a trophy and its stars; none mid-month or for an empty home; online seasons are UTC months and step back across years |
+| `promptpay.test.ts` | CRC-16/CCITT-FALSE; mobile, national-ID and e-wallet targets (others refused); the standard static payload ends in its own checksum; a fixed amount makes a dynamic code |
 | `shop.test.ts` | Upgrades are bought once, for their price, from their chapter (all at once in the sandbox); the central kitchen and laundry cut food and supplies by their percentages; staff welfare adds morale; online marketing adds an enquiry; the family app lifts reputation while residents are content; the smart call system keeps late routine care pending 30 minutes longer |
 | `modes.test.ts` | Campaign games are unchanged; sandbox books ฿50M as capital, unlocks every room, has no tutorial steps and is never judged after 70 days; each challenge opens with its own cash, reputation or chapter; each challenge is won by the scripted player and ends without a next chapter |
 | `chapter7.test.ts` | **Full 390-day campaign:** all 7 chapters won on schedule and solvent, ledger reconciles; one branch of each kind, each manager of the right role and off the roster; branch invoices exact; network occupancy ≥ 70%. **Opening:** locked before chapter 7; manager role checked; full opening cost charged; managers can’t take shifts or a second branch; cap of 5. **Running:** good branches fill and bill daily, poor ones empty, a poor name at headquarters stops growth; certificates raise the quality target; a lost manager leaves the branch leaderless until one is appointed; support visits lift quality, cost money and have a cooldown; closing refunds 30% and frees the manager; busy clinic branches refer to the stroke unit. Guide order; v9→v10 migration |
