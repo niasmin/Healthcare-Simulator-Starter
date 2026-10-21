@@ -246,6 +246,10 @@ All of this is in the renderer only (`src/render/Ambience.ts` and `IsoRenderer`)
 - A month-end count (opening, received, used, expired, closing, value) is kept for six months. A five-step guide shows on the first visit.
 - New games open the supply room with about ten days of free starter stock; older saves keep the flat daily charge until the room is opened.
 
+### Bank loans
+
+Chapter 2 losses in the play statistics were all "cash went below zero" during the expansion. The Finance page now offers a bank loan (฿300,000 / ฿600,000 / ฿1,000,000, one at a time, fictional): the cash comes in at once and is paid back at midnight in equal daily instalments over 60 days with 6% interest in total. Paying off early settles the principal still owed and waives the interest not yet due. Principal is booked as `loan` (neither income nor a cost); interest is a running cost (`interest`), so it counts against the chapter's cashflow target. The next instalment is part of the cash runway. The autopilot borrows the smallest amount that covers a month when cash falls under a week of running costs. No loans in challenge mode.
+
 ### Owner statistics
 
 Signed in with the owner's account, the account window shows **Owner statistics**: players per day, sessions, hours played, accounts and guests, cloud savers, how far players get, chapter wins and losses with the targets missed, chapter 1 guide steps, and the latest feedback. The numbers come from `public.owner_stats()`, a security-definer function that answers only accounts listed in `public.app_owners` (no client access to that table), built from the anonymous `game_events` statistics.

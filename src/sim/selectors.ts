@@ -1,3 +1,4 @@
+import { nextInstalment } from './systems/loans';
 import { chapterDef, EXPANDED_WIDTH, type ChapterDef } from '../data/chapters';
 import { allRoomStatuses, type RoomStatus } from '../domain/rules/rooms';
 import type { GameState, LedgerCategory, Room, RoomType, Satang } from '../domain/types';
@@ -47,7 +48,7 @@ export function summarize(state: GameState): SiteSummary {
       operationalByType[room.type]++;
     }
   }
-  const spentByCategory: Record<LedgerCategory, Satang> = { capital: 0, construction: 0, equipment: 0, refund: 0, upkeep: 0, payroll: 0, revenue: 0, fee_refund: 0, food: 0, supplies: 0, event: 0, training: 0, branch: 0, outing: 0 };
+  const spentByCategory: Record<LedgerCategory, Satang> = { capital: 0, construction: 0, equipment: 0, refund: 0, upkeep: 0, payroll: 0, revenue: 0, fee_refund: 0, food: 0, supplies: 0, event: 0, training: 0, branch: 0, outing: 0, loan: 0, interest: 0 };
   for (const e of state.ledger) spentByCategory[e.category] += e.amountSatang;
   return {
     statuses,
@@ -563,7 +564,7 @@ export function peopleMarkers(state: GameState): PeopleMarker[] {
 // Phase 3: finance view (pure)
 // ---------------------------------------------------------------------------
 
-export const OPEX_CATEGORIES: LedgerCategory[] = ['payroll', 'upkeep', 'food', 'supplies', 'event', 'training', 'branch', 'outing'];
+export const OPEX_CATEGORIES: LedgerCategory[] = ['payroll', 'upkeep', 'food', 'supplies', 'event', 'training', 'branch', 'outing', 'interest'];
 export const CAPEX_CATEGORIES: LedgerCategory[] = ['construction', 'equipment', 'refund'];
 
 /** Entries posted exactly at midnight belong to the day that just closed. */
@@ -655,7 +656,7 @@ export function financeView(state: GameState, period: 'month' | 'all'): FinanceV
 /** Running costs charged every midnight at today's size: payroll, upkeep, food and supplies. */
 export function dailyRunningCost(state: GameState): Satang {
   const { food, supplies } = dailyResidentCosts(state);
-  return dailyPayroll(state) + dailyUpkeep(state) + food + supplies;
+  return dailyPayroll(state) + dailyUpkeep(state) + food + supplies + nextInstalment(state);
 }
 
 /** Day number of the next start-of-month billing run. */
