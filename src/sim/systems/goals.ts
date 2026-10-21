@@ -1,5 +1,6 @@
 import { CITY_ORDER } from '../../data/city';
-import { ACHIEVEMENTS, ALL_MISSIONS_BONUS, MISSIONS, MISSION_ORDER, MISSIONS_PER_DAY } from '../../data/goals';
+import { ACHIEVEMENTS, ALL_MISSIONS_BONUS, MISSIONS, MISSION_ORDER, MISSIONS_PER_DAY, TROPHY_STARS } from '../../data/goals';
+import { DAYS_PER_MONTH, dayInMonth, monthOfDay } from '../../data/finance';
 import { ROLE_ORDER } from '../../data/staff';
 import { allRoomStatuses } from '../../domain/rules/rooms';
 import type { AchievementId, GameState, GoalsState, MissionId } from '../../domain/types';
@@ -137,6 +138,11 @@ export function goalsDayEnd(state: GameState, closingDay: number): GameState {
   for (const id of ids) if (!g.done.includes(id) && missionMet(state, id, closingDay)) g = complete(g, id);
   const all = ids.every((id) => g.done.includes(id));
   g = { ...g, stars: g.stars + (all ? ALL_MISSIONS_BONUS : 0), streak: all ? g.streak + 1 : 0, day: closingDay + 1, done: [] };
+  // The last day of a game month closes the town season: a podium finish earns a trophy.
+  if (dayInMonth(closingDay) === DAYS_PER_MONTH && state.residents.length) {
+    const rank = townRanking({ ...state, goals: g }, { th: '', en: '' }).findIndex((r) => r.you) + 1;
+    if (rank >= 1 && rank <= TROPHY_STARS.length) g = { ...g, trophies: [...(g.trophies ?? []), { month: monthOfDay(closingDay), rank }], stars: g.stars + TROPHY_STARS[rank - 1] };
+  }
   return { ...state, goals: g };
 }
 

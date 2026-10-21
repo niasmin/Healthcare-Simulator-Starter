@@ -64,7 +64,8 @@ export const RESIDENT_SPRITE = { f: 'ch_elder_f', m: 'ch_elder_m', chair: 'ch_wh
 /** Map width of a standing character, in world px. */
 export const PERSON_SPRITE_WIDTH = 24;
 
-export const DECOR_SPRITE: Record<DecorType, { name: string; width: number }> = {
+/** Garden sprites; star-shop pieces reuse the pack's art with a tint (the statue is drawn). */
+export const DECOR_SPRITE: Record<DecorType, { name: string; width: number; tint?: number }> = {
   tree: { name: 'dc_tree', width: 70 },
   tree2: { name: 'dc_tree2', width: 64 },
   sakura: { name: 'dc_sakura', width: 72 },
@@ -75,6 +76,10 @@ export const DECOR_SPRITE: Record<DecorType, { name: string; width: number }> = 
   umbrella: { name: 'dc_umbrella', width: 62 },
   fountain: { name: 'dc_fountain', width: 86 },
   gazebo: { name: 'dc_gazebo', width: 84 },
+  gold_fountain: { name: 'dc_fountain', width: 96, tint: 0xffd46a },
+  sakura_arch: { name: 'dc_gazebo', width: 88, tint: 0xffb8d2 },
+  statue: { name: 'statue', width: 40 },
+  gold_lantern: { name: 'dc_lamp', width: 22, tint: 0xffcf4d },
 };
 
 /** Decode every sprite once and turn it into a Pixi texture. Missing or failed images are skipped. */

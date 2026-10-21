@@ -16,10 +16,10 @@ import { isMobileNow, useMoney, useSummary, useT, useRoomLabel } from '../hooks'
 import { useGame } from '../store';
 import { useTourPointer } from './Tutorial';
 
-export const GROUP_HEX: Record<CareGroup, number> = { active_aging: 0xc9822b, stroke_rehab: 0x4a6aa5, bedridden: 0x8a5a9e, dementia: 0xb5537a, tube_feeding: 0x3f8f86, airway: 0x2f6aa5 };
+export const GROUP_HEX: Record<CareGroup, number> = { active_aging: 0xc9822b, stroke_rehab: 0x4a6aa5, bedridden: 0x8a5a9e, dementia: 0xb5537a, tube_feeding: 0x3f8f86, airway: 0x2f6aa5, advanced_dementia: 0x9c3f6a, post_surgery: 0x3a8fb7 };
 
 /** Groups who can get up and about; the rest stay in bed. */
-const STROLLERS = new Set<CareGroup>(['active_aging', 'stroke_rehab', 'dementia']);
+const STROLLERS = new Set<CareGroup>(['active_aging', 'stroke_rehab', 'dementia', 'post_surgery']);
 /** Strolling hours: mid-morning and the afternoon. */
 const strollHour = (minute: number) => {
   const h = (minute % 1440) / 60;

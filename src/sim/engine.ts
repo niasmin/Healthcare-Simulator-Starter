@@ -18,7 +18,7 @@ import { allocId, log, post, randInt } from './helpers';
 import { careTick, generateAllTasksForDay, generateTasksForDay, pruneTasks } from './systems/care';
 import { chargeDailyPayroll, chargeDailyUpkeep } from './systems/finance';
 import { needsTick, wellbeing } from './systems/needs';
-import { hireFromCandidate, refreshCandidates, removeEmployee, staffEnergyTick, staffMoraleDaily } from './systems/staffing';
+import { hireFromCandidate, refreshCandidates, specialistReferrals, removeEmployee, staffEnergyTick, staffMoraleDaily } from './systems/staffing';
 import { advanceClock, dayOf, schedule } from './systems/time';
 import { summarizeBeds } from './bedsSummary';
 import { judgeChapter, startNextChapter } from './systems/chapter';
@@ -160,7 +160,7 @@ export function applyCommand(state: GameState, cmd: Command): CommandOutcome {
       if (decor) {
         const refund = pctOf(DECOR[decor.type].costSatang, REFUND_PERCENT);
         let s: GameState = { ...state, site: { ...site, decor: site.decor.filter((d) => d.id !== decor.id) } };
-        s = post(s, refund, 'refund', 'ledger.refund_decor', { ref: decor.id, memoParams: { decor: decor.type } });
+        if (refund) s = post(s, refund, 'refund', 'ledger.refund_decor', { ref: decor.id, memoParams: { decor: decor.type } });
         return { state: s, result: { ok: true, costSatang: -refund } };
       }
       if (cell.x === site.entrance.x && cell.y === site.entrance.y) return fail(state, 'cannot_remove_entrance');
@@ -424,7 +424,10 @@ export function applyCommand(state: GameState, cmd: Command): CommandOutcome {
       if (!check.ok) return fail(state, check.reason, check.params);
       let [s, id] = allocId(state, 'decor');
       s = { ...s, site: { ...s.site, decor: [...s.site.decor, { id, type: cmd.decor, cell: { ...cmd.cell } }] } };
-      s = post(s, -check.costSatang, 'construction', 'ledger.decor', { ref: id, memoParams: { decor: cmd.decor } });
+      if (check.costSatang) s = post(s, -check.costSatang, 'construction', 'ledger.decor', { ref: id, memoParams: { decor: cmd.decor } });
+      // Star-shop pieces are paid in stars.
+      const stars = DECOR[cmd.decor].stars ?? 0;
+      if (stars && s.goals) s = { ...s, goals: { ...s.goals, spent: (s.goals.spent ?? 0) + stars } };
       return { state: s, result: { ok: true, id, costSatang: check.costSatang } };
     }
   }
@@ -461,9 +464,21 @@ export const NATURAL_LEAVE_PER_MILLE = 4;
  * - otherwise, after a settling-in week, a family occasionally takes their relative home.
  * Turnover means beds must be refilled, which is where reputation (enquiries) matters.
  */
+/** Post-surgery residents go home recovered after this stay, once they walk well; the home's name gains. */
+export const POST_SURGERY_STAY_DAYS = 21;
+export const RECOVERED_MOBILITY = 55;
+export const RECOVERY_REPUTATION = 1;
+
 function residentDepartures(state: GameState): GameState {
   let s = state;
   for (const r of state.residents) {
+    // After an operation: home again once recovered (no RNG drawn, so other departures are unchanged).
+    if (r.group === 'post_surgery' && state.minute - r.admittedAt >= POST_SURGERY_STAY_DAYS * MINUTES_PER_DAY && r.needs.mobility >= RECOVERED_MOBILITY) {
+      s = removeResident(s, r);
+      s = { ...s, organization: { ...s.organization, reputation: Math.min(100, Math.round((s.organization.reputation + RECOVERY_REPUTATION) * 10) / 10) } };
+      s = log(s, 'good', 'log.recovered', { name: r.name.th, nameEn: r.name.en });
+      continue;
+    }
     const unhappy = r.needs.satisfaction < WITHDRAW_SATISFACTION;
     const settled = state.minute - r.admittedAt >= NATURAL_LEAVE_AFTER_DAYS * MINUTES_PER_DAY;
     if (!unhappy && !settled) continue;
@@ -541,6 +556,7 @@ export function step(state: GameState): GameState {
         s = pruneTasks(s);
         s = generateAllTasksForDay(s, ev.at);
         s = refreshCandidates(s);
+        s = specialistReferrals(s, closingDay);
         s = schedule(s, ev.at + MINUTES_PER_DAY, 'day_end');
         break;
       }

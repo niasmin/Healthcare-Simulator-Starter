@@ -5,7 +5,8 @@ import { RIVALS, rivalSite, townRanking, type CenterStats } from '../../sim/riva
 import { cityBlocker, cityCost, mallDeal } from '../../sim/systems/city';
 import { createInitialState } from '../../sim/state';
 import { dayOf } from '../../sim/systems/time';
-import type { RankRecord } from '../../storage/supabaseStore';
+import { currentSeason, previousSeason, type RankRecord, type SeasonResult } from '../../storage/supabaseStore';
+import { DAYS_PER_MONTH, dayInMonth, monthOfDay } from '../../data/finance';
 import { useMoney, useT } from '../hooks';
 import { displayName, rankEntry, rankOptedIn, setRankOptIn } from '../ranking';
 import { supabase, useSaveStatus } from '../saveService';
@@ -219,6 +220,9 @@ function Ranking({ onVisit }: { onVisit: (v: Visit) => void }) {
       <section className="flex flex-col gap-1.5">
         <h3 className="font-bold text-sm">{t('rank.town')}</h3>
         <p className="text-[11px] text-ink-soft">{t('rank.town_hint')}</p>
+        <p className="text-[11px] font-semibold text-teal">
+          🏆 {t('rank.town_season', { m: monthOfDay(dayOf(game.minute)), left: DAYS_PER_MONTH - dayInMonth(dayOf(game.minute)) + 1 })}
+        </p>
         <ol className="flex flex-col gap-1" data-testid="town-ranking">
           {rows.map((r, i) => (
             <RankLine key={r.id} n={i + 1} name={name(r.name)} you={r.you} score={r.stats.score} detail={t('rank.detail', { res: r.stats.residents, beds: r.stats.beds, rep: r.stats.reputation })} onVisit={r.you ? undefined : () => visitRival(r.id)} />
@@ -262,10 +266,23 @@ function OnlineRanking({ onVisit }: { onVisit: (v: Visit) => void }) {
   const [busy, setBusy] = useState(false);
   const me = supabase?.userId() ?? null;
 
+  const [podium, setPodium] = useState<SeasonResult[]>([]);
+  const [myTrophies, setMyTrophies] = useState<Array<{ season: string; rank: number }>>([]);
+  const season = currentSeason();
   const load = async () => setRows((await supabase?.leaderboard()) ?? []);
   useEffect(() => {
-    if (provider === 'supabase') void load();
-  }, [provider]);
+    if (provider !== 'supabase' || !supabase) return;
+    void load();
+    // Last season's podium, and this player's podiums over the last six seasons.
+    const conn = supabase;
+    void (async () => {
+      const seasons = [1, 2, 3, 4, 5, 6].map((k) => previousSeason(season, k));
+      const results = await Promise.all(seasons.map((x) => conn.seasonResults(x)));
+      setPodium(results[0].slice(0, 3));
+      const id = conn.userId();
+      setMyTrophies(results.flatMap((rs, i) => rs.filter((r) => r.user_id === id && r.rank <= 3).map((r) => ({ season: seasons[i], rank: r.rank }))));
+    })();
+  }, [provider, season]);
 
   const toggle = async () => {
     if (!supabase || !account) return;
@@ -290,6 +307,17 @@ function OnlineRanking({ onVisit }: { onVisit: (v: Visit) => void }) {
   return (
     <section className="flex flex-col gap-1.5">
       <h3 className="font-bold text-sm">{t('rank.online')}</h3>
+      {provider === 'supabase' && (
+        <div className="rounded-xl bg-sand/70 px-2.5 py-1.5 text-[11px] flex flex-col gap-0.5" data-testid="online-season">
+          <span className="font-semibold">🏆 {t('rank.season', { s: seasonLabel(season), left: daysLeftInMonth() })}</span>
+          {podium.length > 0 && (
+            <span className="text-ink-soft">
+              {t('rank.last_podium', { s: seasonLabel(previousSeason(season)) })} {podium.map((p) => `${MEDAL[p.rank - 1] ?? ''} ${p.home_name || p.display_name}`).join(' · ')}
+            </span>
+          )}
+          {myTrophies.length > 0 && <span className="font-semibold text-ok">{t('rank.my_trophies')} {myTrophies.map((x) => `${MEDAL[x.rank - 1]} ${seasonLabel(x.season)}`).join(' · ')}</span>}
+        </div>
+      )}
       {provider !== 'supabase' ? (
         <p className="text-[11px] text-ink-soft">{t('rank.online_site_only')}</p>
       ) : !account ? (
@@ -352,3 +380,15 @@ function VisitOverlay({ visit, onClose }: { visit: Visit; onClose: () => void })
   );
 }
 
+
+const MEDAL = ['🥇', '🥈', '🥉'];
+/** "2026-10" → a month name in the page's language. */
+function seasonLabel(season: string): string {
+  const [y, m] = season.split('-').map(Number);
+  const lang = document.documentElement.lang === 'en' ? 'en-US' : 'th-TH';
+  return new Date(Date.UTC(y, m - 1, 1)).toLocaleDateString(lang, { month: 'long', year: 'numeric', timeZone: 'UTC' });
+}
+function daysLeftInMonth(now = new Date()): number {
+  const end = Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1);
+  return Math.max(1, Math.ceil((end - now.getTime()) / 86_400_000));
+}

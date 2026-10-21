@@ -25,6 +25,8 @@ export const PROGRAMME_FEE: Partial<Record<CareGroup, number>> = {
   dementia: thb(4_000),
   tube_feeding: thb(6_000),
   airway: thb(12_000),
+  advanced_dementia: thb(10_000),
+  post_surgery: thb(8_000),
 };
 
 export const PRICE_LEVELS: PriceLevel[] = ['value', 'standard', 'premium'];
@@ -69,4 +71,4 @@ export function monthlyFee(level: number, price: PriceLevel, group?: CareGroup, 
 }
 
 /** Extra daily supplies for programmes (feeding sets, airway consumables). */
-export const PROGRAMME_SUPPLIES_PER_DAY: Partial<Record<CareGroup, number>> = { tube_feeding: thb(40), airway: thb(90) };
+export const PROGRAMME_SUPPLIES_PER_DAY: Partial<Record<CareGroup, number>> = { tube_feeding: thb(40), airway: thb(90), advanced_dementia: thb(30), post_surgery: thb(60) };

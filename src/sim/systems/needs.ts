@@ -10,7 +10,7 @@ import { clamp, r2 } from '../helpers';
 export const PREMIUM_EXPECTATION = 0.03;
 
 /** Per-tick decay rates (fictional balancing). */
-const MOBILITY_DECAY: Record<CareGroup, number> = { active_aging: 0.01, stroke_rehab: 0.04, bedridden: 0.03, dementia: 0.015, tube_feeding: 0.03, airway: 0.03 };
+const MOBILITY_DECAY: Record<CareGroup, number> = { active_aging: 0.01, stroke_rehab: 0.04, bedridden: 0.03, dementia: 0.015, tube_feeding: 0.03, airway: 0.03, advanced_dementia: 0.03, post_surgery: 0.05 };
 
 export function applyNeedDelta(needs: Needs, delta: Partial<Record<NeedKey, number>>, scale = 1): Needs {
   const out = { ...needs };

@@ -1,6 +1,7 @@
 import { RECEPTION_EXTRA_ENQUIRIES, supportActive, supportApplicants } from './support';
 import { hasUpgrade, MARKETING_EXTRA_ENQUIRIES, WELFARE_MORALE_PER_DAY } from '../../data/shop';
-import { GROUP_LEVELS, RESIDENT_NAMES } from '../../data/patients';
+import { GROUP_LEVELS, RESIDENT_NAMES, SPECIALIST_GROUPS } from '../../data/patients';
+import { freeBeds } from '../../domain/rules/beds';
 import { chapterDef, PREMIUM_SHARE } from '../../data/chapters';
 import { ROLES, STAFF_NAMES, wageFor } from '../../data/staff';
 import { WAITLIST_ARRIVALS } from '../../data/finance';
@@ -66,7 +67,7 @@ export function makeResidentCandidate(state: GameState, forced?: { group: CareGr
   [s, level] = randInt(s, GROUP_LEVELS[group][0], GROUP_LEVELS[group][1]);
   const ranges: Record<keyof Needs, [number, number]> = {
     physical: [55, 80],
-    mobility: group === 'active_aging' ? [60, 85] : group === 'stroke_rehab' ? [25, 45] : group === 'dementia' ? [45, 75] : [5, 20],
+    mobility: group === 'active_aging' ? [60, 85] : group === 'stroke_rehab' ? [25, 45] : group === 'dementia' ? [45, 75] : group === 'post_surgery' ? [30, 50] : group === 'advanced_dementia' ? [10, 30] : [5, 20],
     mental: [50, 85],
     happiness: [45, 75],
     satisfaction: [60, 75],
@@ -209,4 +210,25 @@ export function removeEmployee(state: GameState, employeeId: string): GameState 
     shifts: state.shifts.filter((x) => x.employeeId !== employeeId),
     workforce: { ...state.workforce, training: state.workforce.training.filter((t) => t.employeeId !== employeeId) },
   };
+}
+
+/** Specialist referrals arrive every few days to a home with a ward fitted for them. */
+export const SPECIALIST_REFERRAL_DAYS = 3;
+export const SPECIALIST_MAX_WAITING = 2;
+
+/**
+ * Specialist care levels (advanced dementia, post-surgery rehab) aren't in the everyday waiting
+ * list: hospitals refer them, from chapter 3 (any time in the sandbox), only to a home with a free
+ * bed in a ward fitted for them. A home without such a ward draws nothing (so its RNG is untouched).
+ */
+export function specialistReferrals(state: GameState, closingDay: number): GameState {
+  if (state.mode !== 'sandbox' && state.chapter.id < 3) return state;
+  if (closingDay % SPECIALIST_REFERRAL_DAYS) return state;
+  let s = state;
+  for (const group of SPECIALIST_GROUPS) {
+    if (!freeBeds(s, group).length) continue;
+    if (s.waitlist.filter((c) => c.group === group).length >= SPECIALIST_MAX_WAITING) continue;
+    s = makeResidentCandidate(s, { group });
+  }
+  return s;
 }

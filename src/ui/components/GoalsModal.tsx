@@ -1,5 +1,7 @@
 import { useEffect, useMemo } from 'react';
-import { ACHIEVEMENTS, ALL_MISSIONS_BONUS, MISSIONS } from '../../data/goals';
+import { ACHIEVEMENTS, ALL_MISSIONS_BONUS, MISSIONS, TROPHY_STARS } from '../../data/goals';
+import { DECOR, STAR_DECOR, starsLeft } from '../../data/decor';
+import type { DecorType } from '../../domain/types';
 import { goalsOf, missionsToday } from '../../sim/systems/goals';
 import { useT } from '../hooks';
 import { playSfx } from '../sound';
@@ -49,6 +51,24 @@ export function GoalsModal({ onClose }: { onClose: () => void }) {
             </div>
           ))}
           <p className="text-[11px] text-ink-soft">{t('goals.bonus', { n: ALL_MISSIONS_BONUS })}</p>
+        </section>
+
+        <StarShop onPick={onClose} />
+
+        <section className="flex flex-col gap-1" data-testid="trophies">
+          <h3 className="font-bold text-sm">🏆 {t('goals.trophies')}</h3>
+          <p className="text-[11px] text-ink-soft">{t('goals.trophies_hint', { a: TROPHY_STARS[0], b: TROPHY_STARS[1], c: TROPHY_STARS[2] })}</p>
+          {goals.trophies?.length ? (
+            <div className="flex flex-wrap gap-1.5">
+              {goals.trophies.map((tr) => (
+                <span key={tr.month} className="rounded-full bg-[#fff6dd] border border-[#f2b631] px-2.5 py-0.5 text-xs font-semibold">
+                  {['🥇', '🥈', '🥉'][tr.rank - 1]} {t('goals.trophy_month', { m: tr.month })}
+                </span>
+              ))}
+            </div>
+          ) : (
+            <p className="text-[11px] text-ink-soft">{t('goals.no_trophies')}</p>
+          )}
         </section>
 
         <section className="flex flex-col gap-1.5">
@@ -107,4 +127,46 @@ export function useGoalToasts() {
 export function useOpenMissions(): number {
   const game = useGame((s) => s.game);
   return useMemo(() => missionsToday(game).filter((m) => !m.done).length, [game]);
+}
+
+const STAR_ICON: Record<string, string> = { gold_lantern: '🏮', statue: '🗿', sakura_arch: '🌸', gold_fountain: '⛲' };
+
+/** Exclusive garden pieces paid with stars; picking one starts placing it on the map. */
+function StarShop({ onPick }: { onPick: () => void }) {
+  const t = useT();
+  const goals = useGame((s) => s.game.goals);
+  const setTool = useGame((s) => s.setTool);
+  const left = starsLeft(goals);
+  const pick = (decor: DecorType) => {
+    setTool({ kind: 'decor', decor });
+    onPick();
+  };
+  return (
+    <section className="flex flex-col gap-1.5" data-testid="star-shop">
+      <div className="flex items-baseline gap-2">
+        <h3 className="font-bold text-sm flex-1">⭐ {t('goals.shop')}</h3>
+        <span className="text-[11px] text-ink-soft tabular">{t('goals.shop_left', { n: left })}</span>
+      </div>
+      <p className="text-[11px] text-ink-soft">{t('goals.shop_hint')}</p>
+      <ul className="grid grid-cols-2 gap-1.5">
+        {STAR_DECOR.map((d) => {
+          const cost = DECOR[d].stars ?? 0;
+          return (
+            <li key={d} className="rounded-xl border border-line bg-white p-2 flex items-center gap-2">
+              <span className="text-2xl leading-none" aria-hidden>
+                {STAR_ICON[d]}
+              </span>
+              <div className="min-w-0 flex-1">
+                <div className="text-xs font-bold leading-tight">{t(`decor.${d}`)}</div>
+                <div className="text-[10px] text-ink-soft">{t('goals.shop_appeal', { n: DECOR[d].appeal })}</div>
+              </div>
+              <button type="button" disabled={left < cost} onClick={() => pick(d)} className="shrink-0 px-2 py-1 rounded-lg bg-[#f2b631] text-ink text-xs font-bold disabled:opacity-35">
+                ⭐{cost}
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
 }

@@ -156,7 +156,7 @@ export class Ambience {
       glow(c.x, c.y - 14, 14 + (w + h) * 8, 8 + (w + h) * 4, 0xffa83a, 0.5);
     }
     for (const d of site.decor ?? []) {
-      if (d.type !== 'lamp') continue;
+      if (d.type !== 'lamp' && d.type !== 'gold_lantern') continue;
       const c = cellCenter(d.cell.x, d.cell.y);
       glow(c.x, c.y - 22, 26, 16, 0xffd27a, 0.7);
       glow(c.x, c.y + 4, 34, 14, 0xffc060, 0.3);

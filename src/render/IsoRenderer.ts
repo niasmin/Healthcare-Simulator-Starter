@@ -101,6 +101,8 @@ const PROP: Record<EquipmentId, PropStyle> = {
   lockers: { s: 0.4, h: 28 },
   rest_sofa: { s: 0.6, h: 10 },
   door_sensor: { s: 0.2, h: 20 },
+  sensory_kit: { s: 0.3, h: 10 },
+  rehab_frame: { s: 0.5, h: 16 },
   feeding_pump: { s: 0.25, h: 18 },
   suction_unit: { s: 0.3, h: 18 },
   care_van: { s: 0.85, h: 22 },
@@ -582,7 +584,16 @@ export class IsoRenderer {
           const spec = DECOR_SPRITE[d.type];
           const g2 = new Graphics().ellipse(c.x, c.y + 4, spec.width * 0.32, spec.width * 0.12).fill({ color: 0x000000, alpha: 0.12 });
           this.staticLayer.addChild(g2);
-          if (!this.placeSprite(spec.name, c.x, c.y + 8, spec.width, 0.92)) g2.circle(c.x, c.y - 10, 10).fill(0x6c9f4e);
+          if (d.type === 'statue') {
+            // A stone plinth with a gilded figure (drawn; there is no statue in the art pack).
+            g2.poly([c.x - 12, c.y, c.x, c.y + 6, c.x + 12, c.y, c.x, c.y - 6]).fill(0xe6e1d6);
+            g2.poly([c.x - 12, c.y, c.x, c.y + 6, c.x, c.y - 8, c.x - 12, c.y - 14]).fill(0xcfc8b8);
+            g2.poly([c.x, c.y + 6, c.x + 12, c.y, c.x + 12, c.y - 14, c.x, c.y - 8]).fill(0xb8b0a0);
+            g2.poly([c.x - 12, c.y - 14, c.x, c.y - 20, c.x + 12, c.y - 14, c.x, c.y - 8]).fill(0xf1ede4);
+            g2.roundRect(c.x - 5, c.y - 38, 10, 22, 4).fill(0xe0b23c).stroke({ width: 1, color: 0xa67c1e });
+            g2.circle(c.x, c.y - 43, 6).fill(0xe8bf4f).stroke({ width: 1, color: 0xa67c1e });
+            g2.circle(c.x - 2, c.y - 45, 2).fill({ color: 0xffffff, alpha: 0.6 });
+          } else if (!this.placeSprite(spec.name, c.x, c.y + 8, spec.width, 0.92, spec.tint)) g2.circle(c.x, c.y - 10, 10).fill(0x6c9f4e);
         },
       });
     items.sort((a, b) => a.key - b.key);
@@ -842,13 +853,14 @@ export class IsoRenderer {
   }
 
   /** Place a sprite with its base at a world point; width in world px. */
-  private placeSprite(name: string, x: number, y: number, width: number, anchorY = 0.85): boolean {
+  private placeSprite(name: string, x: number, y: number, width: number, anchorY = 0.85, tint?: number): boolean {
     const t = this.tex.get(name);
     if (!t) return false;
     const sp = new Sprite(t);
     sp.anchor.set(0.5, anchorY);
     sp.scale.set(width / t.width);
     sp.position.set(x, y);
+    if (tint !== undefined) sp.tint = tint;
     this.staticLayer.addChild(sp);
     return true;
   }

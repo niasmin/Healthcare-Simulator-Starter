@@ -1,7 +1,7 @@
 import { CORRIDOR_COST_PER_TILE, ROOMS, roomConstructionCost } from '../../data/rooms';
 import { cellIndex, rectArea, rectCells, rectInBounds, rectsOverlap } from '../grid';
 import type { Cell, DecorType, GameState, Rect, ReasonCode, RoomType, Satang } from '../types';
-import { DECOR } from '../../data/decor';
+import { DECOR, starsLeft } from '../../data/decor';
 import { rectContains, inBounds } from '../grid';
 
 export type PlacementCheck =
@@ -25,6 +25,8 @@ export function validateDecor(state: GameState, type: DecorType, cell: Cell): Pl
   if (occupiedByRoom(state, one) || occupiedByDecor(state, one) || site.corridor[cellIndex(cell.x, cell.y, site.width)])
     return { ok: false, reason: 'overlap', costSatang: cost };
   if (organization.cashSatang < cost) return { ok: false, reason: 'insufficient_funds', costSatang: cost };
+  const stars = DECOR[type].stars ?? 0;
+  if (stars > starsLeft(state.goals)) return { ok: false, reason: 'not_enough_stars', costSatang: cost, params: { n: stars } };
   return { ok: true, costSatang: cost, cells: [cell] };
 }
 

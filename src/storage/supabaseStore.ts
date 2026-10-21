@@ -95,8 +95,10 @@ export interface SupabaseConnection {
   publishRank(entry: RankEntry): Promise<boolean>;
   /** Take the player's home off the ranking. */
   withdrawRank(): Promise<boolean>;
-  /** The public ranking, best first (without the site layouts). */
+  /** This season's public ranking, best first (without the site layouts). */
   leaderboard(limit?: number): Promise<RankRecord[]>;
+  /** A past (or the current) season's podium and top ten. */
+  seasonResults(season: string): Promise<SeasonResult[]>;
   /** One player's published layout, for a visit. */
   rankSite(userId: string): Promise<Site | null>;
 }
@@ -116,7 +118,24 @@ export interface RankEntry {
   chapter: number;
   site: Site;
 }
-export type RankRecord = Omit<RankEntry, 'site'> & { user_id: string; updated_at: string };
+export type RankRecord = Omit<RankEntry, 'site'> & { user_id: string; updated_at: string; season?: string };
+export interface SeasonResult {
+  user_id: string;
+  display_name: string;
+  home_name: string | null;
+  score: number;
+  rank: number;
+}
+
+/** Online seasons are UTC calendar months, e.g. "2026-10". */
+export function currentSeason(now = new Date()): string {
+  return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
+}
+export function previousSeason(season: string, back = 1): string {
+  const [y, m] = season.split('-').map(Number);
+  const d = new Date(Date.UTC(y, m - 1 - back, 1));
+  return currentSeason(d);
+}
 const RANK_COLUMNS = 'user_id,display_name,home_name,score,residents,beds,reputation,satisfaction,staff,stars,day,chapter,updated_at';
 
 export const EVENTS_TABLE = 'game_events';
@@ -217,8 +236,12 @@ export async function connectSupabase(): Promise<SupabaseConnection | null> {
         return !error;
       },
       leaderboard: async (limit = 30) => {
-        const { data: rows, error } = await sb.from(RANK_TABLE).select(RANK_COLUMNS).order('score', { ascending: false }).limit(limit);
+        const { data: rows, error } = await sb.from(RANK_TABLE).select(RANK_COLUMNS).eq('season', currentSeason()).order('score', { ascending: false }).limit(limit);
         return error || !rows ? [] : (rows as unknown as RankRecord[]);
+      },
+      seasonResults: async (season) => {
+        const { data: rows, error } = await sb.rpc('season_results', { p_season: season, p_limit: 10 });
+        return error || !rows ? [] : (rows as SeasonResult[]);
       },
       rankSite: async (userId) => {
         const { data: row, error } = await sb.from(RANK_TABLE).select('site').eq('user_id', userId).maybeSingle();
