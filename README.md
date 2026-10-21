@@ -224,6 +224,17 @@ All of this is in the renderer only (`src/render/Ambience.ts` and `IsoRenderer`)
 - **Walking staff:** a staff figure walks to their next spot (within about a second, with a step bounce and facing the way they walk) instead of jumping there. Idle staff breathe gently.
 - **Settings → Map effects** turns the moving effects off for slow phones. It is off by default when the system asks for reduced motion. The day and night light stays on.
 
+### Graphics pass 2: buildings, strolls, weather and new characters
+
+- **Exterior view:** windows have white frames, glints, mullions and sills, with flower boxes under every other ground-floor window. Doors have panels and a step. Roofs show rows of tiles, and villas have a chimney. Shrubs line the front of each building, and wards of 20 tiles or more are two storeys with two rows of windows. After buying the shop's solar roof, panels appear on every roof.
+- **Residents out for a stroll (looks only):** from 09:00 to 11:30 and 14:30 to 17:30 on a dry day, residents who can get about walk from their bed out to the dining room or the garden and back. These are active ageing, stroke rehab and dementia residents with mobility 40 or more, and nobody at their bedside. The rest stay in bed. The sim is unchanged: care tasks still treat them as in their ward.
+- **Weather (looks only):** about one day in six is rainy and one is overcast. The pick comes from a hash of the seed and the day. Clouds thicken, the daylight greys, rain streaks fall, the petals stop, and nobody strolls in the rain.
+- **New character art (generated with ElevenLabs, image model gpt-image-2.5, cut out locally with OpenCV):**
+  - the accountant, who no longer borrows the receptionist's look, with a matching portrait;
+  - a grandmother with a cane, whose face now gives female residents a chibi portrait like the men's;
+  - a strolling grandfather.
+  - A wheelchair sprite is planned (the generator was rate-limited). Until it arrives, less mobile strollers use the grandfather.
+
 ### Daily missions and achievements
 
 The 🎯 Daily button (desktop top bar, phone map's left column, with a badge while missions are open) opens three missions for the day and the achievements.
@@ -662,7 +673,7 @@ src/
   - Food, supplies, upkeep and payroll are each charged once per day.
   - An event's cost is charged once, and a resolved event can't be resolved again.
 
-## Tests (256 passing)
+## Tests (259 passing)
 
 | File | Covers |
 |---|---|
@@ -688,6 +699,7 @@ src/
 | `goals.test.ts` | Three distinct missions a day, repeatable per seed and day, without touching the RNG; a mission done in the day earns its stars once; day-close missions, the all-three bonus and the streak; rewards are stars and never cash; labels in both languages; stars stay within the online ranking's server cap; achievements unlock once with their stars; the town tour and shopper conditions; goals run in the clock and older saves still play |
 | `autoextras.test.ts` | The autopilot builds an accounting office at 30 beds and rosters an accountant, never in a small home; staff care takes low-morale staff for coffee and unhappy residents for cake and the park at 10:00, and leaves content people home |
 | `ambience.test.ts` | The map light is clear by day, dark at night and warm at dawn and dusk; it changes by at most a few percent per 10-minute tick and wraps at midnight |
+| `strolls.test.ts` | Weather is repeatable per seed and day and mostly clear, with some rain and cloud; mobile residents stroll in the strolling hours, not at night or in the rain, and bedridden ones stay in bed; stroll spots are on the dining floor or lawn, never in other rooms or on paths, without duplicates |
 | `shop.test.ts` | Upgrades are bought once, for their price, from their chapter (all at once in the sandbox); the central kitchen and laundry cut food and supplies by their percentages; staff welfare adds morale; online marketing adds an enquiry; the family app lifts reputation while residents are content; the smart call system keeps late routine care pending 30 minutes longer |
 | `modes.test.ts` | Campaign games are unchanged; sandbox books ฿50M as capital, unlocks every room, has no tutorial steps and is never judged after 70 days; each challenge opens with its own cash, reputation or chapter; each challenge is won by the scripted player and ends without a next chapter |
 | `chapter7.test.ts` | **Full 390-day campaign:** all 7 chapters won on schedule and solvent, ledger reconciles; one branch of each kind, each manager of the right role and off the roster; branch invoices exact; network occupancy ≥ 70%. **Opening:** locked before chapter 7; manager role checked; full opening cost charged; managers can’t take shifts or a second branch; cap of 5. **Running:** good branches fill and bill daily, poor ones empty, a poor name at headquarters stops growth; certificates raise the quality target; a lost manager leaves the branch leaderless until one is appointed; support visits lift quality, cost money and have a cooldown; closing refunds 30% and frees the manager; busy clinic branches refer to the stroke unit. Guide order; v9→v10 migration |

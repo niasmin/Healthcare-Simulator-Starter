@@ -58,7 +58,9 @@ export const ROOM_BADGE: Record<RoomType, { glyph: string; color: number }> = {
 };
 
 /** Full-body chibi sprite per staff role (from the character sheet). RN and PN share the nurse uniform. */
-export const STAFF_SPRITE: Record<StaffRole, string> = { rn: 'ch_nurse', pn: 'ch_nurse', caregiver: 'ch_caregiver', pt: 'ch_pt', ot: 'ch_ot', doctor: 'ch_doctor', pharmacist: 'ch_pharmacist', nutritionist: 'ch_nutritionist', cleaner: 'ch_cleaner', receptionist: 'ch_receptionist', security: 'ch_security', accountant: 'ch_receptionist' };
+export const STAFF_SPRITE: Record<StaffRole, string> = { rn: 'ch_nurse', pn: 'ch_nurse', caregiver: 'ch_caregiver', pt: 'ch_pt', ot: 'ch_ot', doctor: 'ch_doctor', pharmacist: 'ch_pharmacist', nutritionist: 'ch_nutritionist', cleaner: 'ch_cleaner', receptionist: 'ch_receptionist', security: 'ch_security', accountant: 'ch_accountant' };
+/** Residents out of bed (strolling in the garden or the dining room). */
+export const RESIDENT_SPRITE = { f: 'ch_elder_f', m: 'ch_elder_m', chair: 'ch_wheelchair' } as const;
 /** Map width of a standing character, in world px. */
 export const PERSON_SPRITE_WIDTH = 24;
 
