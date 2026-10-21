@@ -1,6 +1,7 @@
 import { Application, Container, Graphics, Sprite, Text, type Texture } from 'pixi.js';
 import { DECOR_SPRITE, EQUIP_SPRITE, ROOM_BADGE, PERSON_SPRITE_WIDTH, loadSpriteTextures } from './sprites';
 import { WORLD_MARGIN, drawWorld, worldBounds } from './WorldBackdrop';
+import { Ambience } from './Ambience';
 import { EQUIPMENT, ROOMS } from '../data/rooms';
 import { cellIndex } from '../domain/grid';
 import type { RoomStatus } from '../domain/rules/rooms';
@@ -45,6 +46,8 @@ export interface RenderInput {
   showLabels?: boolean;
   /** Exterior view: finished buildings with roofs, no interiors or people. */
   exterior?: boolean;
+  /** 'low' turns off moving effects (clouds, petals, puffs, walking) for slow phones. Default high. */
+  effects?: 'high' | 'low';
 }
 
 export interface RendererCallbacks {
@@ -117,8 +120,10 @@ export class IsoRenderer {
   private lastBackdrop = '';
   private carsLayer = new Container();
   private cars: Array<{ g: Graphics; x: number; speed: number; row: number }> = [];
-  private night = new Graphics();
-  private lastNight = '';
+  private amb = new Ambience();
+  /** Staff figures that walk to where they are needed instead of jumping there. */
+  private walkers = new Map<string, { node: Container; body: Sprite; x: number; y: number; tx: number; ty: number; phase: number; sprite: string }>();
+  private clock = 0;
   /** Smallest zoom at which the town still covers the whole screen. */
   private minScale = 0.2;
   private staticLayer = new Container();
@@ -174,12 +179,17 @@ export class IsoRenderer {
     host.appendChild(this.app.canvas);
     this.app.canvas.style.display = 'block';
     this.app.canvas.style.touchAction = 'none';
-    this.world.addChild(this.backdropLayer, this.staticLayer, this.carsLayer, this.overlay, this.peopleLayer, this.labelLayer);
-    this.night.eventMode = 'none';
-    this.app.stage.addChild(this.world, this.night);
+    this.peopleLayer.sortableChildren = true;
+    this.world.addChild(this.backdropLayer, this.staticLayer, this.carsLayer, this.overlay, this.peopleLayer, this.amb.worldFx, this.labelLayer);
+    this.app.stage.addChild(this.world, this.amb.tint, this.amb.lights, this.amb.screenFx);
     this.app.ticker.add((tk) => {
       this.driveCars(tk.deltaMS);
       this.syncLabelScale();
+      this.walk(tk.deltaMS);
+      // The glows live in world space but sit above the screen tint, so they follow the camera here.
+      this.amb.lights.position.copyFrom(this.world.position);
+      this.amb.lights.scale.copyFrom(this.world.scale);
+      this.amb.tick(tk.deltaMS, !!this.input?.game.speed, this.app.screen);
     });
     this.app.stage.eventMode = 'static';
     this.app.stage.hitArea = this.app.screen;
@@ -217,9 +227,8 @@ export class IsoRenderer {
     this.app.canvas.addEventListener('wheel', this.onWheel, { passive: false });
     this.app.canvas.addEventListener('contextmenu', this.onContext);
     this.app.renderer.on('resize', () => {
-      this.lastNight = '';
       this.updateMinScale();
-      if (this.input) this.drawNight(this.input.game.minute);
+      if (this.input) this.amb.drawTint(this.input.game.minute, this.app.screen.width, this.app.screen.height);
       if (!this.userMovedCamera) this.recenter();
     });
     // resizeTo only listens to window resizes; also follow the host element (phone layouts settle late).
@@ -429,22 +438,12 @@ export class IsoRenderer {
     });
   }
 
-  /** Morning glow, clear day, evening amber and a blue night, from the game clock (screen-space tint). */
-  private drawNight(minute: number): void {
-    const hour = Math.floor((minute % 1440) / 60);
-    const [color, alpha] = hour >= 20 || hour < 5 ? [0x14223f, 0.34] : hour < 7 ? [0xf2a65a, 0.1] : hour >= 18 ? [0xe5904a, 0.14] : [0, 0];
-    const key = `${hour >= 20 || hour < 5 ? 'n' : hour < 7 ? 'd' : hour >= 18 ? 'e' : 'x'}|${this.app.screen.width}x${this.app.screen.height}`;
-    if (key === this.lastNight) return;
-    this.lastNight = key;
-    this.night.clear();
-    if (alpha) this.night.rect(0, 0, this.app.screen.width, this.app.screen.height).fill({ color, alpha });
-  }
-
   // ---------- drawing ----------
   update(input: RenderInput): void {
     this.input = input;
     if (!this.ready) return;
-    this.drawNight(input.game.minute);
+    this.amb.setEffects(input.effects !== 'low');
+    this.amb.drawTint(input.game.minute, this.app.screen.width, this.app.screen.height);
     this.labelLayer.visible = input.showLabels !== false;
     this.peopleLayer.visible = !input.exterior;
     const backdropKey = `${input.game.site.width}x${input.game.site.height}|${input.sale?.label ?? ''}|${this.tex.size}`;
@@ -453,12 +452,17 @@ export class IsoRenderer {
       drawWorld(this.backdropLayer, input.game.site, { sale: input.sale ? { fromX: input.game.site.width, toX: input.sale.toX, label: input.sale.label } : null, textures: this.tex });
       this.makeCars(input.game.site);
       this.updateMinScale();
+      const b = worldBounds(input.game.site, input.sale?.toX ?? null);
+      const pts = [cellToWorld(b.minX, b.minY), cellToWorld(b.maxX, b.minY), cellToWorld(b.maxX, b.maxY), cellToWorld(b.minX, b.maxY)];
+      this.amb.setBounds({ minX: Math.min(...pts.map((p) => p.x)), maxX: Math.max(...pts.map((p) => p.x)), minY: Math.min(...pts.map((p) => p.y)), maxY: Math.max(...pts.map((p) => p.y)) });
     }
     const staticKey = `${input.labelFor({ id: '', type: 'ward', rect: { x: 0, y: 0, w: 1, h: 1 }, equipment: {}, builtAt: 0 })}|${input.entranceLabel}|${input.exterior ? 'ext' : 'int'}`;
     if (input.game.site !== this.lastSite || staticKey !== this.lastStatic) {
       this.lastSite = input.game.site;
       this.lastStatic = staticKey;
       this.drawStatic(input);
+      this.amb.drawLights(input.game.site);
+      this.amb.noticeRooms(input.game.site.rooms);
       this.lastPeople = '';
     }
     this.drawOverlay(input);
@@ -741,8 +745,8 @@ export class IsoRenderer {
     this.lastPeople = key;
     const g = this.peopleShapes;
     g.clear();
-    for (const child of this.peopleLayer.removeChildren()) if (child !== g) child.destroy();
-    this.peopleLayer.addChild(g);
+    const keep = new Set<string>();
+    if (g.parent !== this.peopleLayer) this.peopleLayer.addChild(g);
     const items: Array<{ x: number; y: number; p: PersonMarker }> = [];
     for (const p of people) {
       const rc = p.roomId ? this.roomCells.get(p.roomId) : undefined;
@@ -758,6 +762,7 @@ export class IsoRenderer {
       items.push({ x: c.x + dx, y: c.y + dy, p });
     }
     items.sort((a, b) => a.y - b.y);
+    const snap = this.input?.effects === 'low';
     for (const { x, y, p } of items) {
       if (p.kind === 'resident') {
         // Lying in bed: head on the pillow, blanket in the care-group colour.
@@ -765,14 +770,28 @@ export class IsoRenderer {
         g.circle(x - 12, y - 14, 6).fill(0xf1c9a5).stroke({ width: 1.2, color: 0x9b7653 });
         g.ellipse(x - 12, y - 18.5, 6, 3).fill(0xe2ddd4);
       } else if (p.sprite && this.tex.has(p.sprite)) {
-        // Role-coloured ground ring, then the character standing on it (sprites sort by depth).
-        g.ellipse(x, y, 11, 5).fill({ color: p.color, alpha: 0.45 }).stroke({ width: 1.2, color: shade(p.color, 0.7), alpha: 0.8 });
+        // A walker: role-coloured ground ring and the character, moving together to the new spot.
+        keep.add(p.key);
+        const w = this.walkers.get(p.key);
+        if (w && w.sprite === p.sprite) {
+          w.tx = x;
+          w.ty = y;
+          if (snap) (w.x = x), (w.y = y);
+          continue;
+        }
+        if (w) w.node.destroy({ children: true });
+        const node = new Container();
+        node.addChild(new Graphics().ellipse(0, 0, 11, 5).fill({ color: p.color, alpha: 0.45 }).stroke({ width: 1.2, color: shade(p.color, 0.7), alpha: 0.8 }));
         const t = this.tex.get(p.sprite)!;
-        const sp = new Sprite(t);
-        sp.anchor.set(0.5, 0.97);
-        sp.scale.set(PERSON_SPRITE_WIDTH / t.width);
-        sp.position.set(x, y + 1);
-        this.peopleLayer.addChild(sp);
+        const body = new Sprite(t);
+        body.anchor.set(0.5, 0.97);
+        body.scale.set(PERSON_SPRITE_WIDTH / t.width);
+        body.position.set(0, 1);
+        node.addChild(body);
+        node.position.set(x, y);
+        node.zIndex = y;
+        this.peopleLayer.addChild(node);
+        this.walkers.set(p.key, { node, body, x, y, tx: x, ty: y, phase: (p.key.length * 1.7 + x * 0.01) % 6.28, sprite: p.sprite });
       } else {
         g.ellipse(x, y, 10, 4.5).fill({ color: 0x000000, alpha: 0.2 });
         g.roundRect(x - 7, y - 25, 14, 24, 6).fill(p.color).stroke({ width: 1.2, color: shade(p.color, 0.65) });
@@ -780,6 +799,33 @@ export class IsoRenderer {
         g.circle(x, y - 31, 6.5).fill(0xf1c9a5).stroke({ width: 1.2, color: 0x9b7653 });
         g.ellipse(x, y - 35, 6.4, 3.2).fill(0x2b2522);
       }
+    }
+    for (const [k, w] of this.walkers)
+      if (!keep.has(k)) {
+        w.node.destroy({ children: true });
+        this.walkers.delete(k);
+      }
+  }
+
+  /** Walkers head for their spot (within about a second) with a little step bounce; idle ones breathe. */
+  private walk(dtMs: number): void {
+    const dt = Math.min(0.1, dtMs / 1000);
+    this.clock += dt;
+    const still = this.input?.effects === 'low';
+    for (const w of this.walkers.values()) {
+      const dx = w.tx - w.x;
+      const dy = w.ty - w.y;
+      const dist = Math.hypot(dx, dy);
+      let moving = false;
+      if (dist > 0.5 && !still) {
+        const step = Math.max(110, dist / 1.1) * dt;
+        if (step >= dist) (w.x = w.tx), (w.y = w.ty);
+        else (w.x += (dx / dist) * step), (w.y += (dy / dist) * step), (moving = true);
+        w.body.scale.x = Math.abs(w.body.scale.x) * (dx < -0.5 ? -1 : 1);
+      } else (w.x = w.tx), (w.y = w.ty);
+      w.node.position.set(w.x, w.y);
+      w.node.zIndex = w.y;
+      w.body.y = still ? 1 : moving ? 1 - Math.abs(Math.sin(this.clock * 13 + w.phase)) * 3 : 1 - (Math.sin(this.clock * 2.2 + w.phase) + 1) * 0.35;
     }
   }
 

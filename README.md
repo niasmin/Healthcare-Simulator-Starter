@@ -213,6 +213,17 @@ A place can't be used twice on one day, for nobody, or without the cash. Spendin
 - **Online ranking (real players):** on the deployed site, a signed-in player can choose to show their home. The row holds their sign-up name, the home's name, the score and headline numbers, and the building layout (no email, money or people). It is refreshed with every cloud autosave. Anyone can read the board and visit a published layout; each player can write only their own row (Supabase `public.leaderboard`, RLS).
   - **Anti-cheat:** a database trigger decides each row's numbers. Beds are counted from the published layout (care beds in wards and villas, capped by room size). Residents can't exceed beds. Reputation and satisfaction are held to 0–100, and stars to 7 a day played plus 150. The trigger computes the score itself with the game's formula and refuses refreshes less than 10 seconds apart. (In a test, a row claiming 500 beds and a score of 999,999 was stored as 11 beds and 902.) The title screen's 🏆 Ranking button opens it.
 
+### Map effects (graphics pass)
+
+All of this is in the renderer only (`src/render/Ambience.ts` and `IsoRenderer`). It reads the game clock and the site, and never touches the sim or its RNG.
+
+- **Light through the day:** a tint blended from keyframes every 10 minutes: a violet-orange dawn (05:00–08:00), clear day, a warm dusk (17:30–20:30) and a deep blue night. It replaces the earlier four fixed steps.
+- **Night lights:** each room glows warm from the inside after dusk, and so do the garden lamps and the entrance gate. The glows are additive and sit above the night tint.
+- **Clouds and petals:** soft cloud shadows drift over the town and a few sakura petals float down the screen by day.
+- **Build puff:** a dust cloud and gold sparkles where a room has just been built.
+- **Walking staff:** a staff figure walks to their next spot (within about a second, with a step bounce and facing the way they walk) instead of jumping there. Idle staff breathe gently.
+- **Settings → Map effects** turns the moving effects off for slow phones. It is off by default when the system asks for reduced motion. The day and night light stays on.
+
 ### Daily missions and achievements
 
 The 🎯 Daily button (desktop top bar, phone map's left column, with a badge while missions are open) opens three missions for the day and the achievements.
@@ -651,7 +662,7 @@ src/
   - Food, supplies, upkeep and payroll are each charged once per day.
   - An event's cost is charged once, and a resolved event can't be resolved again.
 
-## Tests (254 passing)
+## Tests (256 passing)
 
 | File | Covers |
 |---|---|
@@ -676,6 +687,7 @@ src/
 | `city.test.ts` | Coffee lifts morale and is paid per head with one ledger entry; cake, restaurant and park cheer residents (the park is free); each place once a day, never for nobody or into debt; the mall deal cuts supplies for 7 days then ends; rivals grow repeatably within their limits; the town ranking puts the player among the rivals, best first; a visit builds the same lived-in look-alike every time |
 | `goals.test.ts` | Three distinct missions a day, repeatable per seed and day, without touching the RNG; a mission done in the day earns its stars once; day-close missions, the all-three bonus and the streak; rewards are stars and never cash; labels in both languages; stars stay within the online ranking's server cap; achievements unlock once with their stars; the town tour and shopper conditions; goals run in the clock and older saves still play |
 | `autoextras.test.ts` | The autopilot builds an accounting office at 30 beds and rosters an accountant, never in a small home; staff care takes low-morale staff for coffee and unhappy residents for cake and the park at 10:00, and leaves content people home |
+| `ambience.test.ts` | The map light is clear by day, dark at night and warm at dawn and dusk; it changes by at most a few percent per 10-minute tick and wraps at midnight |
 | `shop.test.ts` | Upgrades are bought once, for their price, from their chapter (all at once in the sandbox); the central kitchen and laundry cut food and supplies by their percentages; staff welfare adds morale; online marketing adds an enquiry; the family app lifts reputation while residents are content; the smart call system keeps late routine care pending 30 minutes longer |
 | `modes.test.ts` | Campaign games are unchanged; sandbox books ฿50M as capital, unlocks every room, has no tutorial steps and is never judged after 70 days; each challenge opens with its own cash, reputation or chapter; each challenge is won by the scripted player and ends without a next chapter |
 | `chapter7.test.ts` | **Full 390-day campaign:** all 7 chapters won on schedule and solvent, ledger reconciles; one branch of each kind, each manager of the right role and off the roster; branch invoices exact; network occupancy ≥ 70%. **Opening:** locked before chapter 7; manager role checked; full opening cost charged; managers can’t take shifts or a second branch; cap of 5. **Running:** good branches fill and bill daily, poor ones empty, a poor name at headquarters stops growth; certificates raise the quality target; a lost manager leaves the branch leaderless until one is appointed; support visits lift quality, cost money and have a cooldown; closing refunds 30% and frees the manager; busy clinic branches refer to the stroke unit. Guide order; v9→v10 migration |

@@ -90,6 +90,9 @@ interface UIStore {
   setMusicOn: (v: boolean) => void;
   statsOn: boolean;
   setStatsOn: (v: boolean) => void;
+  /** Moving map effects (clouds, petals, walking staff, build puffs); off by default with reduced motion. */
+  fxOn: boolean;
+  setFxOn: (v: boolean) => void;
   /** Catch-up in progress, in ticks. */
   away: { done: number; total: number } | null;
   awayReport: AwayReport | null;
@@ -120,6 +123,14 @@ function initialFlag(key: string, fallback = true): boolean {
     return v === null ? fallback : v !== '0';
   } catch {
     return fallback;
+  }
+}
+
+function prefersReducedMotion(): boolean {
+  try {
+    return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  } catch {
+    return false;
   }
 }
 
@@ -182,6 +193,8 @@ export const useGame = create<UIStore>((set, get) => ({
   sfxOn: initialFlag('he.sfx'),
   setSfxOn: (sfxOn) => set({ sfxOn: remember('he.sfx', sfxOn) }),
   musicOn: initialFlag('he.music', false),
+  fxOn: initialFlag('he.fx', !prefersReducedMotion()),
+  setFxOn: (fxOn) => set({ fxOn: remember('he.fx', fxOn) }),
   setMusicOn: (musicOn) => set({ musicOn: remember('he.music', musicOn) }),
   statsOn: initialFlag('he.stats'),
   setStatsOn: (statsOn) => set({ statsOn: remember('he.stats', statsOn) }),
