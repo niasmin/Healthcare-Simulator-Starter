@@ -24,3 +24,13 @@ describe('PromptPay QR payload', () => {
     expect(promptpayPayload('0812345678', 50)).toContain('540550.00');
   });
 });
+
+describe('an existing Thai QR payload', () => {
+  it('is accepted only with a matching checksum', async () => {
+    const { validPayload } = await import('../ui/promptpay');
+    const real = '00020101021129390016A000000677010111031500499925416197853037645802TH63042A6B';
+    expect(validPayload(real)).toBe(true);
+    expect(validPayload(real.slice(0, -1) + 'C')).toBe(false);
+    expect(validPayload('hello')).toBe(false);
+  });
+});

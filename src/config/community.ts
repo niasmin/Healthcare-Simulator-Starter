@@ -6,6 +6,8 @@
  * VITE_SUPPORT_BMC         e.g. https://buymeacoffee.com/yourname
  * VITE_SUPPORT_PATREON     e.g. https://patreon.com/yourname
  * VITE_SUPPORT_PROMPTPAY   a PromptPay phone number or national/tax ID (shown as a QR code)
+ * VITE_SUPPORT_PROMPTPAY_PAYLOAD  or: the exact text of an existing Thai QR (e.g. decoded from a bank app's
+ *                          receive-money QR); used as is when its checksum is valid
  * VITE_SUPPORT_PROMPTPAY_NAME  the account name shown under the QR code
  * VITE_COMMUNITY_URL       a LINE OpenChat, Discord or Facebook group link
  * VITE_CONTACT_EMAIL       where players can write (privacy requests, contact)
@@ -19,6 +21,7 @@ export const SUPPORT = {
   bmc: clean(env.VITE_SUPPORT_BMC),
   patreon: clean(env.VITE_SUPPORT_PATREON),
   promptpay: clean(env.VITE_SUPPORT_PROMPTPAY),
+  promptpayPayload: clean(env.VITE_SUPPORT_PROMPTPAY_PAYLOAD),
   promptpayName: clean(env.VITE_SUPPORT_PROMPTPAY_NAME),
 };
 export const COMMUNITY_URL = clean(env.VITE_COMMUNITY_URL);

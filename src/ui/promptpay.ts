@@ -34,3 +34,8 @@ export function promptpayPayload(id: string, amountBaht?: number): string | null
   const withCrcTag = `${body}6304`;
   return withCrcTag + crc16(withCrcTag);
 }
+
+/** Whether a Thai QR payload text is well formed: EMVCo header and a matching CRC at the end. */
+export function validPayload(payload: string): boolean {
+  return /^000201/.test(payload) && payload.slice(-8, -4) === '6304' && crc16(payload.slice(0, -4)) === payload.slice(-4).toUpperCase();
+}
