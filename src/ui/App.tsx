@@ -1,4 +1,5 @@
-import { InventoryModal } from './components/InventoryModal';
+import { OwnerModal } from './components/OwnerModal';
+import { InventoryModal, useStockToasts } from './components/InventoryModal';
 import { AccountModal } from './components/AccountModal';
 import { useSound } from './sound';
 import { useTelemetry } from './telemetry';
@@ -37,6 +38,7 @@ export function App() {
   useAutosave();
   useTutorialToasts();
   useGoalToasts();
+  useStockToasts();
   const started = useGame((s) => s.started);
   const setStarted = useGame((s) => s.setStarted);
   const saveOpen = useGame((s) => s.saveOpen);
@@ -46,6 +48,7 @@ export function App() {
   const cityOpen = useGame((s) => s.cityOpen);
   const goalsOpen = useGame((s) => s.goalsOpen);
   const stockOpen = useGame((s) => s.stockOpen);
+  const ownerOpen = useGame((s) => s.ownerOpen);
   const communityOpen = useGame((s) => s.communityOpen);
   const autoOpen = useGame((s) => s.autoOpen);
   const accountOpen = useGame((s) => s.accountOpen);
@@ -73,6 +76,7 @@ export function App() {
       {shopOpen && <ShopModal onClose={() => useGame.getState().setShopOpen(false)} />}
       {started && goalsOpen && <GoalsModal onClose={() => useGame.getState().setGoalsOpen(false)} />}
       {started && stockOpen && <InventoryModal onClose={() => useGame.getState().setStockOpen(false)} />}
+      {ownerOpen && <OwnerModal onClose={() => useGame.getState().setOwnerOpen(false)} />}
       {communityOpen && <CommunityModal tab={communityOpen} onClose={() => useGame.getState().setCommunityOpen(null)} />}
       {cityOpen && <CityModal tab={cityOpen} onClose={() => useGame.getState().setCityOpen(null)} />}
       {autoOpen && <AutoModal onClose={() => useGame.getState().setAutoOpen(false)} />}

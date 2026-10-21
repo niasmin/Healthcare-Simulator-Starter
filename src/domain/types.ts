@@ -675,6 +675,8 @@ export interface StockLot {
   qty: number;
   expiresDay: number;
 }
+/** standard = the usual supplier (next morning); bulk = the wholesaler (cheaper, 3 days); express = a courier (1 hour, dearer). */
+export type OrderKind = 'standard' | 'bulk' | 'express';
 export interface StockOrder {
   id: string;
   item: StockItem;
@@ -682,6 +684,7 @@ export interface StockOrder {
   arriveAt: SimMinute;
   costSatang: Satang;
   express?: boolean;
+  bulk?: boolean;
 }
 /** Movements for one month, in uses. */
 export interface StockMonth {
@@ -709,6 +712,9 @@ export interface InventoryState {
   reports: StockReport[];
   /** Day of the last out-of-stock warning per item (one a day). */
   warned?: StockCounts;
+  /** Supply news: an item in short supply until a day, and an item whose next delivery is partly spoiled. */
+  shortage?: { item: StockItem; untilDay: number };
+  badLot?: StockItem;
 }
 
 export interface GameState {
@@ -816,6 +822,8 @@ export type ReasonCode =
   | 'already_today'
   | 'not_enough_stars'
   | 'inventory_off'
+  | 'no_space'
+  | 'min_order'
   | 'nobody_to_treat';
 
 export type CommandResult =

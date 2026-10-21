@@ -1,13 +1,14 @@
 import { advance, applyCommand } from '../sim/engine';
 import { createInitialState } from '../sim/state';
-import { STARTER_STOCK, STOCK, EXPRESS_MINUTES, EXPRESS_PERCENT } from '../data/inventory';
+import { BAD_LOT_PERCENT, BASE_SHELF_PACKS, BULK_DAYS, BULK_MIN_PACKS, BULK_PERCENT, RACK_SHELF_PACKS, SHORTAGE_PERCENT, STARTER_STOCK, STATION_SHELF_PACKS, STOCK, EXPRESS_MINUTES, EXPRESS_PERCENT, SUPPLY_NEWS_EVERY } from '../data/inventory';
 import { dailyResidentCosts } from '../sim/systems/billing';
-import { incoming, inventoryDayEnd, onHand, projectedDailyUse, stockLevels, takeStock } from '../sim/systems/inventory';
+import { arrivalOf, incoming, inventoryDayEnd, onHand, orderCost, projectedDailyUse, shelfCapacity, shelfFree, shelfUsed, stockLevels, supplyNewsFor, takeStock } from '../sim/systems/inventory';
 import { reconcile } from '../domain/rules/ledger';
 import { pctOf } from '../domain/money';
 import type { CareGroup, GameState, ShiftSlot, StaffRole } from '../domain/types';
 import { admitPlanned, buildHome, hire, ok, quietEvents } from './helpers';
 import { MINUTES_PER_DAY } from '../sim/constants';
+import { roomOpen } from '../sim/systems/support';
 
 const STAFF: Array<[StaffRole, ShiftSlot[]]> = [
   ['rn', ['morning']],
@@ -157,5 +158,64 @@ describe('stock room', () => {
     expect(ratio).toBeGreaterThan(0.7);
     expect(ratio).toBeLessThan(1.3);
     expect(reconcile(on).ok).toBe(true);
+  });
+
+  it('shelf space limits what can be stored and ordered; storage-room racks add space', () => {
+    let s = home(true);
+    s = ok(s, { type: 'setStockAuto', on: false });
+    const stations = s.site.rooms.filter((r) => r.type === 'nursing_station').length;
+    expect(shelfCapacity(s)).toBe(BASE_SHELF_PACKS + STATION_SHELF_PACKS * stations);
+    // A part-used pack takes a whole place.
+    expect(shelfUsed(inv(s))).toBe(Object.entries(STARTER_STOCK).reduce((a, [i, q]) => a + Math.ceil(q! / STOCK[i as keyof typeof STOCK].pack), 0));
+    const free = shelfFree(s);
+    expect(applyCommand(s, { type: 'orderStock', item: 'gloves', packs: free + 1 }).result).toEqual({ ok: false, reason: 'no_space' });
+    s = ok(s, { type: 'orderStock', item: 'gloves', packs: free });
+    expect(shelfFree(s)).toBe(0);
+    // A storage room (the prefab has two racks) adds 60 places a rack.
+    let stored: GameState | null = null;
+    for (let y = 0; y < 20 && !stored; y++)
+      for (let x = 0; x < 20 && !stored; x++) {
+        const out = applyCommand(s, { type: 'placePrefab', prefab: 'storage', origin: { x, y } });
+        if (out.result.ok && roomOpen(out.state, 'storage_room')) stored = out.state;
+      }
+    expect(shelfFree(stored!)).toBe(RACK_SHELF_PACKS * 2);
+  });
+
+  it('the wholesaler is cheaper and slower, with a minimum order', () => {
+    const s = ok(ok(createInitialState(1), { type: 'setInventory', on: true }), { type: 'setStockAuto', on: false });
+    expect(applyCommand(s, { type: 'orderStock', item: 'gloves', packs: BULK_MIN_PACKS - 1, bulk: true }).result).toEqual({ ok: false, reason: 'min_order', params: { n: BULK_MIN_PACKS } });
+    expect(orderCost(s, 'gloves', 5, 'bulk')).toBe(pctOf(STOCK.gloves.packSatang * 5, BULK_PERCENT));
+    const dayStart = Math.floor(s.minute / MINUTES_PER_DAY) * MINUTES_PER_DAY;
+    expect(arrivalOf(s, 'gloves', 'bulk')).toBe(dayStart + BULK_DAYS * MINUTES_PER_DAY + 8 * 60);
+    expect(arrivalOf(s, 'gloves')).toBe(dayStart + MINUTES_PER_DAY + 8 * 60);
+  });
+
+  it('supply news: shortages make an item dearer and a day slower; a bad lot spoils part of the next delivery', () => {
+    let s = ok(home(true), { type: 'setStockAuto', on: false });
+    const day = Math.floor(s.minute / MINUTES_PER_DAY) + 1;
+    s = { ...s, inventory: { ...inv(s), shortage: { item: 'gloves', untilDay: day } } };
+    expect(orderCost(s, 'gloves', 1)).toBe(pctOf(STOCK.gloves.packSatang, SHORTAGE_PERCENT));
+    expect(orderCost(s, 'gloves', 1, 'express')).toBe(pctOf(STOCK.gloves.packSatang, EXPRESS_PERCENT));
+    const dayStart = (day - 1) * MINUTES_PER_DAY;
+    expect(arrivalOf(s, 'gloves')).toBe(dayStart + 2 * MINUTES_PER_DAY + 8 * 60);
+    s = { ...s, inventory: { ...inv(s), shortage: undefined, badLot: 'feeding' } };
+    s = ok(s, { type: 'orderStock', item: 'feeding', packs: 2, express: true });
+    const before = onHand(inv(s), 'feeding');
+    s = advance(s, EXPRESS_MINUTES / 10);
+    const spoiled = Math.round((20 * BAD_LOT_PERCENT) / 100);
+    expect(inv(s).badLot).toBeUndefined();
+    expect(inv(s).month.wasted.feeding).toBe(spoiled);
+    expect(onHand(inv(s), 'feeding')).toBeLessThanOrEqual(before + 20 - spoiled);
+    expect(s.log.some((l) => l.key === 'log.stock_bad_lot')).toBe(true);
+  });
+
+  it('supply news comes about one day in twelve, from a hash (never the PRNG)', () => {
+    const s = home(true);
+    const days = Array.from({ length: 600 }, (_, i) => i + 5).filter((d) => supplyNewsFor(s, d));
+    expect(days.length).toBeGreaterThan(600 / SUPPLY_NEWS_EVERY / 2);
+    expect(days.length).toBeLessThan((600 / SUPPLY_NEWS_EVERY) * 2);
+    expect(supplyNewsFor(s, 3)).toBeNull();
+    // Same answer every time for the same seed and day.
+    expect(days.map((d) => supplyNewsFor(s, d))).toEqual(days.map((d) => supplyNewsFor(s, d)));
   });
 });

@@ -332,6 +332,7 @@ export function MobileShell() {
   const missionBadge = useGame((s) => !!s.game.chapter.result) && !nextChapter;
   const openMissions = useOpenMissions();
   const lowItems = useGame((s) => lowStock(s.game));
+  const stockNew = useGame((s) => !s.stockGuideSeen);
 
   const summary = useMemo(() => summarize(game), [game]);
   const alertCount = useMemo(() => {
@@ -411,7 +412,7 @@ export function MobileShell() {
                   />
                   <FloatButton emoji="🏙️" label={t('hud.city')} onClick={() => useGame.getState().setCityOpen('city')} />
                   <FloatButton emoji="🎯" label={t('hud.daily')} onClick={() => useGame.getState().setGoalsOpen(true)} badge={openMissions > 0} />
-                  <FloatButton emoji="📦" label={t('stock.short')} onClick={() => useGame.getState().setStockOpen(true)} badge={lowItems > 0} />
+                  <FloatButton emoji="📦" label={t('stock.short')} onClick={() => useGame.getState().setStockOpen(true)} badge={lowItems > 0 || stockNew} />
                 </div>
                 <div className="absolute right-2 top-[11.2rem] z-10 flex flex-col gap-2 pointer-events-none">
                   <FloatButton icon={eventsIcon} label={t('hud.events')} onClick={() => setSheet('events')} />

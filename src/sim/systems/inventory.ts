@@ -1,4 +1,16 @@
 import {
+  BAD_LOT_PERCENT,
+  BASE_SHELF_PACKS,
+  BULK_DAYS,
+  BULK_MIN_PACKS,
+  BULK_PERCENT,
+  PHARMACY_SHELF_PACKS,
+  RACK_SHELF_PACKS,
+  SHORTAGE_DAYS,
+  SHORTAGE_PERCENT,
+  STATION_SHELF_PACKS,
+  SUPPLY_NEWS_EVERY,
+  SUPPLY_NEWS_FROM_DAY,
   DELIVERY_HOUR,
   EXPRESS_LOOKAHEAD_MINUTES,
   EXPRESS_MINUTES,
@@ -14,10 +26,11 @@ import {
 import { carePlanSchedule } from '../../data/patients';
 import { monthOfDay } from '../../data/finance';
 import { pctOf } from '../../domain/money';
-import type { CareTask, GameState, InventoryState, ReasonCode, StockCounts, StockItem, StockMonth, TaskKind } from '../../domain/types';
+import type { CareTask, GameState, InventoryState, OrderKind, ReasonCode, StockCounts, StockItem, StockMonth, TaskKind } from '../../domain/types';
 import { MINUTES_PER_DAY } from '../constants';
 import { allocId, log, post } from '../helpers';
 import { supplyPrice } from './billing';
+import { allRoomStatuses } from '../../domain/rules/rooms';
 import { dayOf } from './time';
 
 /**
@@ -102,29 +115,71 @@ export function stockLevels(state: GameState, item: StockItem): { min: number; m
   return { min, max: Math.max(min + 1, Math.ceil((daily * MAX_COVER_DAYS) / STOCK[item].pack)), auto: true };
 }
 
-export function orderCost(state: GameState, item: StockItem, packs: number, express = false): number {
-  const base = supplyPrice(state, STOCK[item].packSatang * packs);
-  return express ? pctOf(base, EXPRESS_PERCENT) : base;
+/** Shelf space in packs: a cupboard, plus each open nursing station and pharmacy, plus storage-room racks. */
+export function shelfCapacity(state: GameState): number {
+  const statuses = allRoomStatuses(state.site);
+  let cap = BASE_SHELF_PACKS;
+  for (const r of state.site.rooms) {
+    if (!statuses.get(r.id)?.operational) continue;
+    if (r.type === 'nursing_station') cap += STATION_SHELF_PACKS;
+    if (r.type === 'pharmacy') cap += PHARMACY_SHELF_PACKS;
+    if (r.type === 'storage_room') cap += RACK_SHELF_PACKS * (r.equipment.storage_rack ?? 0);
+  }
+  return cap;
 }
 
-export function orderBlocker(state: GameState, item: StockItem, packs: number, express = false): ReasonCode | null {
+/** Shelf places taken: packs on hand (a started pack counts whole) and packs on the way. */
+export function shelfUsed(inv: InventoryState): number {
+  let n = inv.orders.reduce((a, o) => a + o.packs, 0);
+  for (const item of STOCK_ITEMS) n += Math.ceil(onHand(inv, item) / STOCK[item].pack);
+  return n;
+}
+
+export function shelfFree(state: GameState): number {
+  return state.inventory ? Math.max(0, shelfCapacity(state) - shelfUsed(state.inventory)) : 0;
+}
+
+/** The item in short supply today, if any. */
+export function shortageOf(state: GameState): StockItem | null {
+  const sh = state.inventory?.shortage;
+  return sh && sh.untilDay >= dayOf(state.minute) ? sh.item : null;
+}
+
+export function orderCost(state: GameState, item: StockItem, packs: number, kind: OrderKind = 'standard'): number {
+  let base = supplyPrice(state, STOCK[item].packSatang * packs);
+  if (kind === 'bulk') base = pctOf(base, BULK_PERCENT);
+  if (kind !== 'express' && shortageOf(state) === item) base = pctOf(base, SHORTAGE_PERCENT);
+  return kind === 'express' ? pctOf(base, EXPRESS_PERCENT) : base;
+}
+
+/** When an order placed now arrives. */
+export function arrivalOf(state: GameState, item: StockItem, kind: OrderKind = 'standard'): number {
+  if (kind === 'express') return state.minute + EXPRESS_MINUTES;
+  const days = (kind === 'bulk' ? BULK_DAYS : 1) + (shortageOf(state) === item ? 1 : 0);
+  return (dayOf(state.minute) - 1 + days) * MINUTES_PER_DAY + DELIVERY_HOUR * 60;
+}
+
+export function orderBlocker(state: GameState, item: StockItem, packs: number, kind: OrderKind = 'standard'): ReasonCode | null {
   if (!state.inventory?.on) return 'inventory_off';
   if (!STOCK[item] || !Number.isInteger(packs) || packs < 1 || packs > 999) return 'invalid_choice';
-  if (state.organization.cashSatang < orderCost(state, item, packs, express)) return 'insufficient_funds';
+  if (kind === 'bulk' && packs < BULK_MIN_PACKS) return 'min_order';
+  if (packs > shelfFree(state)) return 'no_space';
+  if (state.organization.cashSatang < orderCost(state, item, packs, kind)) return 'insufficient_funds';
   return null;
 }
 
 /** Place an order (check orderBlocker first). */
-export function orderStock(state: GameState, item: StockItem, packs: number, express = false): GameState {
+export function orderStock(state: GameState, item: StockItem, packs: number, kind: OrderKind = 'standard'): GameState {
   const inv = state.inventory!;
-  const costSatang = orderCost(state, item, packs, express);
-  const arriveAt = express ? state.minute + EXPRESS_MINUTES : (dayOf(state.minute) * MINUTES_PER_DAY) + DELIVERY_HOUR * 60;
+  const costSatang = orderCost(state, item, packs, kind);
+  const arriveAt = arrivalOf(state, item, kind);
   let [s, id] = allocId(state, 'po');
+  const flag = kind === 'express' ? { express: true } : kind === 'bulk' ? { bulk: true } : {};
   s = {
     ...s,
-    inventory: { ...inv, orders: [...inv.orders, { id, item, packs, arriveAt, costSatang, ...(express ? { express: true } : {}) }], month: { ...inv.month, spentSatang: inv.month.spentSatang + costSatang } },
+    inventory: { ...inv, orders: [...inv.orders, { id, item, packs, arriveAt, costSatang, ...flag }], month: { ...inv.month, spentSatang: inv.month.spentSatang + costSatang } },
   };
-  return post(s, -costSatang, 'supplies', express ? 'ledger.stock_express' : 'ledger.stock_order', { ref: id, memoParams: { item, packs } });
+  return post(s, -costSatang, 'supplies', `ledger.stock_${kind === 'standard' ? 'order' : kind}`, { ref: id, memoParams: { item, packs } });
 }
 
 /** Stock a task would use, or null when it needs none. */
@@ -178,13 +233,22 @@ function receive(state: GameState): GameState {
   if (!here.length) return state;
   const day = dayOf(state.minute);
   const lots = { ...inv.lots };
-  let received = inv.month.received;
+  let { received, wasted } = inv.month;
+  let badLot = inv.badLot;
+  let s = state;
   for (const o of here) {
     const qty = o.packs * STOCK[o.item].pack;
-    lots[o.item] = [...(lots[o.item] ?? []), { qty, expiresDay: day + STOCK[o.item].shelfDays }].sort((a, b) => a.expiresDay - b.expiresDay);
     received = add(received, o.item, qty);
+    // Supply news: part of this delivery arrives spoiled and goes straight in the bin.
+    const spoiled = badLot === o.item ? Math.round((qty * BAD_LOT_PERCENT) / 100) : 0;
+    if (spoiled) {
+      badLot = undefined;
+      wasted = add(wasted, o.item, spoiled);
+      s = log(s, 'warn', 'log.stock_bad_lot', { item: o.item, n: spoiled });
+    }
+    lots[o.item] = [...(lots[o.item] ?? []), { qty: qty - spoiled, expiresDay: day + STOCK[o.item].shelfDays }].sort((a, b) => a.expiresDay - b.expiresDay);
   }
-  return { ...state, inventory: { ...inv, lots, orders: inv.orders.filter((o) => o.arriveAt > state.minute), month: { ...inv.month, received } } };
+  return { ...s, inventory: { ...inv, lots, badLot, orders: inv.orders.filter((o) => o.arriveAt > state.minute), month: { ...inv.month, received, wasted } } };
 }
 
 /** Uses that pending tasks due before `by` will need. */
@@ -204,14 +268,15 @@ function autoReorder(state: GameState, topUp: boolean): GameState {
     const need = dueNeed(s.tasks, item, by);
     const soon = have + incoming(inv, item, by);
     if (need > soon) {
-      const packs = Math.ceil((need - soon) / STOCK[item].pack);
-      if (!orderBlocker(s, item, packs, true)) s = orderStock(s, item, packs, true);
+      const packs = Math.min(shelfFree(s), Math.ceil((need - soon) / STOCK[item].pack));
+      if (packs > 0 && !orderBlocker(s, item, packs, 'express')) s = orderStock(s, item, packs, 'express');
     }
     if (!topUp) continue;
     const { min, max } = stockLevels(s, item);
     const level = onHand(s.inventory!, item) + incoming(s.inventory!, item);
     if (max > 0 && level < min * STOCK[item].pack) {
-      const packs = Math.ceil((max * STOCK[item].pack - level) / STOCK[item].pack);
+      // Only what the shelves can take.
+      const packs = Math.min(shelfFree(s), Math.ceil((max * STOCK[item].pack - level) / STOCK[item].pack));
       if (packs > 0 && !orderBlocker(s, item, packs)) s = orderStock(s, item, packs);
     }
   }
@@ -242,11 +307,37 @@ export function inventoryDayEnd(state: GameState, closingDay: number): GameState
     s = log(s, 'warn', 'log.stock_expired', { item, n: gone });
   }
   inv = { ...inv, lots, month: { ...inv.month, wasted } };
+  if (inv.on) [s, inv] = supplyNews(s, inv, newDay);
   if (monthOfDay(newDay) !== inv.month.month) {
     const closing = allOnHand(inv);
     inv = { ...inv, reports: [...inv.reports, { ...inv.month, closing }].slice(-STOCK_REPORTS_KEPT), month: newMonth(monthOfDay(newDay), closing) };
   }
   return { ...s, inventory: inv };
+}
+
+function hash(a: number, b: number): number {
+  let h = Math.imul(a ^ 0x2545f491, 0x9e3779b1) ^ Math.imul(b + 0x7f4a7c15, 0x85ebca77);
+  h ^= h >>> 15;
+  h = Math.imul(h, 0x27d4eb2f);
+  return (h ^ (h >>> 13)) >>> 0;
+}
+
+/** About one day in twelve: a shortage or a bad lot of an item the home uses (seed + day hash, no PRNG). */
+export function supplyNewsFor(state: GameState, day: number): { kind: 'shortage' | 'bad_lot'; item: StockItem } | null {
+  if (day < SUPPLY_NEWS_FROM_DAY) return null;
+  const h = hash(state.seed, day);
+  if (h % SUPPLY_NEWS_EVERY !== 0) return null;
+  const use = projectedDailyUse(state);
+  const items = STOCK_ITEMS.filter((i) => (use[i] ?? 0) > 0);
+  if (!items.length) return null;
+  return { kind: (h >>> 8) % 2 ? 'bad_lot' : 'shortage', item: items[(h >>> 12) % items.length] };
+}
+
+function supplyNews(state: GameState, inv: InventoryState, day: number): [GameState, InventoryState] {
+  const news = supplyNewsFor(state, day);
+  if (!news) return [state, inv];
+  if (news.kind === 'shortage') return [log(state, 'warn', 'log.stock_shortage', { item: news.item, n: SHORTAGE_DAYS }), { ...inv, shortage: { item: news.item, untilDay: day + SHORTAGE_DAYS - 1 } }];
+  return [log(state, 'warn', 'log.stock_bad_news', { item: news.item }), { ...inv, badLot: news.item }];
 }
 
 /** Value of the stock on hand at list price. */

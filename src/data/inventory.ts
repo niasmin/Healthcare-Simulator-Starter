@@ -60,5 +60,27 @@ export const MAX_COVER_DAYS = 10;
 export const EXPRESS_LOOKAHEAD_MINUTES = 240;
 /** Free starter stock when the stock room opens, in uses: about ten days for a full ten-bed home. */
 export const STARTER_STOCK: Partial<Record<StockItem, number>> = { gloves: 600, diapers: 200, syringes: 200, medkit: 200 };
+/**
+ * Shelf space, in packs (a part-used pack takes a whole place): a cupboard everywhere, more in each
+ * nursing station and pharmacy, and the most on the racks of a storage room.
+ */
+export const BASE_SHELF_PACKS = 40;
+export const STATION_SHELF_PACKS = 30;
+export const PHARMACY_SHELF_PACKS = 40;
+export const RACK_SHELF_PACKS = 60;
+/** The wholesaler: cheaper, slower, and only by the case. */
+export const BULK_PERCENT = 85;
+export const BULK_DAYS = 3;
+export const BULK_MIN_PACKS = 5;
+/**
+ * Supply news, from a hash of the seed and the day (never the PRNG): about one day in twelve, from
+ * day 5. A shortage makes an item dearer and a day slower to come for three days; a bad lot spoils
+ * part of the next delivery of an item.
+ */
+export const SUPPLY_NEWS_EVERY = 12;
+export const SUPPLY_NEWS_FROM_DAY = 5;
+export const SHORTAGE_DAYS = 3;
+export const SHORTAGE_PERCENT = 130;
+export const BAD_LOT_PERCENT = 20;
 /** Month-end stock counts kept for the report. */
 export const STOCK_REPORTS_KEPT = 6;

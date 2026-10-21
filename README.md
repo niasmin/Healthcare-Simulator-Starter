@@ -235,6 +235,21 @@ All of this is in the renderer only (`src/render/Ambience.ts` and `IsoRenderer`)
   - a strolling grandfather.
   - Wheelchair: until generated art arrives (the ElevenLabs free plan's daily image limit kept refusing), the renderer draws the wheelchair itself. It has wheels, a seat, a backrest and a blanket, and the grandfather sits in it, his sprite cropped at the waist. Strollers with mobility under 65 use it. A `ch_wheelchair` sprite replaces it automatically once added.
 
+### Supply room (inventory)
+
+- Eight abstract consumable groups (gloves, diapers & pads, PPE, dressing sets, tube-feeding sets, needles & syringes, suction & tubing, a basic medication kit), folded from a real care home's month-end count sheet. Medicines are one abstract kit: no drug names or doses. All prices are fictional game values (`src/data/inventory.ts`), tuned so a tidy home spends about what the old flat daily supplies charge cost.
+- Care tasks take their supplies when they start; without stock a task cannot start and is missed after its grace period.
+- Orders are paid when placed: standard (08:00 next day), wholesale (15% off, 3 days, at least 5 packs) and express (1 hour, 150%). Shop, pharmacy, storage, mall and accountant discounts apply.
+- Shelf space in packs: 40, +30 a nursing station, +40 a pharmacy, +60 a storage-room rack. Lots expire and are used earliest-expiry first; expired stock is counted as waste.
+- Auto reorder keeps 3–10 days of projected use (or the player's own levels), within the shelf space, and rushes stock for work due in four hours.
+- Supply news, about one day in twelve from day 5 (seed + day hash, never the PRNG): a shortage (an item 30% dearer and a day slower for three days) or a bad lot (20% of the next delivery spoiled).
+- A month-end count (opening, received, used, expired, closing, value) is kept for six months. A five-step guide shows on the first visit.
+- New games open the supply room with about ten days of free starter stock; older saves keep the flat daily charge until the room is opened.
+
+### Owner statistics
+
+Signed in with the owner's account, the account window shows **Owner statistics**: players per day, sessions, hours played, accounts and guests, cloud savers, how far players get, chapter wins and losses with the targets missed, chapter 1 guide steps, and the latest feedback. The numbers come from `public.owner_stats()`, a security-definer function that answers only accounts listed in `public.app_owners` (no client access to that table), built from the anonymous `game_events` statistics.
+
 ### Launch kit: support, feedback, privacy, itch.io
 
 - **Community window (☕):** opens from the title screen (side menu on desktop and phone), the Settings and phone menu (three buttons) and the desktop top bar. It has three tabs.

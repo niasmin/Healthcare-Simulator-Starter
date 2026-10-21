@@ -2,6 +2,7 @@ import { AccountChip } from "./AccountModal";
 import { PrefsList } from "./Prefs";
 import { useEffect, useState, type ReactNode } from "react";
 import hero from "../../assets/title/hero.jpg";
+import emblem from "../../assets/title/emblem.png";
 import ceoFace from "../../assets/faces/owner_f_smile.png";
 import heroPortrait from "../../assets/title/hero_portrait.jpg";
 import { formatTHB } from "../../domain/money";
@@ -481,7 +482,8 @@ export function TitleScreen() {
           <div className="relative min-h-full flex flex-col p-3 sm:p-5 gap-3">
             {/* Top row: logo, player card, figures from the latest save, language */}
             <header className="flex flex-wrap items-start gap-3">
-              <div className="select-none drop-shadow-[0_3px_0_rgba(0,0,0,0.25)]">
+              <img src={emblem} alt="" className="hidden sm:block h-[7.2rem] w-auto select-none drop-shadow-[0_3px_0_rgba(0,0,0,0.25)]" draggable={false} />
+              <div className="select-none drop-shadow-[0_3px_0_rgba(0,0,0,0.25)] sm:-ml-2">
                 <div
                   className="text-[2.1rem] sm:text-5xl font-black leading-none tracking-tight"
                   style={{ WebkitTextStroke: "2px #1d4f7a", color: "#5fd0f2" }}
