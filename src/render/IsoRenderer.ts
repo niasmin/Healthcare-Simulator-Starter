@@ -70,6 +70,8 @@ const FRONT_WALL_H = 6;
 const SLAB_DEPTH = 14;
 /** Exterior view: storey height of a finished building, and the room types that get a pitched roof. */
 const STOREY_H = 46;
+/** Sprite name for residents who use a wheelchair (drawn from the grandfather until its own art exists). */
+const WHEELCHAIR = 'ch_wheelchair';
 const PITCHED: ReadonlySet<RoomType> = new Set<RoomType>(['ward', 'villa', 'staff_room', 'dining_room']);
 const FONT = '"IBM Plex Sans Thai", "Noto Sans Thai", "Leelawadee UI", Tahoma, sans-serif';
 
@@ -133,7 +135,7 @@ export class IsoRenderer {
   /** Townsfolk on the pavements around the lot (made once the sprites are loaded). */
   private town: TownLife | null = null;
   /** Staff figures that walk to where they are needed instead of jumping there. */
-  private walkers = new Map<string, { node: Container; body: Sprite; x: number; y: number; tx: number; ty: number; phase: number; sprite: string }>();
+  private walkers = new Map<string, { node: Container; body: Container; x: number; y: number; tx: number; ty: number; phase: number; sprite: string }>();
   private clock = 0;
   /** Smallest zoom at which the town still covers the whole screen. */
   private minScale = 0.2;
@@ -877,8 +879,8 @@ export class IsoRenderer {
     let strolling = 0;
     for (const raw of people) {
       // A stroller whose sprite isn't drawn yet (the wheelchair) walks with the grandfather's.
-      const p = raw.kind === 'resident' && raw.sprite && !this.tex.has(raw.sprite) ? { ...raw, sprite: 'ch_elder_m' } : raw;
-      if (p.stroll && p.sprite && this.tex.has(p.sprite) && this.strollSpots.length) {
+      const p = raw.kind === 'resident' && raw.sprite && !this.canDraw(raw.sprite) ? { ...raw, sprite: 'ch_elder_m' } : raw;
+      if (p.stroll && p.sprite && this.canDraw(p.sprite) && this.strollSpots.length) {
         const spot = this.strollSpots[(strolling++ * 7) % this.strollSpots.length];
         const c = cellCenter(spot.x, spot.y);
         // A little offset so two strollers sharing a lawn tile stand side by side.
@@ -901,12 +903,12 @@ export class IsoRenderer {
     items.sort((a, b) => a.y - b.y);
     const snap = this.input?.effects === 'low';
     for (const { x, y, p } of items) {
-      if (p.kind === 'resident' && !((p.stroll || p.bed === undefined) && p.sprite && this.tex.has(p.sprite))) {
+      if (p.kind === 'resident' && !((p.stroll || p.bed === undefined) && p.sprite && this.canDraw(p.sprite))) {
         // Lying in bed: head on the pillow, blanket in the care-group colour.
         g.ellipse(x + 1, y - 9, 13, 6.5).fill({ color: p.color, alpha: 0.95 }).stroke({ width: 1, color: shade(p.color, 0.7) });
         g.circle(x - 12, y - 14, 6).fill(0xf1c9a5).stroke({ width: 1.2, color: 0x9b7653 });
         g.ellipse(x - 12, y - 18.5, 6, 3).fill(0xe2ddd4);
-      } else if (p.sprite && this.tex.has(p.sprite)) {
+      } else if (p.sprite && this.canDraw(p.sprite)) {
         // A walker: role-coloured ground ring and the character, moving together to the new spot.
         keep.add(p.key);
         const w = this.walkers.get(p.key);
@@ -924,11 +926,7 @@ export class IsoRenderer {
             ? new Graphics().ellipse(0, 0, 11, 5).fill({ color: p.color, alpha: 0.45 }).stroke({ width: 1.2, color: shade(p.color, 0.7), alpha: 0.8 })
             : new Graphics().ellipse(0, 0, 10, 4.5).fill({ color: 0x000000, alpha: 0.18 }),
         );
-        const t = this.tex.get(p.sprite)!;
-        const body = new Sprite(t);
-        body.anchor.set(0.5, 0.97);
-        body.scale.set(PERSON_SPRITE_WIDTH / t.width);
-        body.position.set(0, 1);
+        const body = this.figure(p.sprite);
         node.addChild(body);
         node.position.set(x, y);
         node.zIndex = y;
@@ -952,6 +950,49 @@ export class IsoRenderer {
         w.node.destroy({ children: true });
         this.walkers.delete(k);
       }
+  }
+
+  /** Whether a figure can be drawn: its sprite, or the wheelchair built from the grandfather's. */
+  private canDraw(sprite: string): boolean {
+    return this.tex.has(sprite) || (sprite === WHEELCHAIR && this.tex.has('ch_elder_m'));
+  }
+
+  /** A standing figure, or (until its own art arrives) the grandfather seated in a drawn wheelchair. */
+  private figure(sprite: string): Container {
+    const body = new Container();
+    body.position.set(0, 1);
+    const t = this.tex.get(sprite);
+    if (t) {
+      const sp = new Sprite(t);
+      sp.anchor.set(0.5, 0.97);
+      sp.scale.set(PERSON_SPRITE_WIDTH / t.width);
+      body.addChild(sp);
+      return body;
+    }
+    const elder = this.tex.get('ch_elder_m')!;
+    const chair = new Graphics();
+    // Back wheel, seat and backrest, then the rider (top of the sprite only), then the front wheel.
+    chair.circle(-5, -6, 7).stroke({ width: 2.2, color: 0x5d6670 }).circle(-5, -6, 1.6).fill(0x5d6670);
+    chair.roundRect(-9, -14, 16, 4, 1.5).fill(0x8d97a1);
+    chair.roundRect(-11, -30, 4, 18, 1.5).fill(0x7c8690);
+    body.addChild(chair);
+    const rider = new Sprite(elder);
+    rider.anchor.set(0.5, 0);
+    const k = PERSON_SPRITE_WIDTH / elder.width;
+    rider.scale.set(k);
+    const seatedH = elder.height * k * 0.6;
+    rider.position.set(1, -12 - seatedH);
+    const mask = new Graphics().rect(-14, -12 - seatedH, 28, seatedH + 1).fill(0xffffff);
+    body.addChild(mask);
+    rider.mask = mask;
+    body.addChild(rider);
+    const front = new Graphics();
+    front.roundRect(-6, -13, 14, 3, 1).fill({ color: 0x9fcfc3, alpha: 0.95 }); // blanket over the knees
+    front.circle(3, -6, 7.5).stroke({ width: 2.4, color: 0x47505a }).circle(3, -6, 1.8).fill(0x47505a);
+    front.moveTo(-3, -6).lineTo(9, -6).stroke({ width: 1, color: 0x47505a, alpha: 0.6 });
+    front.circle(10, -1, 1.6).fill(0x2b2522);
+    body.addChild(front);
+    return body;
   }
 
   /** Where a resident's bed is on the map, or null. */
