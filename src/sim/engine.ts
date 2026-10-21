@@ -31,6 +31,7 @@ import { admitInpatient, hospitalDayEnd, hospitalTick } from './systems/hospital
 import { supportDayEnd } from './systems/support';
 import { cityBlocker, cityCost, visitPlace } from './systems/city';
 import { goalsDayEnd, goalsTick } from './systems/goals';
+import { loanBlocker, loanDayEnd, loanOwed, repayBlocker, repayLoan, takeLoan } from './systems/loans';
 import { inventoryDayEnd, inventoryTick, orderBlocker, orderCost, orderStock, setInventory } from './systems/inventory';
 import { BULK_MIN_PACKS, STOCK } from '../data/inventory';
 import { assignManager, closeBranch, networkDayEnd, openBranch, supportBranch } from './systems/network';
@@ -76,6 +77,8 @@ export type Command =
   | { type: 'buyUpgrade'; upgrade: UpgradeId }
   | { type: 'visitPlace'; place: CityPlace }
   | { type: 'setAuto'; settings: Partial<AutoSettings> }
+  | { type: 'takeLoan'; amount: number }
+  | { type: 'repayLoan' }
   | { type: 'setInventory'; on: boolean }
   | { type: 'orderStock'; item: StockItem; packs: number; express?: boolean; bulk?: boolean }
   | { type: 'setStockAuto'; on: boolean }
@@ -434,6 +437,19 @@ export function applyCommand(state: GameState, cmd: Command): CommandOutcome {
       return { state: visitPlace(state, cmd.place), result: { ok: true, costSatang } };
     }
 
+    case 'takeLoan': {
+      const blocker = loanBlocker(state, cmd.amount);
+      if (blocker) return fail(state, blocker);
+      return { state: takeLoan(state, cmd.amount), result: { ok: true, costSatang: -cmd.amount } };
+    }
+
+    case 'repayLoan': {
+      const blocker = repayBlocker(state);
+      if (blocker) return fail(state, blocker);
+      const costSatang = loanOwed(state);
+      return { state: repayLoan(state), result: { ok: true, costSatang } };
+    }
+
     case 'buyUpgrade': {
       const def = UPGRADES[cmd.upgrade];
       if (!def) return fail(state, 'not_found');
@@ -571,6 +587,7 @@ export function step(state: GameState): GameState {
         s = chargeDailyUpkeep(s);
         s = chargeDailyPayroll(s);
         s = chargeDailyResidentCosts(s);
+        s = loanDayEnd(s, closingDay);
         s = collectPayments(s, closingDay);
         s = expireReferrals(s, closingDay);
         s = homecareDayEnd(s, closingDay, ev.at);

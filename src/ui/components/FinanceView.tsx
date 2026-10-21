@@ -1,8 +1,11 @@
+import { AUTO_LOAN_DAYS, LOAN_AMOUNTS, LOAN_DAYS, LOAN_INTEREST_PERCENT } from '../../data/loans';
+import { loanInterest, loanOwed, nextInstalment } from '../../sim/systems/loans';
+import { dayOf } from '../../sim/systems/time';
 import { autoSettings, effectiveSettings } from '../../sim/autopilot';
 import { useMemo, useState } from 'react';
 import { monthlyFee, PRICE_LEVELS } from '../../data/finance';
 import type { LedgerCategory, RevenueStream } from '../../domain/types';
-import { financeView, OPEX_CATEGORIES } from '../../sim/selectors';
+import { dailyRunningCost, financeView, OPEX_CATEGORIES } from '../../sim/selectors';
 import { localeOf } from '../i18n';
 import { useMoney, useT } from '../hooks';
 import { useGame } from '../store';
@@ -160,6 +163,58 @@ function Donut({ mix }: { mix: { stream: RevenueStream; amount: number }[] }) {
   );
 }
 
+/** Bank loan: borrow one of three amounts, see the instalments, or pay the rest off early. */
+export function LoanCard() {
+  const t = useT();
+  const money = useMoney();
+  const game = useGame((s) => s.game);
+  const dispatch = useGame((s) => s.dispatch);
+  const loan = game.loan;
+  const cost = dailyRunningCost(game);
+  const runway = cost > 0 ? Math.floor(game.organization.cashSatang / cost) : null;
+  const low = runway !== null && runway < AUTO_LOAN_DAYS;
+  if (game.mode === 'challenge') return null;
+  return (
+    <section className={`rounded-2xl border p-3 flex flex-col gap-2 ${low && !loan ? 'bg-[#fff1d6] border-[#f2b631]' : 'bg-white border-line'}`} data-testid="loan">
+      <div className="flex items-baseline gap-2 flex-wrap">
+        <h3 className="font-semibold text-sm mr-auto">🏦 {t('loan.title')}</h3>
+        {runway !== null && <span className={`text-xs tabular ${low ? 'text-bad font-semibold' : 'text-ink-soft'}`}>{t('loan.runway', { d: runway })}</span>}
+      </div>
+      {loan ? (
+        <div className="flex flex-col gap-1.5 text-sm">
+          <div className="flex flex-wrap gap-x-4 gap-y-1 tabular">
+            <span>{t('loan.owed', { v: money(loan.principal - loan.paidPrincipal) })}</span>
+            <span className="text-ink-soft">{t('loan.daily', { v: money(nextInstalment(game)) })}</span>
+            <span className="text-ink-soft">{t('loan.left', { d: loan.startDay + loan.days - dayOf(game.minute) })}</span>
+          </div>
+          <div className="h-1.5 rounded-full bg-sand overflow-hidden" aria-hidden>
+            <div className="h-full bg-teal" style={{ width: `${(loan.paidPrincipal / loan.principal) * 100}%` }} />
+          </div>
+          <button
+            type="button"
+            onClick={() => dispatch({ type: 'repayLoan' })}
+            disabled={game.organization.cashSatang < loanOwed(game)}
+            className="self-start rounded-lg bg-white border border-line px-3 py-1.5 text-xs font-semibold disabled:opacity-40"
+          >
+            {t('loan.repay', { v: money(loanOwed(game)) })}
+          </button>
+        </div>
+      ) : (
+        <>
+          <p className="text-xs text-ink-soft leading-relaxed">{t(low ? 'loan.intro_low' : 'loan.intro', { days: LOAN_DAYS, pct: LOAN_INTEREST_PERCENT })}</p>
+          <div className="flex flex-wrap gap-1.5">
+            {LOAN_AMOUNTS.map((amount) => (
+              <button key={amount} type="button" onClick={() => dispatch({ type: 'takeLoan', amount })} className="rounded-lg bg-teal text-white px-3 py-1.5 text-xs font-semibold">
+                {t('loan.take', { v: money(amount), daily: money(Math.round((amount + loanInterest(amount)) / LOAN_DAYS)) })}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </section>
+  );
+}
+
 export function FinanceView() {
   const autoPrice = effectiveSettings(autoSettings(useGame((st) => st.game))).pricing;
   const t = useT();
@@ -205,6 +260,8 @@ export function FinanceView() {
         <Kpi tone="plain" label={t('fin.receivable')} value={money(v.receivables)} />
         <Kpi tone="plain" label={t('fin.capex')} value={money(v.current.capex)} />
       </div>
+
+      <LoanCard />
 
       <div className="grid gap-3 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
         <section className="rounded-2xl bg-white border border-line p-3 min-w-0">

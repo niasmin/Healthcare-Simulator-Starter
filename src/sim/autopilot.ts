@@ -1,3 +1,4 @@
+import { AUTO_LOAN_DAYS, AUTO_LOAN_TARGET_DAYS, LOAN_AMOUNTS } from '../data/loans';
 import { EVENT_DEFS } from '../data/events';
 import { prefabCost, prefabDef } from '../data/prefabs';
 import { thb } from '../domain/money';
@@ -167,6 +168,17 @@ function buildNext(state: GameState, apply: Apply): GameState {
  * Run the switched-on helpers. Events every tick (so nothing waits); the rest once an hour.
  * `speed` is the game speed before this tick, restored when a chapter verdict is followed straight on.
  */
+/** Cash for under a week of running costs and no loan yet: take the smallest loan that covers a month. */
+export function autoLoan(state: GameState, apply: Apply): GameState {
+  if (state.loan || state.mode === 'challenge') return state;
+  const cost = dailyRunningCost(state);
+  if (cost <= 0 || state.organization.cashSatang >= cost * AUTO_LOAN_DAYS) return state;
+  const gap = cost * AUTO_LOAN_TARGET_DAYS - state.organization.cashSatang;
+  const amount = LOAN_AMOUNTS.find((x) => x >= gap) ?? LOAN_AMOUNTS[LOAN_AMOUNTS.length - 1];
+  const out = apply(state, { type: 'takeLoan', amount });
+  return out.result.ok ? out.state : state;
+}
+
 export function autopilot(state: GameState, apply: Apply, speed: GameState['speed'] = state.speed): GameState {
   const a = state.auto;
   if (!a) return state;
@@ -179,6 +191,8 @@ export function autopilot(state: GameState, apply: Apply, speed: GameState['spee
   if (all.staffCare || all.pricing) s = dailyCare(s, apply, all);
   const business = all.chapters || all.build || all.estate || all.homecare || all.training || all.placements || all.branches || all.shop || all.garden;
   if (business && (s.minute % (24 * 60) === 7 * 60 || s.minute % (24 * 60) === 15 * 60)) s = campaignTurn(s, apply, all);
+  // Before the midnight bills: borrow rather than let cash run out.
+  if ((a.staff || business) && s.minute % (24 * 60) === 20 * 60) s = autoLoan(s, apply);
   if (a.staff) s = staffAll(s, apply);
   if (a.admit) s = admitAll(s, apply);
   if (a.carePlan) s = planAll(s, apply);

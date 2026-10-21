@@ -113,7 +113,11 @@ export type LedgerCategory =
   | 'training'
   | 'branch'
   /** Treats and outings bought in town (city map). */
-  | 'outing';
+  | 'outing'
+  /** Bank loan principal: in when borrowed, out with each instalment (not income or a cost). */
+  | 'loan'
+  /** Interest on a bank loan (a running cost). */
+  | 'interest';
 
 export type MissionId = 'no_missed' | 'tasks40' | 'admit_one' | 'hire_one' | 'outing' | 'satisfied75' | 'happy70' | 'cash_up' | 'full_beds';
 export type AchievementId =
@@ -717,6 +721,17 @@ export interface InventoryState {
   badLot?: StockItem;
 }
 
+/** A bank loan: paid back in equal daily instalments of principal and interest. */
+export interface Loan {
+  principal: Satang;
+  interest: Satang;
+  paidPrincipal: Satang;
+  paidInterest: Satang;
+  days: number;
+  /** Day the loan was taken; its first instalment is paid that midnight. */
+  startDay: number;
+}
+
 export interface GameState {
   schemaVersion: 10;
   auto?: AutoSettings;
@@ -759,6 +774,8 @@ export interface GameState {
   city?: CityState;
   /** Daily missions and achievements (older saves: absent). */
   goals?: GoalsState;
+  /** A bank loan being paid back (data/loans.ts); absent when there is none. */
+  loan?: Loan;
   /** Care consumables (older saves: absent = the flat daily supplies charge). */
   inventory?: InventoryState;
   // Phase 3
@@ -823,6 +840,8 @@ export type ReasonCode =
   | 'not_enough_stars'
   | 'inventory_off'
   | 'no_space'
+  | 'loan_active'
+  | 'no_loans'
   | 'min_order'
   | 'nobody_to_treat';
 
