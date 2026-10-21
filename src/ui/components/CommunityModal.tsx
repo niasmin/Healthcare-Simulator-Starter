@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { COMMUNITY_URL, CONTACT_EMAIL, GAME_URL, SUPPORT } from '../../config/community';
 import { dayOf } from '../../sim/systems/time';
 import { useT } from '../hooks';
-import { promptpayPayload } from '../promptpay';
+import { promptpayPayload, validPayload } from '../promptpay';
 import { supabase, useSaveStatus } from '../saveService';
 import { useGame } from '../store';
 
@@ -50,7 +50,8 @@ function Support() {
   const t = useT();
   const [qr, setQr] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
-  const payload = SUPPORT.promptpay ? promptpayPayload(SUPPORT.promptpay) : null;
+  // An exact QR from the bank app wins; otherwise build one from the PromptPay id.
+  const payload = SUPPORT.promptpayPayload && validPayload(SUPPORT.promptpayPayload) ? SUPPORT.promptpayPayload : SUPPORT.promptpay ? promptpayPayload(SUPPORT.promptpay) : null;
   useEffect(() => {
     if (!payload) return;
     let alive = true;

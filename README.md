@@ -238,7 +238,7 @@ All of this is in the renderer only (`src/render/Ambience.ts` and `IsoRenderer`)
 ### Launch kit: support, feedback, privacy, itch.io
 
 - **Community window (☕):** opens from the title screen (side menu on desktop and phone), the Settings and phone menu (three buttons) and the desktop top bar. It has three tabs.
-  - **Support:** links to Ko-fi, Buy Me a Coffee and Patreon, and a PromptPay QR code. The QR follows the Thai QR standard (EMVCo) with its CRC-16, and any Thai banking app can scan it.
+  - **Support:** links to Ko-fi, Buy Me a Coffee and Patreon, and a PromptPay QR code. The QR follows the Thai QR standard (EMVCo) with its CRC-16, and any Thai banking app can scan it. `VITE_SUPPORT_PROMPTPAY_PAYLOAD` takes the exact text of an existing bank-app QR; it is used as is when its checksum is valid. The live site uses the owner's K PLUS receive-money QR this way, and the QR re-drawn in the game scans back to the identical text.
     - Each link shows only when it is set in `.env.production`, through `VITE_SUPPORT_KOFI`, `VITE_SUPPORT_BMC`, `VITE_SUPPORT_PATREON`, `VITE_SUPPORT_PROMPTPAY` (a phone number or national/tax ID) and `VITE_SUPPORT_PROMPTPAY_NAME`.
     - The tab also has free ways to help: a Share button (the system share sheet, or the link copied) and an optional `VITE_COMMUNITY_URL` (a LINE OpenChat or Discord link).
     - Support never changes anything in the game.
@@ -721,7 +721,7 @@ src/
   - Food, supplies, upkeep and payroll are each charged once per day.
   - An event's cost is charged once, and a resolved event can't be resolved again.
 
-## Tests (279 passing)
+## Tests (280 passing)
 
 | File | Covers |
 |---|---|
