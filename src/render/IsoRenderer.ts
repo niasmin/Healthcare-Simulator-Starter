@@ -1,7 +1,7 @@
 import { Application, Container, Graphics, Sprite, Text, type Texture } from 'pixi.js';
 import { DECOR_SPRITE, EQUIP_SPRITE, ROOM_BADGE, PERSON_SPRITE_WIDTH, loadSpriteTextures } from './sprites';
 import { WORLD_MARGIN, drawWorld, worldBounds } from './WorldBackdrop';
-import { Ambience } from './Ambience';
+import { Ambience, type Weather } from './Ambience';
 import { EQUIPMENT, ROOMS } from '../data/rooms';
 import { cellIndex } from '../domain/grid';
 import type { RoomStatus } from '../domain/rules/rooms';
@@ -23,8 +23,10 @@ export interface PersonMarker {
   bed?: number;
   /** Spot index for idle staff inside a room. */
   spot?: number;
-  /** Standing sprite (staff); falls back to the vector figure when missing. */
+  /** Standing sprite (staff, or a resident out of bed); falls back to the vector figure when missing. */
   sprite?: string;
+  /** A resident out for a stroll: drawn standing in the dining room or the garden instead of in bed. */
+  stroll?: boolean;
 }
 
 export interface RenderInput {
@@ -48,6 +50,8 @@ export interface RenderInput {
   exterior?: boolean;
   /** 'low' turns off moving effects (clouds, petals, puffs, walking) for slow phones. Default high. */
   effects?: 'high' | 'low';
+  /** The day's weather (looks only). */
+  weather?: Weather;
 }
 
 export interface RendererCallbacks {
@@ -135,6 +139,8 @@ export class IsoRenderer {
   private lastPeople = '';
   /** Per room: cells holding beds (in bed order) and free floor cells, for placing people. */
   private roomCells = new Map<string, { beds: Cell[]; free: Cell[] }>();
+  /** Where strolling residents go: dining-room floor first, then lawn beside the garden and the paths. */
+  private strollSpots: Cell[] = [];
   private ready = false;
   private tex = new Map<string, Texture>();
   private destroyed = false;
@@ -443,6 +449,7 @@ export class IsoRenderer {
     this.input = input;
     if (!this.ready) return;
     this.amb.setEffects(input.effects !== 'low');
+    this.amb.setWeather(input.weather ?? 'clear');
     this.amb.drawTint(input.game.minute, this.app.screen.width, this.app.screen.height);
     this.labelLayer.visible = input.showLabels !== false;
     this.peopleLayer.visible = !input.exterior;
@@ -456,7 +463,7 @@ export class IsoRenderer {
       const pts = [cellToWorld(b.minX, b.minY), cellToWorld(b.maxX, b.minY), cellToWorld(b.maxX, b.maxY), cellToWorld(b.minX, b.maxY)];
       this.amb.setBounds({ minX: Math.min(...pts.map((p) => p.x)), maxX: Math.max(...pts.map((p) => p.x)), minY: Math.min(...pts.map((p) => p.y)), maxY: Math.max(...pts.map((p) => p.y)) });
     }
-    const staticKey = `${input.labelFor({ id: '', type: 'ward', rect: { x: 0, y: 0, w: 1, h: 1 }, equipment: {}, builtAt: 0 })}|${input.entranceLabel}|${input.exterior ? 'ext' : 'int'}`;
+    const staticKey = `${input.labelFor({ id: '', type: 'ward', rect: { x: 0, y: 0, w: 1, h: 1 }, equipment: {}, builtAt: 0 })}|${input.entranceLabel}|${input.exterior ? 'ext' : 'int'}|${input.game.upgrades?.includes('solar_roof') ? 'solar' : ''}`;
     if (input.game.site !== this.lastSite || staticKey !== this.lastStatic) {
       this.lastSite = input.game.site;
       this.lastStatic = staticKey;
@@ -552,6 +559,7 @@ export class IsoRenderer {
       });
     items.sort((a, b) => a.key - b.key);
     for (const it of items) it.draw();
+    this.strollSpots = strollSpots(site, (id) => this.roomCells.get(id)?.free ?? []);
   }
 
   private drawRoom(room: Room, status: RoomStatus | undefined, label: string): void {
@@ -637,7 +645,10 @@ export class IsoRenderer {
     const g = new Graphics();
     this.staticLayer.addChild(g);
     const { x, y, w, h } = room.rect;
-    const H = STOREY_H;
+    // Big wards read as two-storey blocks.
+    const floors = room.type === 'ward' && w * h >= 20 ? 2 : 1;
+    const H = STOREY_H * (floors === 2 ? 1.75 : 1);
+    const solar = !!this.input?.game.upgrades?.includes('solar_roof');
     const up = (p: { x: number; y: number }, z: number) => ({ x: p.x, y: p.y - z });
     const T = cellToWorld(x, y);
     const R = cellToWorld(x + w, y);
@@ -660,26 +671,55 @@ export class IsoRenderer {
     face(B, R, shade(wallColor, 0.84));
     // windows: one per tile along each face, skipping the door tile
     const door = status?.door ?? null;
-    const win = (a: { x: number; y: number }, b: { x: number; y: number }, n: number, skip: number, dark: number) => {
+    const win = (a: { x: number; y: number }, b: { x: number; y: number }, n: number, skip: number, dark: number, flowers: boolean) => {
+      const at = (f: number, z: number) => ({ x: a.x + (b.x - a.x) * f, y: a.y + (b.y - a.y) * f - z });
       for (let i = 0; i < n; i++) {
         const f0 = (i + 0.25) / n;
         const f1 = (i + 0.75) / n;
-        const p0 = { x: a.x + (b.x - a.x) * f0, y: a.y + (b.y - a.y) * f0 };
-        const p1 = { x: a.x + (b.x - a.x) * f1, y: a.y + (b.y - a.y) * f1 };
         if (i === skip) {
-          // the front door with a small canopy
+          // the front door with a small canopy and two steps
+          const [p0, p1] = [at(f0, 0), at(f1, 0)];
           g.poly([p0.x, p0.y - 2, p1.x, p1.y - 2, p1.x, p1.y - 24, p0.x, p0.y - 24]).fill(0x7a5236);
+          g.poly([p0.x + 2, p0.y - 4, p1.x - 2, p1.y - 4, p1.x - 2, p1.y - 21, p0.x + 2, p0.y - 21]).stroke({ width: 1, color: 0x5a3a24, alpha: 0.8 });
           g.poly([p0.x - 3, p0.y - 26, p1.x + 3, p1.y - 26, p1.x + 3, p1.y - 30, p0.x - 3, p0.y - 30]).fill(shade(def.wallColor, 1.1));
+          g.poly([p0.x - 2, p0.y + 1, p1.x + 2, p1.y + 1, p1.x + 2, p1.y - 2, p0.x - 2, p0.y - 2]).fill(0xd8d2c4);
           continue;
         }
-        g.poly([p0.x, p0.y - 14, p1.x, p1.y - 14, p1.x, p1.y - 32, p0.x, p0.y - 32]).fill({ color: dark, alpha: 0.9 });
-        g.poly([p0.x, p0.y - 23, p1.x, p1.y - 23]).stroke({ width: 1, color: 0xffffff, alpha: 0.6 });
+        for (let f = 0; f < floors; f++) {
+          const z = f * STOREY_H * 0.78;
+          const [q0, q1, q2, q3] = [at(f0, 14 + z), at(f1, 14 + z), at(f1, 32 + z), at(f0, 32 + z)];
+          g.poly([q0.x, q0.y, q1.x, q1.y, q2.x, q2.y, q3.x, q3.y]).fill({ color: dark, alpha: 0.9 }).stroke({ width: 1.5, color: 0xfbf8f2 });
+          // a glint and a mullion
+          g.poly([q3.x + 2, q3.y + 3, q3.x + 5, q3.y + 2, q0.x + 5, q0.y - 6, q0.x + 2, q0.y - 5]).fill({ color: 0xffffff, alpha: 0.35 });
+          const m0 = at((f0 + f1) / 2, 14 + z);
+          const m1 = at((f0 + f1) / 2, 32 + z);
+          g.moveTo(m0.x, m0.y).lineTo(m1.x, m1.y).stroke({ width: 1, color: 0xfbf8f2, alpha: 0.8 });
+          // sill, and a flower box under every other ground-floor window
+          g.poly([q0.x - 1.5, q0.y + 1, q1.x + 1.5, q1.y + 1, q1.x + 1.5, q1.y - 1.5, q0.x - 1.5, q0.y - 1.5]).fill(shade(wallColor, 0.7));
+          if (flowers && f === 0 && i % 2 === 0) {
+            g.poly([q0.x, q0.y + 4, q1.x, q1.y + 4, q1.x, q1.y + 1, q0.x, q0.y + 1]).fill(0x8a5a3c);
+            for (let k = 0; k < 4; k++) {
+              const fp = at(f0 + ((f1 - f0) * (k + 0.5)) / 4, 15.5 + z);
+              g.circle(fp.x, fp.y, 2.2).fill(k % 2 ? 0xf08aa8 : 0xffd166);
+              g.circle(fp.x + 1, fp.y + 1.5, 1.6).fill(0x5f9e4e);
+            }
+          }
+        }
       }
     };
     const doorLeft = door && door.outside.y === y + h ? door.inside.x - x : -1;
     const doorRight = door && door.outside.x === x + w ? door.inside.y - y : -1;
-    win(L, B, w, doorLeft, 0x8fbccc);
-    win(B, R, h, doorRight, 0x76a6b8);
+    win(L, B, w, doorLeft, 0x8fbccc, true);
+    win(B, R, h, doorRight, 0x76a6b8, room.type === 'villa');
+    // Shrubs along the base of the front-left face, clear of the door.
+    for (let i = 0; i < w; i += 2) {
+      if (i === doorLeft || i + 1 === doorLeft) continue;
+      const p = { x: L.x + ((B.x - L.x) * (i + 0.5)) / w, y: L.y + ((B.y - L.y) * (i + 0.5)) / w };
+      g.ellipse(p.x, p.y + 3, 8, 3.5).fill({ color: 0x000000, alpha: 0.12 });
+      g.circle(p.x - 3, p.y - 2, 5).fill(0x5f9e4e);
+      g.circle(p.x + 3, p.y - 3, 5.5).fill(0x6fb05a);
+      g.circle(p.x, p.y - 6, 4.5).fill(0x82c06a);
+    }
     const [t1, r1, b1, l1] = [up(T, H), up(R, H), up(B, H), up(L, H)];
     if (PITCHED.has(room.type)) {
       // pitched tile roof, ridge along the longer side, with eaves
@@ -698,14 +738,60 @@ export class IsoRenderer {
         g.poly([r1.x, r1.y, b1.x, b1.y, k2.x, k2.y, k1.x, k1.y]).fill(shade(roof, 0.85));
         g.poly([l1.x, l1.y, b1.x, b1.y, k2.x, k2.y]).fill(shade(wallColor, 0.92));
       }
+      // rows of roof tiles, parallel to the ridge, on both slopes
+      const eaves = alongX ? [[t1, r1], [l1, b1]] : [[t1, l1], [r1, b1]];
+      for (const [e0, e1] of eaves)
+        for (let k = 1; k < 4; k++) {
+          const f = k / 4;
+          g.moveTo(e0.x + (k1.x - e0.x) * f, e0.y + (k1.y - e0.y) * f)
+            .lineTo(e1.x + (k2.x - e1.x) * f, e1.y + (k2.y - e1.y) * f)
+            .stroke({ width: 1, color: shade(roof, 0.78), alpha: 0.7 });
+        }
       g.moveTo(k1.x, k1.y).lineTo(k2.x, k2.y).stroke({ width: 2, color: shade(roof, 0.7) });
+      if (room.type === 'villa') {
+        // a little chimney on the back slope
+        const cx = k1.x + (k2.x - k1.x) * 0.3;
+        const cy = k1.y + (k2.y - k1.y) * 0.3 + 4;
+        g.poly([cx - 4, cy, cx + 4, cy, cx + 4, cy - 12, cx - 4, cy - 12]).fill(0x9c6a52);
+        g.poly([cx - 5, cy - 12, cx + 5, cy - 12, cx + 5, cy - 15, cx - 5, cy - 15]).fill(0x7d5240);
+      }
+      if (solar) {
+        // solar panels on the front slope
+        const [e0, e1] = eaves[1];
+        for (let k = 0; k < 2; k++) {
+          const a0 = 0.2 + k * 0.32;
+          const a1 = a0 + 0.26;
+          const lerp = (p: { x: number; y: number }, q: { x: number; y: number }, f: number) => ({ x: p.x + (q.x - p.x) * f, y: p.y + (q.y - p.y) * f });
+          const lo0 = lerp(e0, e1, a0);
+          const lo1 = lerp(e0, e1, a1);
+          const hi0 = lerp(lerp(e0, k1, 0.7), lerp(e1, k2, 0.7), a0);
+          const hi1 = lerp(lerp(e0, k1, 0.7), lerp(e1, k2, 0.7), a1);
+          const P = (p: { x: number; y: number }, q: { x: number; y: number }) => lerp(p, q, 0.15);
+          const [s0, s1, s2, s3] = [P(lo0, hi0), P(lo1, hi1), P(hi1, lo1), P(hi0, lo0)];
+          g.poly([s0.x, s0.y, s1.x, s1.y, s2.x, s2.y, s3.x, s3.y]).fill(0x2b4d7a).stroke({ width: 1, color: 0xdfe8f2, alpha: 0.9 });
+          const mid0 = lerp(s0, s3, 0.5);
+          const mid1 = lerp(s1, s2, 0.5);
+          g.moveTo(mid0.x, mid0.y).lineTo(mid1.x, mid1.y).stroke({ width: 1, color: 0x9bb7d6, alpha: 0.7 });
+        }
+      }
     } else {
       // flat roof with a parapet and rooftop units
       g.poly([t1.x, t1.y, r1.x, r1.y, b1.x, b1.y, l1.x, l1.y]).fill(0xd9dcd6).stroke({ width: 3, color: shade(def.wallColor, 0.95) });
       const inset = (p: { x: number; y: number }, k: number) => ({ x: p.x + ((t1.x + b1.x) / 2 - p.x) * k, y: p.y + ((t1.y + b1.y) / 2 - p.y) * k });
       const [ti, ri, bi, li] = [inset(t1, 0.12), inset(r1, 0.12), inset(b1, 0.12), inset(l1, 0.12)];
       g.poly([ti.x, ti.y, ri.x, ri.y, bi.x, bi.y, li.x, li.y]).fill(0xc9cdc6);
-      const units = Math.max(1, Math.min(3, Math.floor((w * h) / 4)));
+      if (solar) {
+        // rows of solar panels across the flat roof
+        for (let row = 0; row < 2; row++)
+          for (let col = 0; col < Math.max(1, Math.floor(w / 2)); col++) {
+            const c = cellToWorld(x + 0.6 + col * 2, y + 0.5 + row * Math.max(1, h - 1.6));
+            const cx = c.x;
+            const cy = c.y - H - 1;
+            g.poly([cx - 14, cy, cx, cy - 7, cx + 14, cy, cx, cy + 7]).fill(0x2b4d7a).stroke({ width: 1, color: 0xdfe8f2, alpha: 0.9 });
+            g.moveTo(cx - 7, cy - 3.5).lineTo(cx + 7, cy + 3.5).stroke({ width: 1, color: 0x9bb7d6, alpha: 0.7 });
+          }
+      }
+      const units = solar ? 0 : Math.max(1, Math.min(3, Math.floor((w * h) / 4)));
       for (let k = 0; k < units; k++) {
         const c = cellToWorld(x + w * (units === 1 ? 0.5 : 0.28 + (0.44 * k) / (units - 1)), y + h * 0.4);
         const cx = c.x;
@@ -740,7 +826,7 @@ export class IsoRenderer {
   }
 
   private drawPeople(people: PersonMarker[]): void {
-    const key = people.map((p) => `${p.key}:${p.roomId}:${p.bed ?? ''}:${p.spot ?? ''}`).join('|');
+    const key = people.map((p) => `${p.key}:${p.roomId}:${p.bed ?? ''}:${p.spot ?? ''}:${p.stroll ? 's' : ''}`).join('|');
     if (key === this.lastPeople) return;
     this.lastPeople = key;
     const g = this.peopleShapes;
@@ -748,7 +834,18 @@ export class IsoRenderer {
     const keep = new Set<string>();
     if (g.parent !== this.peopleLayer) this.peopleLayer.addChild(g);
     const items: Array<{ x: number; y: number; p: PersonMarker }> = [];
-    for (const p of people) {
+    let strolling = 0;
+    for (const raw of people) {
+      // A stroller whose sprite isn't drawn yet (the wheelchair) walks with the grandfather's.
+      const p = raw.stroll && raw.sprite && !this.tex.has(raw.sprite) ? { ...raw, sprite: 'ch_elder_m' } : raw;
+      if (p.stroll && p.sprite && this.tex.has(p.sprite) && this.strollSpots.length) {
+        const spot = this.strollSpots[(strolling++ * 7) % this.strollSpots.length];
+        const c = cellCenter(spot.x, spot.y);
+        // A little offset so two strollers sharing a lawn tile stand side by side.
+        const k = Math.floor(((strolling - 1) * 7) / this.strollSpots.length);
+        items.push({ x: c.x - 6 + (k % 3) * 12, y: c.y + 2 + (k % 2) * 4, p });
+        continue;
+      }
       const rc = p.roomId ? this.roomCells.get(p.roomId) : undefined;
       let cell: Cell | undefined;
       if (rc && p.bed !== undefined) cell = rc.beds[p.bed] ?? rc.free[p.bed % Math.max(1, rc.free.length)];
@@ -764,7 +861,7 @@ export class IsoRenderer {
     items.sort((a, b) => a.y - b.y);
     const snap = this.input?.effects === 'low';
     for (const { x, y, p } of items) {
-      if (p.kind === 'resident') {
+      if (p.kind === 'resident' && !(p.stroll && p.sprite && this.tex.has(p.sprite))) {
         // Lying in bed: head on the pillow, blanket in the care-group colour.
         g.ellipse(x + 1, y - 9, 13, 6.5).fill({ color: p.color, alpha: 0.95 }).stroke({ width: 1, color: shade(p.color, 0.7) });
         g.circle(x - 12, y - 14, 6).fill(0xf1c9a5).stroke({ width: 1.2, color: 0x9b7653 });
@@ -781,7 +878,12 @@ export class IsoRenderer {
         }
         if (w) w.node.destroy({ children: true });
         const node = new Container();
-        node.addChild(new Graphics().ellipse(0, 0, 11, 5).fill({ color: p.color, alpha: 0.45 }).stroke({ width: 1.2, color: shade(p.color, 0.7), alpha: 0.8 }));
+        // Staff stand on a role-coloured ring; residents on a soft shadow.
+        node.addChild(
+          p.kind === 'staff'
+            ? new Graphics().ellipse(0, 0, 11, 5).fill({ color: p.color, alpha: 0.45 }).stroke({ width: 1.2, color: shade(p.color, 0.7), alpha: 0.8 })
+            : new Graphics().ellipse(0, 0, 10, 4.5).fill({ color: 0x000000, alpha: 0.18 }),
+        );
         const t = this.tex.get(p.sprite)!;
         const body = new Sprite(t);
         body.anchor.set(0.5, 0.97);
@@ -791,7 +893,12 @@ export class IsoRenderer {
         node.position.set(x, y);
         node.zIndex = y;
         this.peopleLayer.addChild(node);
-        this.walkers.set(p.key, { node, body, x, y, tx: x, ty: y, phase: (p.key.length * 1.7 + x * 0.01) % 6.28, sprite: p.sprite });
+        // A resident setting out walks from their bed.
+        const from = p.kind === 'resident' ? this.bedPoint(p) : null;
+        const sx = from && !snap ? from.x : x;
+        const sy = from && !snap ? from.y : y;
+        node.position.set(sx, sy);
+        this.walkers.set(p.key, { node, body, x: sx, y: sy, tx: x, ty: y, phase: (p.key.length * 1.7 + x * 0.01) % 6.28, sprite: p.sprite });
       } else {
         g.ellipse(x, y, 10, 4.5).fill({ color: 0x000000, alpha: 0.2 });
         g.roundRect(x - 7, y - 25, 14, 24, 6).fill(p.color).stroke({ width: 1.2, color: shade(p.color, 0.65) });
@@ -805,6 +912,13 @@ export class IsoRenderer {
         w.node.destroy({ children: true });
         this.walkers.delete(k);
       }
+  }
+
+  /** Where a resident's bed is on the map, or null. */
+  private bedPoint(p: PersonMarker): { x: number; y: number } | null {
+    const rc = p.roomId ? this.roomCells.get(p.roomId) : undefined;
+    const cell = rc && p.bed !== undefined ? rc.beds[p.bed] : undefined;
+    return cell ? cellCenter(cell.x, cell.y) : null;
   }
 
   /** Walkers head for their spot (within about a second) with a little step bounce; idle ones breathe. */
@@ -934,4 +1048,35 @@ export class IsoRenderer {
       g.poly(cellDiamond(input.hover.x, input.hover.y)).fill({ color, alpha: 0.18 }).stroke({ width: 2, color });
     }
   }
+}
+
+/** Stroll spots: dining-room floor, then lawn tiles beside garden decor, then lawn along the paths. */
+export function strollSpots(site: GameState['site'], diningFloor: (roomId: string) => Cell[]): Cell[] {
+  const taken = new Set<string>();
+  for (const r of site.rooms) for (let y = r.rect.y; y < r.rect.y + r.rect.h; y++) for (let x = r.rect.x; x < r.rect.x + r.rect.w; x++) taken.add(`${x},${y}`);
+  for (const d of site.decor ?? []) taken.add(`${d.cell.x},${d.cell.y}`);
+  const out: Cell[] = [];
+  const seen = new Set<string>();
+  const add = (c: Cell) => {
+    const k = `${c.x},${c.y}`;
+    if (seen.has(k)) return;
+    seen.add(k);
+    out.push(c);
+  };
+  for (const r of site.rooms) if (r.type === 'dining_room') diningFloor(r.id).forEach(add);
+  const lawn = (x: number, y: number) => x >= 0 && y >= 0 && x < site.width && y < site.height && !taken.has(`${x},${y}`) && !site.corridor[cellIndex(x, y, site.width)];
+  const around = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+  for (const d of site.decor ?? []) for (const [dx, dy] of around) if (lawn(d.cell.x + dx, d.cell.y + dy)) add({ x: d.cell.x + dx, y: d.cell.y + dy });
+  let path = 0;
+  for (let y = 0; y < site.height && path < 24; y++)
+    for (let x = 0; x < site.width && path < 24; x++) {
+      if (!site.corridor[cellIndex(x, y, site.width)] || (x + y) % 3) continue;
+      for (const [dx, dy] of around)
+        if (lawn(x + dx, y + dy)) {
+          add({ x: x + dx, y: y + dy });
+          path++;
+          break;
+        }
+    }
+  return out;
 }

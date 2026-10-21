@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { rectCells, rectContains, rectFromCorners } from '../../domain/grid';
 import { validateCorridor, validateDecor, validateRoomPlacement, type PlacementCheck } from '../../domain/rules/placement';
-import type { Cell, Rect } from '../../domain/types';
+import type { Cell, GameState, Rect } from '../../domain/types';
 import { IsoRenderer } from '../../render/IsoRenderer';
 import { ROLES } from '../../data/staff';
 import { peopleMarkers } from '../../sim/selectors';
-import { STAFF_SPRITE } from '../../render/sprites';
+import { RESIDENT_SPRITE, STAFF_SPRITE } from '../../render/sprites';
+import { weatherFor } from '../../render/Ambience';
+import { dayOf } from '../../sim/systems/time';
 import { prefabCost, prefabDef, prefabRect } from '../../data/prefabs';
 import { nextPlot } from '../../data/chapters';
 import type { CareGroup, StaffRole } from '../../domain/types';
@@ -14,6 +16,31 @@ import { useGame } from '../store';
 import { useTourPointer } from './Tutorial';
 
 export const GROUP_HEX: Record<CareGroup, number> = { active_aging: 0xc9822b, stroke_rehab: 0x4a6aa5, bedridden: 0x8a5a9e, dementia: 0xb5537a, tube_feeding: 0x3f8f86, airway: 0x2f6aa5 };
+
+/** Groups who can get up and about; the rest stay in bed. */
+const STROLLERS = new Set<CareGroup>(['active_aging', 'stroke_rehab', 'dementia']);
+/** Strolling hours: mid-morning and the afternoon. */
+const strollHour = (minute: number) => {
+  const h = (minute % 1440) / 60;
+  return (h >= 9 && h < 11.5) || (h >= 14.5 && h < 17.5);
+};
+
+/** The sim's people as map markers: colours, sprites, and residents out for a stroll (looks only). */
+export function mapMarkers(game: GameState) {
+  const residents = new Map(game.residents.map((r) => [r.id, r]));
+  const markers = peopleMarkers(game);
+  // Nobody strolls in the rain, and a resident with a carer at the bedside stays put.
+  const outside = strollHour(game.minute) && weatherFor(game.seed, dayOf(game.minute)) !== 'rain';
+  const tended = new Set(markers.filter((m) => m.kind === 'staff' && m.bed !== undefined).map((m) => `${m.roomId}#${m.bed}`));
+  return markers.map((m) => {
+    if (m.kind === 'staff') return { ...m, color: ROLES[m.role as StaffRole].color, sprite: STAFF_SPRITE[m.role as StaffRole] };
+    const r = residents.get(m.key);
+    const color = GROUP_HEX[m.group as CareGroup];
+    if (!r || !outside || !STROLLERS.has(r.group) || r.needs.mobility < 40 || tended.has(`${m.roomId}#${m.bed}`)) return { ...m, color };
+    const sprite = r.needs.mobility < 65 ? RESIDENT_SPRITE.chair : r.name.gender === 'm' ? RESIDENT_SPRITE.m : RESIDENT_SPRITE.f;
+    return { ...m, color, stroll: true, sprite };
+  });
+}
 
 /**
  * Glue between the React/Zustand UI and the Pixi renderer.
@@ -117,15 +144,7 @@ export function GameCanvas({ controls = true }: { controls?: boolean } = {}) {
     return null;
   }, [drag, hover, tool, game]);
 
-  const people = useMemo(
-    () =>
-      peopleMarkers(game).map((m) => ({
-        ...m,
-        color: m.kind === 'staff' ? ROLES[m.role as StaffRole].color : GROUP_HEX[m.group as CareGroup],
-        ...(m.kind === 'staff' ? { sprite: STAFF_SPRITE[m.role as StaffRole] } : {}),
-      })),
-    [game],
-  );
+  const people = useMemo(() => mapMarkers(game), [game]);
 
   const plot = nextPlot(game.site.width);
   useEffect(() => {
@@ -144,6 +163,7 @@ export function GameCanvas({ controls = true }: { controls?: boolean } = {}) {
       showLabels,
       exterior,
       effects: fxOn ? 'high' : 'low',
+      weather: weatherFor(game.seed, dayOf(game.minute)),
       sale: plot ? { toX: plot.width, label: game.chapter.id >= plot.chapter ? t('world.sale_now', { price: money(plot.priceSatang) }) : t('world.sale_later', { c: plot.chapter }) } : null,
     });
   }, [game, people, summary, selectedRoomId, hover, preview, tool, t, ready, lang, showLabels, exterior, tourHint, roomLabel, fxOn]);

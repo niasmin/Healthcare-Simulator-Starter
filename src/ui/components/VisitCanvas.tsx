@@ -1,12 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { allRoomStatuses } from '../../domain/rules/rooms';
-import type { CareGroup, GameState, StaffRole } from '../../domain/types';
+import type { GameState } from '../../domain/types';
 import { IsoRenderer } from '../../render/IsoRenderer';
-import { STAFF_SPRITE } from '../../render/sprites';
-import { ROLES } from '../../data/staff';
-import { peopleMarkers } from '../../sim/selectors';
 import { useT } from '../hooks';
-import { GROUP_HEX } from './GameCanvas';
+import { mapMarkers } from './GameCanvas';
 
 /** A read-only map of another home (a rival look-alike or a player's published layout). */
 export function VisitCanvas({ state }: { state: GameState }) {
@@ -30,15 +27,7 @@ export function VisitCanvas({ state }: { state: GameState }) {
     };
   }, []);
 
-  const people = useMemo(
-    () =>
-      peopleMarkers(state).map((m) => ({
-        ...m,
-        color: m.kind === 'staff' ? ROLES[m.role as StaffRole].color : GROUP_HEX[m.group as CareGroup],
-        ...(m.kind === 'staff' ? { sprite: STAFF_SPRITE[m.role as StaffRole] } : {}),
-      })),
-    [state],
-  );
+  const people = useMemo(() => mapMarkers(state), [state]);
 
   useEffect(() => {
     if (!ready) return;

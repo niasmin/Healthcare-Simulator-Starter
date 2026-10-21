@@ -43,6 +43,15 @@ export function lightAt(minute: number): { color: number; alpha: number; night: 
   return { color: mix(a.color, b.color, t), alpha: a.alpha + (b.alpha - a.alpha) * t, night: a.night + (b.night - a.night) * t };
 }
 
+export type Weather = 'clear' | 'cloudy' | 'rain';
+/** The day's weather, purely for looks: about one rainy and one overcast day in six. */
+export function weatherFor(seed: number, day: number): Weather {
+  let h = Math.imul(seed ^ 0x5bd1e995, 0x27d4eb2d) ^ Math.imul(day + 0x165667b1, 0x85ebca6b);
+  h ^= h >>> 13;
+  const k = ((h >>> 0) % 6 + 6) % 6;
+  return k === 0 ? 'rain' : k === 1 ? 'cloudy' : 'clear';
+}
+
 /** A repeatable jitter in 0..1 (no Math.random, so screenshots and tests are stable). */
 const jitter = (n: number) => {
   const s = Math.sin(n * 127.1 + 311.7) * 43758.5453;
@@ -51,6 +60,7 @@ const jitter = (n: number) => {
 
 interface Petal { g: Graphics; x: number; y: number; vy: number; sway: number; phase: number; spin: number }
 interface Cloud { g: Graphics; x: number; y: number; speed: number }
+interface Drop { g: Graphics; x: number; y: number; v: number }
 interface Puff { g: Graphics; age: number; life: number; vx: number; vy: number; grow: number; sparkle: boolean }
 
 export class Ambience {
@@ -73,6 +83,10 @@ export class Ambience {
   private puffs: Puff[] = [];
   private knownRooms: Set<string> | null = null;
   private effects = true;
+  private weather: Weather = 'clear';
+  private drops: Drop[] = [];
+  private rainLayer = new Container();
+  private gloom = new Graphics();
   private time = 0;
   private bounds = { minX: -600, maxX: 600, minY: -200, maxY: 600 };
 
@@ -82,13 +96,23 @@ export class Ambience {
     this.worldFx.eventMode = 'none';
     this.screenFx.eventMode = 'none';
     this.worldFx.addChild(this.cloudLayer, this.puffLayer);
+    this.screenFx.addChild(this.gloom, this.rainLayer);
+  }
+
+  /** Overcast and rainy days darken the map; rain adds falling streaks (effects on). */
+  setWeather(w: Weather): void {
+    if (w === this.weather) return;
+    this.weather = w;
+    this.lastTint = '';
+    if (w !== 'rain') for (const d of this.drops.splice(0)) d.g.destroy();
   }
 
   setEffects(on: boolean): void {
     if (on === this.effects) return;
     this.effects = on;
     this.cloudLayer.visible = on;
-    this.screenFx.visible = on;
+    this.petals.forEach((p) => (p.g.visible = on));
+    this.rainLayer.visible = on;
     if (!on) for (const p of this.puffs.splice(0)) p.g.destroy();
   }
 
@@ -102,11 +126,15 @@ export class Ambience {
   drawTint(minute: number, width: number, height: number): void {
     const l = lightAt(minute);
     this.night = l.night;
-    const key = `${l.color}|${l.alpha.toFixed(3)}|${width}x${height}`;
+    const key = `${l.color}|${l.alpha.toFixed(3)}|${width}x${height}|${this.weather}`;
     if (key === this.lastTint) return;
     this.lastTint = key;
     this.tint.clear();
     if (l.alpha > 0.001) this.tint.rect(0, 0, width, height).fill({ color: l.color, alpha: l.alpha });
+    // Grey daylight under cloud; the night is dark enough already.
+    const grey = (this.weather === 'rain' ? 0.2 : this.weather === 'cloudy' ? 0.1 : 0) * (1 - l.night);
+    this.gloom.clear();
+    if (grey > 0.001) this.gloom.rect(0, 0, width, height).fill({ color: 0x5d6b7a, alpha: grey });
     this.lights.alpha = Math.min(1, l.night * 1.1);
     this.lights.visible = l.night > 0.02;
   }
@@ -190,6 +218,26 @@ export class Ambience {
     }
   }
 
+  private rain(dt: number, screen: { width: number; height: number }): void {
+    const want = Math.round(Math.min(140, (screen.width * screen.height) / 9000));
+    while (this.drops.length < want) {
+      const i = this.drops.length;
+      const g = new Graphics().moveTo(0, 0).lineTo(-3, 13).stroke({ width: 1.2, color: 0xcfe0f0, alpha: 0.55 });
+      this.rainLayer.addChild(g);
+      this.drops.push({ g, x: jitter(i * 13 + 1) * screen.width, y: jitter(i * 17 + 2) * screen.height, v: 520 + jitter(i * 19) * 260 });
+    }
+    for (const d of this.drops) {
+      d.y += d.v * dt;
+      d.x -= d.v * 0.22 * dt;
+      if (d.y > screen.height) {
+        d.y = -14;
+        d.x = jitter(d.v + this.time) * (screen.width + 60);
+      }
+      if (d.x < -10) d.x += screen.width + 20;
+      d.g.position.set(d.x, d.y);
+    }
+  }
+
   /** Per frame. `running` is false while the game is paused (petals and clouds still drift slowly). */
   tick(dtMs: number, running: boolean, screen: { width: number; height: number }): void {
     const dt = Math.min(0.1, dtMs / 1000);
@@ -205,12 +253,15 @@ export class Ambience {
       if (c.y > maxY + 150) c.y = minY - 150;
       c.g.position.set(c.x, c.y);
     }
-    this.cloudLayer.alpha = day;
+    this.cloudLayer.alpha = day * (this.weather === 'clear' ? 1 : this.weather === 'cloudy' ? 2.2 : 3);
     // Petals fall and sway; they wrap at the bottom of the screen.
     const expected = Math.round(Math.min(26, (screen.width * screen.height) / 42000));
     if (this.petals.length !== expected) this.makePetals(screen.width, screen.height);
-    this.screenFx.alpha = day * 0.95;
+    this.screenFx.alpha = 1;
+    const petalAlpha = day * (this.weather === 'clear' ? 0.95 : this.weather === 'cloudy' ? 0.4 : 0);
+    if (this.weather === 'rain') this.rain(dt, screen);
     for (const p of this.petals) {
+      p.g.alpha = petalAlpha;
       p.y += p.vy * dt;
       p.x += Math.sin(this.time * 0.9 + p.phase) * p.sway * dt + 6 * dt;
       if (p.y > screen.height + 8) {

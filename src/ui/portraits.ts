@@ -1,6 +1,4 @@
 import type { Employee, Needs, PersonName, StaffRole } from '../domain/types';
-import residentF from '../assets/portraits/resident_f.jpg';
-import residentF2 from '../assets/portraits/resident_f2.jpg';
 
 /**
  * Character portraits from the project's chibi character sheet (fictional characters).
@@ -9,9 +7,9 @@ import residentF2 from '../assets/portraits/resident_f2.jpg';
 const faces = import.meta.glob('../assets/faces/*.png', { eager: true, import: 'default' }) as Record<string, string>;
 
 export type Mood = 'default' | 'smile' | 'happy' | 'surprise' | 'sad';
-type FaceSet = 'owner_f' | 'owner_m' | 'nurse' | 'caregiver' | 'pt' | 'ot' | 'resident' | 'doctor' | 'pharmacist' | 'nutritionist' | 'cleaner' | 'receptionist' | 'security';
+type FaceSet = 'owner_f' | 'owner_m' | 'nurse' | 'caregiver' | 'pt' | 'ot' | 'resident' | 'doctor' | 'pharmacist' | 'nutritionist' | 'cleaner' | 'receptionist' | 'security' | 'accountant' | 'elder_f';
 
-const ROLE_FACE: Record<StaffRole, FaceSet> = { rn: 'nurse', pn: 'nurse', caregiver: 'caregiver', pt: 'pt', ot: 'ot', doctor: 'doctor', pharmacist: 'pharmacist', nutritionist: 'nutritionist', cleaner: 'cleaner', receptionist: 'receptionist', security: 'security', accountant: 'receptionist' };
+const ROLE_FACE: Record<StaffRole, FaceSet> = { rn: 'nurse', pn: 'nurse', caregiver: 'caregiver', pt: 'pt', ot: 'ot', doctor: 'doctor', pharmacist: 'pharmacist', nutritionist: 'nutritionist', cleaner: 'cleaner', receptionist: 'receptionist', security: 'security', accountant: 'accountant' };
 
 function face(set: FaceSet, mood: Mood): string {
   return faces[`../assets/faces/${set}_${mood}.png`];
@@ -32,10 +30,8 @@ export function staffPortrait(e: Employee): string {
 }
 
 
-/** Male residents use the chibi elder with live expressions; female residents keep the earlier portraits. */
+/** Residents use the chibi elders: the grandfather with live expressions, the grandmother (one expression so far). */
 export function residentPortrait(name: PersonName, needs?: Needs, mood?: Mood): string {
-  if (name.gender === 'm') return face('resident', mood ?? (needs ? moodOf((needs.happiness + needs.satisfaction) / 2) : 'default'));
-  let h = 0;
-  for (const ch of name.th) h = (h + ch.charCodeAt(0)) % 97;
-  return h % 2 ? residentF2 : residentF;
+  const m = mood ?? (needs ? moodOf((needs.happiness + needs.satisfaction) / 2) : 'default');
+  return face(name.gender === 'm' ? 'resident' : 'elder_f', m);
 }
