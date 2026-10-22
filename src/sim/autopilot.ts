@@ -14,6 +14,7 @@ import { dailyRunningCost, rosterView } from './selectors';
 import { choiceBlocker } from './systems/events';
 import { DRILL_SATANG, SAFETY_KIT_SATANG } from '../data/standards';
 import { needsReassessment, standardsChecklist } from './systems/standards';
+import { allRoomStatuses } from '../domain/rules/rooms';
 
 /** The autopilot buys the safety kit or books the drill only with this many times the price in hand. */
 const AUTO_STANDARDS_CASH_MULTIPLE = 5;
@@ -103,6 +104,13 @@ function admitAll(state: GameState, apply: Apply): GameState {
 function planAll(state: GameState, apply: Apply): GameState {
   let s = state;
   for (const r of state.residents) if (!r.carePlan || needsReassessment(s, r.carePlan.createdAt)) [s] = tryCmd(s, apply, { type: 'createCarePlan', residentId: r.id });
+  return s;
+}
+
+function connectAll(state: GameState, apply: Apply): GameState {
+  let s = state;
+  const statuses = allRoomStatuses(s.site);
+  for (const r of state.site.rooms) if (!statuses.get(r.id)?.door) [s] = tryCmd(s, apply, { type: 'connectRoom', roomId: r.id });
   return s;
 }
 
@@ -204,6 +212,8 @@ export function autopilot(state: GameState, apply: Apply, speed: GameState['spee
   if (a.chapters && s.chapter.result) s = advanceChapter(s, apply, speed);
   if (s.minute % 60 !== 0) return s;
   if (a.build && s.minute % (24 * 60) === BUILD_MINUTE) s = buildNext(s, apply);
+  // A building cut off from the corridors gets the shortest corridor to its door.
+  if (a.build || a.estate) s = connectAll(s, apply);
   const all = effectiveSettings(autoSettings(s));
   if (all.staffCare || all.pricing) s = dailyCare(s, apply, all);
   const business = all.chapters || all.build || all.estate || all.homecare || all.training || all.placements || all.branches || all.shop || all.garden;

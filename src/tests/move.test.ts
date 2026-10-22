@@ -3,7 +3,8 @@ import { createInitialState } from '../sim/state';
 import { findDoor } from '../domain/rules/navigation';
 import { reconcile } from '../domain/rules/ledger';
 import { roomStatus } from '../domain/rules/rooms';
-import { doorFee, moveFee, turnedPlacement, worksMinutes } from '../sim/systems/move';
+import { connectPath, moveFee, turnedRect, worksMinutes } from '../sim/systems/move';
+import { CORRIDOR_COST_PER_TILE } from '../data/rooms';
 import type { GameState } from '../domain/types';
 import { admitPlanned, buildHome, hire, ok, quietEvents } from './helpers';
 
@@ -60,33 +61,35 @@ describe('moving and turning buildings', () => {
 
   it('turning a long building swaps its sides about the centre; four turns come back', () => {
     const r = { id: 'r', type: 'ward' as const, rect: { x: 4, y: 4, w: 4, h: 6 }, equipment: {}, builtAt: 0 };
-    let cur = { ...r } as typeof r & { facing?: 's' | 'e' | 'n' | 'w' };
-    for (let i = 0; i < 4; i++) cur = { ...cur, ...turnedPlacement(cur, 1) };
+    let cur = { ...r };
+    for (let i = 0; i < 4; i++) cur = { ...cur, rect: turnedRect(cur) };
     expect(cur.rect).toEqual(r.rect);
-    expect(cur.facing).toBe('s');
-    expect(turnedPlacement(r, 1).rect).toEqual({ x: 3, y: 5, w: 6, h: 4 });
-    expect(turnedPlacement(r, 1).facing).toBe('w');
-    expect(turnedPlacement(r, -1).facing).toBe('e');
+    expect(turnedRect(r)).toEqual({ x: 3, y: 5, w: 6, h: 4 });
   });
 
-  it('turning a square building only moves its door: a small fee, done at once, still open', () => {
+  it('doors are automatic: a square building is not turned, its door finds the corridor', () => {
     let s = quietEvents(buildHome(createInitialState(1)));
-    s = ok(s, { type: 'paintCorridor', rect: { x: 13, y: 7, w: 1, h: 3 } });
     const st = room(s, 'nursing_station');
-    expect(findDoor(st, s.site)!.outside.y).toBe(10);
+    expect(applyCommand(s, { type: 'turnRoom', roomId: st.id, turns: 1 }).result).toMatchObject({ ok: false, reason: 'nothing_to_build' });
+    // An older save's chosen door side is ignored.
+    s = { ...s, site: { ...s.site, rooms: s.site.rooms.map((r) => (r.id === st.id ? { ...r, facing: 'n' } : r)) } };
+    expect(findDoor(room(s, 'nursing_station'), s.site)).toEqual(findDoor(st, s.site));
+  });
+
+  it('paves the shortest corridor that gives a cut-off building its door', () => {
+    let s = quietEvents(buildHome(createInitialState(1)));
+    // A staff room out on its own, two tiles from the crossway.
+    s = ok(s, { type: 'placeRoom', roomType: 'staff_room', rect: { x: 15, y: 5, w: 2, h: 2 } });
+    const lone = s.site.rooms[s.site.rooms.length - 1];
+    expect(findDoor(lone, s.site)).toBeNull();
+    const tiles = connectPath(s, lone.id)!;
+    expect(tiles).toHaveLength(3);
     const cash = s.organization.cashSatang;
-    s = ok(s, { type: 'turnRoom', roomId: st.id, turns: -1 });
-    const turned = room(s, 'nursing_station');
-    expect(turned.rect).toEqual(st.rect);
-    expect(turned.facing).toBe('e');
-    expect(turned.worksUntil).toBeUndefined();
-    expect(findDoor(turned, s.site)!.outside.x).toBe(13);
-    expect(roomStatus(turned, s.site).operational).toBe(true);
-    expect(s.organization.cashSatang).toBe(cash - doorFee(st));
-    // setFacing picks a side directly; a side with no corridor falls back to the usual order.
-    s = ok(s, { type: 'setFacing', roomId: st.id, facing: 'n' });
-    expect(findDoor(room(s, 'nursing_station'), s.site)!.outside.y).toBe(10);
-    expect(applyCommand(s, { type: 'setFacing', roomId: st.id, facing: 'n' }).result).toMatchObject({ ok: false, reason: 'already_done' });
+    s = ok(s, { type: 'connectRoom', roomId: lone.id });
+    expect(findDoor(room(s, 'staff_room') && s.site.rooms.find((r) => r.id === lone.id)!, s.site)).not.toBeNull();
+    expect(s.organization.cashSatang).toBe(cash - 3 * CORRIDOR_COST_PER_TILE);
+    expect(applyCommand(s, { type: 'connectRoom', roomId: lone.id }).result).toMatchObject({ ok: false, reason: 'already_done' });
+    expect(reconcile(s).ok).toBe(true);
   });
 
   it('turning a long building in place needs room for its new footprint', () => {

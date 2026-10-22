@@ -63,8 +63,6 @@ export interface Room {
   builtAt: SimMinute;
   /** The player's name for the building (missing = the default "Ward 1", "Villa 2", ...). */
   name?: string;
-  /** The side the front door is on, when it touches a corridor (missing = the default order, front sides first). */
-  facing?: Facing;
   /** Building works (a move or a turn) under way: the building is closed until this minute. */
   worksUntil?: SimMinute;
 }
@@ -848,6 +846,7 @@ export type ReasonCode =
   | 'no_free_bed'
   | 'room_occupied'
   | 'works_active'
+  | 'no_route'
   | 'bed_occupied'
   | 'shift_overlap'
   | 'shift_too_long'
