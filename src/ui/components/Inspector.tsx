@@ -1,9 +1,10 @@
-import { EQUIPMENT, REFUND_PERCENT, ROOMS, roomConstructionCost } from '../../data/rooms';
+import { BED_ROOMS, EQUIPMENT, REFUND_PERCENT, ROOMS, roomConstructionCost } from '../../data/rooms';
 import { cellIndex, rectArea } from '../../domain/grid';
 import { pctOf } from '../../domain/money';
 import type { EquipmentId, Facing } from '../../domain/types';
 import { FACINGS } from '../../domain/rules/navigation';
-import { moveFee } from '../../sim/systems/move';
+import { doorFee, moveFee, worksMinutes } from '../../sim/systems/move';
+import { residentsInRoom } from '../../domain/rules/beds';
 import { dayOf, formatClock } from '../../sim/systems/time';
 import { useMemo, useState } from 'react';
 import { EQUIP_SPRITE, spriteUrl } from '../../render/sprites';
@@ -21,6 +22,7 @@ function RoomInspector({ roomId }: { roomId: string }) {
   const t = useT();
   const money = useMoney();
   const room = useGame((s) => s.game.site.rooms.find((r) => r.id === roomId));
+  const game = useGame((s) => s.game);
   const roomLabel = useRoomLabel();
   const cash = useGame((s) => s.game.organization.cashSatang);
   const dispatch = useGame((s) => s.dispatch);
@@ -33,6 +35,10 @@ function RoomInspector({ roomId }: { roomId: string }) {
   const refund = pctOf(roomConstructionCost(room.type, room.rect) + equipValue, REFUND_PERCENT);
   const area = rectArea(room.rect);
   const fee = moveFee(room);
+  const dFee = doorFee(room);
+  const works = room.worksUntil !== undefined;
+  const occupied = BED_ROOMS.includes(room.type) && residentsInRoom(game, room.id).length > 0;
+  const hours = Math.round(worksMinutes(room) / 60);
   const door = st.door;
   const doorSide: Facing | null = !door ? null : door.outside.y > door.inside.y ? 's' : door.outside.x > door.inside.x ? 'e' : door.outside.y < door.inside.y ? 'n' : 'w';
 
@@ -66,7 +72,9 @@ function RoomInspector({ roomId }: { roomId: string }) {
               ⚠{' '}
               {iss.kind === 'no_access'
                 ? t('issue.no_access')
-                : t('issue.missing_equipment', { equipment: iss.equipment, have: iss.have, need: iss.need })}
+                : iss.kind === 'works'
+                  ? t('issue.works', { day: dayOf(iss.until), time: formatClock(iss.until) })
+                  : t('issue.missing_equipment', { equipment: iss.equipment, have: iss.have, need: iss.need })}
             </li>
           ))}
         </ul>
@@ -127,15 +135,15 @@ function RoomInspector({ roomId }: { roomId: string }) {
               st.setTool({ kind: 'move', roomId: room.id, rotated: false });
               if (st.sheet) st.setSheet(null);
             }}
-            disabled={cash < fee}
+            disabled={cash < fee || works || occupied}
             className="flex-1 rounded-lg bg-teal text-white text-sm font-semibold py-1.5 disabled:opacity-40"
           >
             ✥ {t('move.move', { fee: money(fee) })}
           </button>
-          <button type="button" onClick={() => dispatch({ type: 'turnRoom', roomId: room.id, turns: -1 })} className="px-3 rounded-lg border border-line bg-white text-sm font-bold" aria-label={t('move.turn_left')} title={t('move.turn_left')}>
+          <button type="button" disabled={works} onClick={() => dispatch({ type: 'turnRoom', roomId: room.id, turns: -1 })} className="px-3 rounded-lg border border-line bg-white text-sm font-bold" aria-label={t('move.turn_left')} title={t('move.turn_left')}>
             ⟲
           </button>
-          <button type="button" onClick={() => dispatch({ type: 'turnRoom', roomId: room.id, turns: 1 })} className="px-3 rounded-lg border border-line bg-white text-sm font-bold" aria-label={t('move.turn_right')} title={t('move.turn_right')}>
+          <button type="button" disabled={works} onClick={() => dispatch({ type: 'turnRoom', roomId: room.id, turns: 1 })} className="px-3 rounded-lg border border-line bg-white text-sm font-bold" aria-label={t('move.turn_right')} title={t('move.turn_right')}>
             ⟳
           </button>
         </div>
@@ -145,6 +153,7 @@ function RoomInspector({ roomId }: { roomId: string }) {
             <button
               key={f}
               type="button"
+              disabled={works}
               onClick={() => dispatch({ type: 'setFacing', roomId: room.id, facing: f })}
               className={`px-2 py-1 rounded-md border ${doorSide === f ? 'bg-teal text-white border-teal' : 'bg-white border-line'}`}
             >
@@ -152,7 +161,10 @@ function RoomInspector({ roomId }: { roomId: string }) {
             </button>
           ))}
         </div>
-        <p className="text-[11px] text-ink-soft leading-snug">{t(room.rect.w === room.rect.h ? 'move.hint_square' : 'move.hint_long', { fee: money(fee) })}</p>
+        <p className="text-[11px] text-ink-soft leading-snug">
+          {t(room.rect.w === room.rect.h ? 'move.hint_square' : 'move.hint_long', { fee: money(fee), door: money(dFee), hours })}
+          {occupied && <span className="block text-bad mt-0.5">{t('move.occupied')}</span>}
+        </p>
       </div>
 
       <button

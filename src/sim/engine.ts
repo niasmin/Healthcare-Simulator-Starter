@@ -34,7 +34,7 @@ import { goalsDayEnd, goalsTick } from './systems/goals';
 import { loanBlocker, loanDayEnd, loanOwed, repayBlocker, repayLoan, takeLoan } from './systems/loans';
 import { inventoryDayEnd, inventoryTick, orderBlocker, orderCost, orderStock, setInventory } from './systems/inventory';
 import { BULK_MIN_PACKS, STOCK } from '../data/inventory';
-import { isFacing, moveCheck, movedRect, placeMovedRoom, turnedPlacement, turnFacing } from './systems/move';
+import { doorBlocker, doorFee, isFacing, moveCheck, movedRect, setDoor, startWorks, turnedPlacement, turnFacing, worksTick } from './systems/move';
 import { DRILL_SATANG, SAFETY_KIT_SATANG } from '../data/standards';
 import { buySafetyKit, drillBlocker, needsReassessment, runDrill, safetyKitBlocker, setStandards, standardsDayEnd } from './systems/standards';
 import { assignManager, closeBranch, networkDayEnd, openBranch, supportBranch } from './systems/network';
@@ -164,7 +164,7 @@ export function applyCommand(state: GameState, cmd: Command): CommandOutcome {
       if (!check.ok) return fail(state, check.reason, check.params);
       // Turned while moving: the door turns with the building.
       const facing = cmd.rotated ? turnFacing(room.facing, 1) : room.facing;
-      return { state: placeMovedRoom(state, room.id, rect, facing, check.costSatang), result: { ok: true, id: room.id, costSatang: check.costSatang } };
+      return { state: startWorks(state, room.id, rect, facing, check.costSatang), result: { ok: true, id: room.id, costSatang: check.costSatang } };
     }
 
     case 'turnRoom': {
@@ -172,17 +172,25 @@ export function applyCommand(state: GameState, cmd: Command): CommandOutcome {
       if (!room) return fail(state, 'not_found');
       if (cmd.turns !== 1 && cmd.turns !== -1) return fail(state, 'invalid_choice');
       const { rect, facing } = turnedPlacement(room, cmd.turns);
-      const target = rect.w === rect.h ? room.rect : rect;
-      const check = moveCheck(state, room.id, target);
+      // A square building keeps its footprint: only its door moves round.
+      if (rect.w === rect.h) {
+        const blocker = doorBlocker(state, room);
+        if (blocker) return fail(state, blocker);
+        return { state: setDoor(state, room.id, facing), result: { ok: true, id: room.id, costSatang: doorFee(room) } };
+      }
+      const check = moveCheck(state, room.id, rect);
       if (!check.ok) return fail(state, check.reason, check.params);
-      return { state: placeMovedRoom(state, room.id, target, facing, check.costSatang), result: { ok: true, id: room.id, costSatang: check.costSatang } };
+      return { state: startWorks(state, room.id, rect, facing, check.costSatang), result: { ok: true, id: room.id, costSatang: check.costSatang } };
     }
 
     case 'setFacing': {
       const room = state.site.rooms.find((r) => r.id === cmd.roomId);
       if (!room) return fail(state, 'not_found');
       if (!isFacing(cmd.facing)) return fail(state, 'invalid_choice');
-      return { state: placeMovedRoom(state, room.id, room.rect, cmd.facing, 0), result: { ok: true, id: room.id, costSatang: 0 } };
+      if (room.facing === cmd.facing) return fail(state, 'already_done');
+      const blocker = doorBlocker(state, room);
+      if (blocker) return fail(state, blocker);
+      return { state: setDoor(state, room.id, cmd.facing), result: { ok: true, id: room.id, costSatang: doorFee(room) } };
     }
 
     case 'renameRoom': {
@@ -681,6 +689,7 @@ export function step(state: GameState): GameState {
     }
   }
   s = eventExpiryTick(s);
+  s = worksTick(s);
   // Autopilot (if switched on) answers events and does the routine admin through public commands.
   s = autopilot(s, applyCommand, state.speed);
   if (s.minute % 60 === 0) s = goalsTick(s);

@@ -65,6 +65,8 @@ export interface Room {
   name?: string;
   /** The side the front door is on, when it touches a corridor (missing = the default order, front sides first). */
   facing?: Facing;
+  /** Building works (a move or a turn) under way: the building is closed until this minute. */
+  worksUntil?: SimMinute;
 }
 
 /** A side of a room's footprint: s = bottom edge (y + h), e = right (x + w), n = top, w = left. */
@@ -841,6 +843,7 @@ export type ReasonCode =
   | 'invalid_speed'
   | 'no_free_bed'
   | 'room_occupied'
+  | 'works_active'
   | 'bed_occupied'
   | 'shift_overlap'
   | 'shift_too_long'
