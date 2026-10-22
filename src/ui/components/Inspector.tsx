@@ -1,7 +1,9 @@
 import { EQUIPMENT, REFUND_PERCENT, ROOMS, roomConstructionCost } from '../../data/rooms';
 import { cellIndex, rectArea } from '../../domain/grid';
 import { pctOf } from '../../domain/money';
-import type { EquipmentId } from '../../domain/types';
+import type { EquipmentId, Facing } from '../../domain/types';
+import { FACINGS } from '../../domain/rules/navigation';
+import { moveFee } from '../../sim/systems/move';
 import { dayOf, formatClock } from '../../sim/systems/time';
 import { useMemo, useState } from 'react';
 import { EQUIP_SPRITE, spriteUrl } from '../../render/sprites';
@@ -30,6 +32,9 @@ function RoomInspector({ roomId }: { roomId: string }) {
   for (const [id, n] of Object.entries(room.equipment) as [EquipmentId, number][]) equipValue += EQUIPMENT[id].costSatang * n;
   const refund = pctOf(roomConstructionCost(room.type, room.rect) + equipValue, REFUND_PERCENT);
   const area = rectArea(room.rect);
+  const fee = moveFee(room);
+  const door = st.door;
+  const doorSide: Facing | null = !door ? null : door.outside.y > door.inside.y ? 's' : door.outside.x > door.inside.x ? 'e' : door.outside.y < door.inside.y ? 'n' : 'w';
 
   return (
     <div className="flex flex-col gap-3">
@@ -111,6 +116,45 @@ function RoomInspector({ roomId }: { roomId: string }) {
         </ul>
       </div>
 
+      <div className="flex flex-col gap-1.5">
+        <div className="text-xs font-semibold text-ink-soft uppercase tracking-wide">{t('move.title')}</div>
+        <div className="flex gap-1.5">
+          <button
+            type="button"
+            data-testid="move-room"
+            onClick={() => {
+              const st = useGame.getState();
+              st.setTool({ kind: 'move', roomId: room.id, rotated: false });
+              if (st.sheet) st.setSheet(null);
+            }}
+            disabled={cash < fee}
+            className="flex-1 rounded-lg bg-teal text-white text-sm font-semibold py-1.5 disabled:opacity-40"
+          >
+            ✥ {t('move.move', { fee: money(fee) })}
+          </button>
+          <button type="button" onClick={() => dispatch({ type: 'turnRoom', roomId: room.id, turns: -1 })} className="px-3 rounded-lg border border-line bg-white text-sm font-bold" aria-label={t('move.turn_left')} title={t('move.turn_left')}>
+            ⟲
+          </button>
+          <button type="button" onClick={() => dispatch({ type: 'turnRoom', roomId: room.id, turns: 1 })} className="px-3 rounded-lg border border-line bg-white text-sm font-bold" aria-label={t('move.turn_right')} title={t('move.turn_right')}>
+            ⟳
+          </button>
+        </div>
+        <div className="flex items-center gap-1 text-xs">
+          <span className="text-ink-soft mr-1">🚪 {t('move.door')}</span>
+          {FACINGS.map((f) => (
+            <button
+              key={f}
+              type="button"
+              onClick={() => dispatch({ type: 'setFacing', roomId: room.id, facing: f })}
+              className={`px-2 py-1 rounded-md border ${doorSide === f ? 'bg-teal text-white border-teal' : 'bg-white border-line'}`}
+            >
+              {t(`move.side.${f}`)}
+            </button>
+          ))}
+        </div>
+        <p className="text-[11px] text-ink-soft leading-snug">{t(room.rect.w === room.rect.h ? 'move.hint_square' : 'move.hint_long', { fee: money(fee) })}</p>
+      </div>
+
       <button
         type="button"
         onClick={() => dispatch({ type: 'deleteRoom', roomId: room.id })}
@@ -131,6 +175,7 @@ function CellInfo() {
   let hint = t('tool.select.hint');
   if (tool.kind === 'corridor') hint = t('tool.corridor.hint');
   if (tool.kind === 'bulldoze') hint = t('tool.bulldoze.hint', { pct: REFUND_PERCENT });
+  if (tool.kind === 'move') hint = t('move.hint');
   if (tool.kind === 'decor') hint = t('tool.decor.hint', { name: t(`decor.${tool.decor}`) });
   if (tool.kind === 'room') {
     const d = ROOMS[tool.roomType];

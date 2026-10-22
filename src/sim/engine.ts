@@ -9,7 +9,7 @@ import { SHIFT_SLOTS } from '../data/staff';
 import { freeBeds, parseBedId, residentsInRoom } from '../domain/rules/beds';
 import { roomStatus } from '../domain/rules/rooms';
 import { validateShift } from '../domain/rules/shifts';
-import type { CityPlace, UpgradeId, BranchKind, Cell, CommandResult, CourseId, DayStats, DecorType, EquipmentId, GameSpeed, GameState, PriceLevel, Rect, Resident, Room, RoomType, ShiftSlot, AutoSettings, StockItem } from '../domain/types';
+import type { Facing, CityPlace, UpgradeId, BranchKind, Cell, CommandResult, CourseId, DayStats, DecorType, EquipmentId, GameSpeed, GameState, PriceLevel, Rect, Resident, Room, RoomType, ShiftSlot, AutoSettings, StockItem } from '../domain/types';
 import { dayInMonth, monthOfDay, PRICE_LEVELS } from '../data/finance';
 import { billAdmission, billFinal, billMonth, chargeDailyResidentCosts, collectPayments, refundUnusedDays } from './systems/billing';
 import { eventCheck, eventExpiryTick, expireReferrals, resolveEvent } from './systems/events';
@@ -34,6 +34,7 @@ import { goalsDayEnd, goalsTick } from './systems/goals';
 import { loanBlocker, loanDayEnd, loanOwed, repayBlocker, repayLoan, takeLoan } from './systems/loans';
 import { inventoryDayEnd, inventoryTick, orderBlocker, orderCost, orderStock, setInventory } from './systems/inventory';
 import { BULK_MIN_PACKS, STOCK } from '../data/inventory';
+import { isFacing, moveCheck, movedRect, placeMovedRoom, turnedPlacement, turnFacing } from './systems/move';
 import { DRILL_SATANG, SAFETY_KIT_SATANG } from '../data/standards';
 import { buySafetyKit, drillBlocker, needsReassessment, runDrill, safetyKitBlocker, setStandards, standardsDayEnd } from './systems/standards';
 import { assignManager, closeBranch, networkDayEnd, openBranch, supportBranch } from './systems/network';
@@ -50,6 +51,9 @@ export type Command =
   | { type: 'bulldoze'; cell: Cell }
   | { type: 'deleteRoom'; roomId: string }
   | { type: 'renameRoom'; roomId: string; name: string }
+  | { type: 'moveRoom'; roomId: string; origin: Cell; rotated?: boolean }
+  | { type: 'turnRoom'; roomId: string; turns: 1 | -1 }
+  | { type: 'setFacing'; roomId: string; facing: Facing }
   | { type: 'installEquipment'; roomId: string; equipment: EquipmentId }
   | { type: 'removeEquipment'; roomId: string; equipment: EquipmentId }
   | { type: 'hireStaff'; candidateId: string }
@@ -151,6 +155,35 @@ export function applyCommand(state: GameState, cmd: Command): CommandOutcome {
 
     case 'deleteRoom':
       return deleteRoom(state, cmd.roomId);
+
+    case 'moveRoom': {
+      const room = state.site.rooms.find((r) => r.id === cmd.roomId);
+      if (!room) return fail(state, 'not_found');
+      const rect = movedRect(room, cmd.origin, cmd.rotated);
+      const check = moveCheck(state, room.id, rect);
+      if (!check.ok) return fail(state, check.reason, check.params);
+      // Turned while moving: the door turns with the building.
+      const facing = cmd.rotated ? turnFacing(room.facing, 1) : room.facing;
+      return { state: placeMovedRoom(state, room.id, rect, facing, check.costSatang), result: { ok: true, id: room.id, costSatang: check.costSatang } };
+    }
+
+    case 'turnRoom': {
+      const room = state.site.rooms.find((r) => r.id === cmd.roomId);
+      if (!room) return fail(state, 'not_found');
+      if (cmd.turns !== 1 && cmd.turns !== -1) return fail(state, 'invalid_choice');
+      const { rect, facing } = turnedPlacement(room, cmd.turns);
+      const target = rect.w === rect.h ? room.rect : rect;
+      const check = moveCheck(state, room.id, target);
+      if (!check.ok) return fail(state, check.reason, check.params);
+      return { state: placeMovedRoom(state, room.id, target, facing, check.costSatang), result: { ok: true, id: room.id, costSatang: check.costSatang } };
+    }
+
+    case 'setFacing': {
+      const room = state.site.rooms.find((r) => r.id === cmd.roomId);
+      if (!room) return fail(state, 'not_found');
+      if (!isFacing(cmd.facing)) return fail(state, 'invalid_choice');
+      return { state: placeMovedRoom(state, room.id, room.rect, cmd.facing, 0), result: { ok: true, id: room.id, costSatang: 0 } };
+    }
 
     case 'renameRoom': {
       // A building's name is only a label: trimmed, at most 30 characters, empty brings back the default.

@@ -373,6 +373,8 @@ export function MobileShell() {
         ? t(`decor.${tool.decor}`)
         : tool.kind === 'prefab'
           ? t(`prefab.${tool.prefab}`)
+          : tool.kind === 'move'
+            ? t('move.moving')
           : tool.kind === 'corridor'
             ? t('tool.corridor')
             : t('tool.bulldoze');
@@ -390,7 +392,7 @@ export function MobileShell() {
               {placing ? (
                 <div className="pointer-events-auto flex items-center gap-2 rounded-xl bg-teal text-white pl-3 pr-1 py-1 shadow-lg">
                   <span className="text-sm font-semibold">{t('m.placing', { what: toolName })}</span>
-                  {tool.kind === 'prefab' && (
+                  {(tool.kind === 'prefab' || tool.kind === 'move') && (
                     <button type="button" onClick={() => setTool({ ...tool, rotated: !tool.rotated })} className="px-2.5 py-1.5 rounded-lg bg-white/20 text-sm font-bold" aria-label={t('prefab.rotate')}>
                       ⟳
                     </button>

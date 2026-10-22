@@ -334,6 +334,8 @@ export const CORRIDOR_UPKEEP_PER_TILE: Satang = thb(5);
 
 /** Percentage of the original price refunded on demolition / selling equipment. */
 export const REFUND_PERCENT = 50;
+/** Moving a building, or turning a long one, costs this share of its construction cost (fictional). */
+export const MOVE_FEE_PERCENT = 20;
 
 export function roomConstructionCost(type: RoomType, rect: Rect): Satang {
   const def = ROOMS[type];

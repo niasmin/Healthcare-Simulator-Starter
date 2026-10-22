@@ -1,5 +1,8 @@
 import { cellIndex, inBounds, NEIGHBOURS } from '../grid';
-import type { Cell, Room, Site } from '../types';
+import type { Cell, Facing, Room, Site } from '../types';
+
+/** Door sides in the default order: the two facing the camera first. */
+export const FACINGS: Facing[] = ['s', 'e', 'n', 'w'];
 
 /**
  * Breadth-first search over corridor tiles starting at the site entrance.
@@ -41,15 +44,18 @@ export interface Door {
  * Doors are placed automatically: the first perimeter cell (in a fixed,
  * deterministic order) that touches a corridor reachable from the entrance.
  * Order: front faces first (bottom edge y+h, then right edge x+w), then back faces,
- * so doors prefer the side facing the camera.
+ * so doors prefer the side facing the camera. A room's `facing` puts its side first.
  */
 export function findDoor(room: Room, site: Site, reachable: Uint8Array = reachableCorridor(site)): Door | null {
   const { x, y, w, h } = room.rect;
-  const candidates: Array<[Cell, Cell]> = [];
-  for (let i = 0; i < w; i++) candidates.push([{ x: x + i, y: y + h - 1 }, { x: x + i, y: y + h }]);
-  for (let j = 0; j < h; j++) candidates.push([{ x: x + w - 1, y: y + j }, { x: x + w, y: y + j }]);
-  for (let i = 0; i < w; i++) candidates.push([{ x: x + i, y }, { x: x + i, y: y - 1 }]);
-  for (let j = 0; j < h; j++) candidates.push([{ x, y: y + j }, { x: x - 1, y: y + j }]);
+  const sides: Record<Facing, Array<[Cell, Cell]>> = { s: [], e: [], n: [], w: [] };
+  for (let i = 0; i < w; i++) sides.s.push([{ x: x + i, y: y + h - 1 }, { x: x + i, y: y + h }]);
+  for (let j = 0; j < h; j++) sides.e.push([{ x: x + w - 1, y: y + j }, { x: x + w, y: y + j }]);
+  for (let i = 0; i < w; i++) sides.n.push([{ x: x + i, y }, { x: x + i, y: y - 1 }]);
+  for (let j = 0; j < h; j++) sides.w.push([{ x, y: y + j }, { x: x - 1, y: y + j }]);
+  // A room turned to face a side tries that side first, then the usual order.
+  const order: Facing[] = room.facing ? [room.facing, ...FACINGS.filter((f) => f !== room.facing)] : FACINGS;
+  const candidates = order.flatMap((f) => sides[f]);
   for (const [inside, outside] of candidates) {
     if (!inBounds(outside.x, outside.y, site.width, site.height)) continue;
     if (reachable[cellIndex(outside.x, outside.y, site.width)]) return { inside, outside };

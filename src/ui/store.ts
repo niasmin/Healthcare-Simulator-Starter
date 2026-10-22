@@ -9,7 +9,7 @@ import { newGameState } from '../sim/modes';
 import { autopilotOn, runAway, ticksFor } from './away';
 import { MS_PER_TICK_1X } from './constants';
 
-export type Tool = { kind: 'select' } | { kind: 'corridor' } | { kind: 'bulldoze' } | { kind: 'room'; roomType: RoomType } | { kind: 'decor'; decor: DecorType } | { kind: 'prefab'; prefab: string; rotated: boolean };
+export type Tool = { kind: 'select' } | { kind: 'corridor' } | { kind: 'bulldoze' } | { kind: 'room'; roomType: RoomType } | { kind: 'decor'; decor: DecorType } | { kind: 'prefab'; prefab: string; rotated: boolean } | { kind: 'move'; roomId: string; rotated: boolean };
 
 export type View = 'map' | 'residents' | 'roster' | 'finance';
 export type LeftTab = 'build' | 'hire' | 'admit' | 'network';
