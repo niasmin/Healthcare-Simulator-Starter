@@ -225,11 +225,12 @@ function ActionCards() {
   const setSheet = useGame((s) => s.setSheet);
   const setLeftTab = useGame((s) => s.setLeftTab);
   const setView = useGame((s) => s.setView);
+  const autoOn = useAutoOn();
   const card = 'relative h-14 rounded-xl flex flex-col items-center justify-center gap-0.5 overflow-visible';
   const badge = (n: number) =>
     n > 0 && <span className="absolute -top-1.5 right-1 min-w-5 h-5 px-1 rounded-full bg-coral text-white text-[11px] font-bold grid place-items-center tabular">{n}</span>;
   return (
-    <div className="shrink-0 bg-white/95 border-t border-line px-2 py-1.5 grid grid-cols-4 gap-1.5">
+    <div className="shrink-0 bg-white/95 border-t border-line px-2 py-1.5 grid grid-cols-5 gap-1.5">
       <button
         type="button"
         data-tour="m-build"
@@ -264,6 +265,19 @@ function ActionCards() {
       <button type="button" onClick={() => setSheet('report')} className={`${card} bg-[#e3f0fb] text-[#14365f]`}>
         <img src={chartIcon} alt="" className="h-7 object-contain" />
         <span className="font-bold text-[12px] leading-none">{t('hud.report')}</span>
+      </button>
+      {/* The assistant sits with the everyday actions; gold while it is running. */}
+      <button
+        type="button"
+        data-tour="m-auto"
+        onClick={() => useGame.getState().setAutoOpen(true)}
+        className={`${card} ${autoOn ? 'bg-gradient-to-b from-[#f2b631] to-[#d9901a] text-ink shadow' : 'bg-[#e3f0fb] text-[#14365f]'}`}
+      >
+        <span className="text-[26px] leading-7" aria-hidden>
+          🤖
+        </span>
+        <span className="font-bold text-[12px] leading-none">{t('hud.auto')}</span>
+        {autoOn && <span className="absolute -top-1.5 right-1 h-5 px-1.5 rounded-full bg-ok text-white text-[10px] font-black grid place-items-center">ON</span>}
       </button>
     </div>
   );
@@ -329,7 +343,6 @@ export function MobileShell() {
   const setShowLabels = useGame((s) => s.setShowLabels);
   const exterior = useGame((s) => s.exterior);
   const setExterior = useGame((s) => s.setExterior);
-  const autoOn = useAutoOn();
   const nextChapter = useGame((s) => nextChapterAvailable(s.game));
   const missionBadge = useGame((s) => !!s.game.chapter.result) && !nextChapter;
   const openMissions = useOpenMissions();
@@ -411,12 +424,6 @@ export function MobileShell() {
               <>
                 <div className="absolute left-2 top-[11.2rem] z-10 flex flex-col gap-2 pointer-events-none">
                   <FloatButton icon={clipIcon} label={t('hud.missions')} onClick={() => setSheet('missions')} badge={missionBadge} />
-                  <FloatButton
-                    emoji="🤖"
-                    label={t(autoOn ? 'auto.on' : 'hud.auto')}
-                    onClick={() => useGame.getState().setAutoOpen(true)}
-                    className={autoOn ? '!from-[#f2b631] !to-[#d9901a]' : ''}
-                  />
                   {settled && (
                     <>
                       <FloatButton emoji="🏙️" label={t('hud.city')} onClick={() => useGame.getState().setCityOpen('city')} />
