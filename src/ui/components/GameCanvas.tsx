@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { moveCheck, movedRect } from '../../sim/systems/move';
 import { rectCells, rectContains, rectFromCorners } from '../../domain/grid';
 import { validateCorridor, validateDecor, validateRoomPlacement, type PlacementCheck } from '../../domain/rules/placement';
 import type { Cell, GameState, Rect, Resident } from '../../domain/types';
@@ -107,6 +108,13 @@ export function GameCanvas({ controls = true }: { controls?: boolean } = {}) {
           // Drag the ghost around, lift to place (a tap places where you tapped).
           const res = st.dispatch({ type: 'placePrefab', prefab: tl.prefab, origin: d.end, rotated: tl.rotated });
           if (res.ok && res.id) st.select(res.id);
+        } else if (tl.kind === 'move') {
+          // Like a prefab: drag the ghost, lift to drop the building there.
+          const res = st.dispatch({ type: 'moveRoom', roomId: tl.roomId, origin: d.end, rotated: tl.rotated });
+          if (res.ok) {
+            st.setTool({ kind: 'select' });
+            st.select(tl.roomId);
+          }
         } else if (tl.kind === 'bulldoze') {
           if (d.start.x === d.end.x && d.start.y === d.end.y) st.dispatch({ type: 'bulldoze', cell: d.start });
         }
@@ -142,6 +150,13 @@ export function GameCanvas({ controls = true }: { controls?: boolean } = {}) {
       const costSatang = prefabCost(def, rect);
       const check: PlacementCheck = room.ok && game.organization.cashSatang < costSatang ? { ok: false, reason: 'insufficient_funds', costSatang } : { ...room, costSatang };
       return { rect, check, cells: rectCells(rect) };
+    }
+    if (tool.kind === 'move') {
+      const at = drag?.end ?? hover;
+      const room = game.site.rooms.find((r) => r.id === tool.roomId);
+      if (!at || !room) return null;
+      const rect = movedRect(room, at, tool.rotated);
+      return { rect, check: moveCheck(game, room.id, rect), cells: rectCells(rect) };
     }
     if (!drag) return null;
     const rect = rectFromCorners(drag.start, drag.end);
@@ -186,7 +201,7 @@ export function GameCanvas({ controls = true }: { controls?: boolean } = {}) {
   let status: { text: string; tone: 'ok' | 'bad' | 'muted' } | null = showHelp ? { text: t(coarse ? 'canvas.help_touch' : 'canvas.help'), tone: 'muted' } : null;
   if (preview) {
     const name =
-      tool.kind === 'room' ? t(`room.${tool.roomType}`) : tool.kind === 'decor' ? t(`decor.${tool.decor}`) : tool.kind === 'prefab' ? t(`prefab.${tool.prefab}`) : t('room.corridor');
+      tool.kind === 'room' ? t(`room.${tool.roomType}`) : tool.kind === 'decor' ? t(`decor.${tool.decor}`) : tool.kind === 'prefab' ? t(`prefab.${tool.prefab}`) : tool.kind === 'move' ? t('move.moving') : t('room.corridor');
     const head = `${name} ${preview.rect.w}×${preview.rect.h} · ${money(preview.check.costSatang)}`;
     status = preview.check.ok
       ? { text: `${head} · ✓ ${t('preview.ok')}`, tone: 'ok' }

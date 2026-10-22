@@ -63,7 +63,12 @@ export interface Room {
   builtAt: SimMinute;
   /** The player's name for the building (missing = the default "Ward 1", "Villa 2", ...). */
   name?: string;
+  /** The side the front door is on, when it touches a corridor (missing = the default order, front sides first). */
+  facing?: Facing;
 }
+
+/** A side of a room's footprint: s = bottom edge (y + h), e = right (x + w), n = top, w = left. */
+export type Facing = 's' | 'e' | 'n' | 'w';
 
 export type DecorType = 'tree' | 'sakura' | 'tree2' | 'flowers' | 'hedge' | 'planter' | 'lamp' | 'umbrella' | 'fountain' | 'gazebo' | 'gold_fountain' | 'sakura_arch' | 'statue' | 'gold_lantern';
 

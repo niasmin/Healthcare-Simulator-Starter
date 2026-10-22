@@ -1610,6 +1610,23 @@ const th: Dict = {
   'ledger.drill': 'ซ้อมดับเพลิงและ CPR ประจำปี',
   'ledger.inspection_fine': 'ค่าปรับตรวจมาตรฐาน ({n} ข้อ)',
   'reason.standards_off': 'ต้องเปิดโหมดมาตรฐาน สบส. ก่อน',
+  // Moving and turning buildings
+  'move.title': 'ย้ายและหมุนอาคาร',
+  'move.move': 'ย้าย {fee}',
+  'move.moving': 'ย้ายอาคาร',
+  'move.turn_left': 'หมุนซ้าย',
+  'move.turn_right': 'หมุนขวา',
+  'move.door': 'ประตูหันไปทาง',
+  'move.side.s': 'หน้าซ้าย',
+  'move.side.e': 'หน้าขวา',
+  'move.side.n': 'หลังขวา',
+  'move.side.w': 'หลังซ้าย',
+  'move.hint_square': 'อาคารสี่เหลี่ยมจัตุรัส หมุนได้ฟรี (ประตูและป้ายย้ายไปด้านใหม่) ย้ายตำแหน่งค่าขนย้าย {fee} อุปกรณ์และผู้พักอาศัยย้ายตามไปด้วย',
+  'move.hint_long': 'หมุนอาคารนี้จะสลับด้านกว้างและยาว ค่าขนย้าย {fee} เท่ากับการย้าย อุปกรณ์และผู้พักอาศัยย้ายตามไปด้วย ประตูต้องติดทางเดิน',
+  'move.hint': 'ลากเงาอาคารไปวางที่ใหม่ แล้วปล่อยหรือแตะเพื่อวาง กด R หรือ ⟳ เพื่อหมุน กด Esc เพื่อยกเลิก',
+  'log.room_moved': 'ย้าย{room}เรียบร้อย',
+  'log.room_turned': 'หันประตู{room}ไปด้านใหม่แล้ว',
+  'ledger.move_room': 'ค่าขนย้าย{room}',
 };
 
 const en: Dict = {
@@ -3220,6 +3237,23 @@ const en: Dict = {
   'ledger.drill': 'Yearly fire drill and CPR training',
   'ledger.inspection_fine': 'Inspection fine ({n} checks)',
   'reason.standards_off': 'Switch on licensing standards first',
+  // Moving and turning buildings
+  'move.title': 'Move and turn',
+  'move.move': 'Move {fee}',
+  'move.moving': 'Moving building',
+  'move.turn_left': 'Turn left',
+  'move.turn_right': 'Turn right',
+  'move.door': 'Door faces',
+  'move.side.s': 'front left',
+  'move.side.e': 'front right',
+  'move.side.n': 'back right',
+  'move.side.w': 'back left',
+  'move.hint_square': 'A square building turns for free (its door and sign move to the new side). Moving it costs {fee}; equipment and residents move with it.',
+  'move.hint_long': 'Turning this building swaps its length and width, for the same {fee} as a move; equipment and residents move with it. The door must touch a corridor.',
+  'move.hint': 'Drag the ghost to the new spot and let go (or tap) to place it. R or ⟳ turns it; Esc cancels.',
+  'log.room_moved': '{room} moved',
+  'log.room_turned': "{room}'s door turned to a new side",
+  'ledger.move_room': 'Moved {room}',
 };
 
 export const DICTS: Record<Lang, Dict> = { th, en };
