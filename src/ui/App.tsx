@@ -1,5 +1,6 @@
 import { useShowIntro, WelcomeIntro } from './components/WelcomeIntro';
 import { OwnerModal } from './components/OwnerModal';
+import { StandardsModal } from './components/StandardsModal';
 import { InventoryModal, useStockToasts } from './components/InventoryModal';
 import { AccountModal } from './components/AccountModal';
 import { useSound } from './sound';
@@ -49,6 +50,7 @@ export function App() {
   const cityOpen = useGame((s) => s.cityOpen);
   const goalsOpen = useGame((s) => s.goalsOpen);
   const stockOpen = useGame((s) => s.stockOpen);
+  const standardsOpen = useGame((s) => s.standardsOpen);
   const ownerOpen = useGame((s) => s.ownerOpen);
   const showIntro = useShowIntro();
   const communityOpen = useGame((s) => s.communityOpen);
@@ -78,6 +80,7 @@ export function App() {
       {shopOpen && <ShopModal onClose={() => useGame.getState().setShopOpen(false)} />}
       {started && goalsOpen && <GoalsModal onClose={() => useGame.getState().setGoalsOpen(false)} />}
       {started && stockOpen && <InventoryModal onClose={() => useGame.getState().setStockOpen(false)} />}
+      {started && standardsOpen && <StandardsModal onClose={() => useGame.getState().setStandardsOpen(false)} />}
       {showIntro && <WelcomeIntro />}
       {ownerOpen && <OwnerModal onClose={() => useGame.getState().setOwnerOpen(false)} />}
       {communityOpen && <CommunityModal tab={communityOpen} onClose={() => useGame.getState().setCommunityOpen(null)} />}

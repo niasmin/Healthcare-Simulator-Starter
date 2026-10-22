@@ -1,4 +1,5 @@
 import { lowStock } from './InventoryModal';
+import { useStandardsBadge } from './StandardsModal';
 import { useOpenMissions } from './GoalsModal';
 import { AccountRow, PrefsList } from './Prefs';
 import { useAutoOn } from './AutoModal';
@@ -333,6 +334,7 @@ export function MobileShell() {
   const missionBadge = useGame((s) => !!s.game.chapter.result) && !nextChapter;
   const openMissions = useOpenMissions();
   const lowItems = useGame((s) => lowStock(s.game));
+  const stdFailing = useStandardsBadge();
   const stockNew = useGame((s) => !s.stockGuideSeen);
   // A first game keeps the screen calm: town, daily missions and stock appear with the first resident.
   const settled = useGame((s) => s.game.residents.length > 0 || s.game.chapter.id > 1 || s.game.mode === 'sandbox');
@@ -418,6 +420,7 @@ export function MobileShell() {
                       <FloatButton emoji="🏙️" label={t('hud.city')} onClick={() => useGame.getState().setCityOpen('city')} />
                       <FloatButton emoji="🎯" label={t('hud.daily')} onClick={() => useGame.getState().setGoalsOpen(true)} badge={openMissions > 0} />
                       <FloatButton emoji="📦" label={t('stock.short')} onClick={() => useGame.getState().setStockOpen(true)} badge={lowItems > 0 || stockNew} />
+                      <FloatButton emoji="🏛️" label={t('std.short')} onClick={() => useGame.getState().setStandardsOpen(true)} badge={stdFailing > 0} />
                     </>
                   )}
                 </div>

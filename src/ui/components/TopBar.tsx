@@ -1,4 +1,5 @@
 import { lowStock } from './InventoryModal';
+import { useStandardsBadge } from './StandardsModal';
 import { useOpenMissions } from './GoalsModal';
 import { MuteButton } from './Prefs';
 import { useAutoOn } from './AutoModal';
@@ -21,6 +22,7 @@ const SPEEDS: { speed: GameSpeed; label: string }[] = [
 export function TopBar() {
   const openMissions = useOpenMissions();
   const lowItems = useGame((s) => lowStock(s.game));
+  const stdFailing = useStandardsBadge();
   const settled = useGame((s) => s.game.residents.length > 0 || s.game.chapter.id > 1 || s.game.mode === 'sandbox');
   const stockNew = useGame((s) => !s.stockGuideSeen) && settled;
   const t = useT();
@@ -140,6 +142,14 @@ export function TopBar() {
           ) : (
             stockNew && <span className="absolute -top-1.5 -right-2 h-4 px-1 rounded-full bg-[#f2b631] text-ink text-[9px] font-black grid place-items-center">{t('stock.new')}</span>
           )}
+        </button>
+        <button
+          type="button"
+          onClick={() => useGame.getState().setStandardsOpen(true)}
+          className="relative px-3 py-1 rounded-md bg-white/15 border border-white/30 text-sm hover:bg-white/25 font-semibold"
+        >
+          🏛️ {t('std.short')}
+          {stdFailing > 0 && <span className="absolute -top-1.5 -right-1.5 min-w-4 h-4 px-1 rounded-full bg-coral text-white text-[10px] font-black grid place-items-center">{stdFailing}</span>}
         </button>
         <button
           type="button"
