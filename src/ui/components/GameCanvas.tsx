@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { moveCheck, movedRect } from '../../sim/systems/move';
+import { routineAt } from '../../sim/systems/routine';
+import { allRoomStatuses } from '../../domain/rules/rooms';
 import { rectCells, rectContains, rectFromCorners } from '../../domain/grid';
 import { validateCorridor, validateDecor, validateRoomPlacement, type PlacementCheck } from '../../domain/rules/placement';
 import type { Cell, GameState, Rect, Resident } from '../../domain/types';
 import { MEAL_TIMES } from '../../data/patients';
-import { IsoRenderer } from '../../render/IsoRenderer';
+import { IsoRenderer, type PersonMarker } from '../../render/IsoRenderer';
 import { ROLES } from '../../data/staff';
 import { peopleMarkers } from '../../sim/selectors';
 import { RESIDENT_SPRITE, STAFF_SPRITE } from '../../render/sprites';
@@ -39,16 +41,41 @@ export function mapMarkers(game: GameState) {
   const outside = (strollHour(game.minute) && weatherFor(game.seed, dayOf(game.minute)) !== 'rain') || (dining && mealTime(game.minute));
   const tended = new Set(markers.filter((m) => m.kind === 'staff' && m.bed !== undefined).map((m) => `${m.roomId}#${m.bed}`));
   const look = (r: Resident) => (r.needs.mobility < 65 ? RESIDENT_SPRITE.chair : r.name.gender === 'm' ? RESIDENT_SPRITE.m : RESIDENT_SPRITE.f);
-  return markers.map((m) => {
+  // The day's routine takes residents who get about to the bathroom and the therapy room.
+  const statuses = allRoomStatuses(game.site);
+  const openRoom = (type: string) => game.site.rooms.find((x) => x.type === type && statuses.get(x.id)?.operational)?.id;
+  const bathroom = openRoom('bathroom');
+  const therapy = openRoom('therapy');
+  const spots = new Map<string, number>();
+  const spotIn = (roomId: string) => {
+    const n = spots.get(roomId) ?? 0;
+    spots.set(roomId, n + 1);
+    return n;
+  };
+  const visitors: PersonMarker[] = [];
+  const out = markers.map((m) => {
     if (m.kind === 'staff') return { ...m, color: ROLES[m.role as StaffRole].color, sprite: STAFF_SPRITE[m.role as StaffRole] };
     const r = residents.get(m.key);
     const color = GROUP_HEX[m.group as CareGroup];
     // In a therapy session: standing (or in a chair) in the therapy room.
     if (r && m.bed === undefined) return { ...m, color, sprite: look(r) };
-    if (!r || !outside || !STROLLERS.has(r.group) || r.needs.mobility < 40 || tended.has(`${m.roomId}#${m.bed}`)) return { ...m, color };
+    if (!r) return { ...m, color };
+    const step = routineAt(game, r);
+    const busy = tended.has(`${m.roomId}#${m.bed}`);
+    // Family at the bedside (they walk in from the gate).
+    if (step === 'visit') visitors.push({ key: `visit-${r.id}`, kind: 'visitor', roomId: m.roomId, bed: m.bed, color: 0x7a8a99, sprite: VISITOR_SPRITES[r.id.length % VISITOR_SPRITES.length] });
+    const mobile = STROLLERS.has(r.group) && r.needs.mobility >= 40 && !busy;
+    if (step === 'sleep' || step === 'nap' || step === 'visit' || !mobile) return { ...m, color };
+    if (step === 'bath' && bathroom) return { ...m, roomId: bathroom, bed: undefined, spot: spotIn(bathroom), color, sprite: look(r) };
+    if (step === 'activity' && therapy && !(outside && r.id.length % 2)) return { ...m, roomId: therapy, bed: undefined, spot: spotIn(therapy), color, sprite: look(r) };
+    if (!outside) return { ...m, color };
     return { ...m, color, stroll: true, sprite: look(r) };
   });
+  return [...out, ...visitors];
 }
+
+/** Relatives who come to visit (townsfolk art). */
+const VISITOR_SPRITES = ['ch_owner_f', 'ch_owner_m', 'ch_student'];
 
 /**
  * Glue between the React/Zustand UI and the Pixi renderer.

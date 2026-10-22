@@ -34,6 +34,7 @@ import { goalsDayEnd, goalsTick } from './systems/goals';
 import { loanBlocker, loanDayEnd, loanOwed, repayBlocker, repayLoan, takeLoan } from './systems/loans';
 import { inventoryDayEnd, inventoryTick, orderBlocker, orderCost, orderStock, setInventory } from './systems/inventory';
 import { BULK_MIN_PACKS, STOCK } from '../data/inventory';
+import { visitsTick } from './systems/routine';
 import { doorBlocker, doorFee, isFacing, moveCheck, movedRect, setDoor, startWorks, turnedPlacement, turnFacing, worksTick } from './systems/move';
 import { DRILL_SATANG, SAFETY_KIT_SATANG } from '../data/standards';
 import { buySafetyKit, drillBlocker, needsReassessment, runDrill, safetyKitBlocker, setStandards, standardsDayEnd } from './systems/standards';
@@ -690,6 +691,7 @@ export function step(state: GameState): GameState {
   }
   s = eventExpiryTick(s);
   s = worksTick(s);
+  s = visitsTick(s);
   // Autopilot (if switched on) answers events and does the routine admin through public commands.
   s = autopilot(s, applyCommand, state.speed);
   if (s.minute % 60 === 0) s = goalsTick(s);
