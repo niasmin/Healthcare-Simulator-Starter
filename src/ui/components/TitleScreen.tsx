@@ -1,3 +1,4 @@
+import { MoneyHelp, StaffingHelp } from "./HelpFaq";
 import { AccountChip } from "./AccountModal";
 import { PrefsList } from "./Prefs";
 import { useEffect, useState, type ReactNode } from "react";
@@ -767,6 +768,8 @@ export function TitleScreen() {
               <li key={n}>{t(`home.help${n}`)}</li>
             ))}
           </ol>
+          <StaffingHelp />
+          <MoneyHelp />
         </Modal>
       )}
       {panel === "shop" && (
