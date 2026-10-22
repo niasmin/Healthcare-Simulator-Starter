@@ -1,4 +1,6 @@
-import { SKILL_OWNER, SUPPORT_ROLES } from '../../data/staff';
+import { SKILL_OWNER, SUPPORT_ROLES, WALK_MAX_MINUTES, WALK_TILES_PER_MINUTE } from '../../data/staff';
+import { corridorSteps } from '../../domain/rules/navigation';
+import { cellIndex } from '../../domain/grid';
 import { EHR_TASK_PERCENT, hasUpgrade, SMART_CALL_EXTRA_GRACE } from '../../data/shop';
 import { carePlanSchedule, TASK_KINDS } from '../../data/patients';
 import { parseBedId } from '../../domain/rules/beds';
@@ -88,10 +90,24 @@ export function careTick(state: GameState): GameState {
   };
 
   const statuses = allRoomStatuses(state.site);
+  // Corridor steps from each door, worked out once per tick when someone needs to walk.
+  const stepsFrom = new Map<string, Int32Array>();
+  const walkMinutes = (fromRoom: string | undefined, toRoom: string): number => {
+    if (!fromRoom || fromRoom === toRoom) return 0;
+    const a = statuses.get(fromRoom)?.door;
+    const b = statuses.get(toRoom)?.door;
+    if (!a || !b) return 0;
+    let dist = stepsFrom.get(fromRoom);
+    if (!dist) stepsFrom.set(fromRoom, (dist = corridorSteps(state.site, a.outside)));
+    const steps = dist[cellIndex(b.outside.x, b.outside.y, state.site.width)];
+    if (steps < 0) return 0;
+    return Math.min(WALK_MAX_MINUTES, Math.round(steps / WALK_TILES_PER_MINUTE));
+  };
 
   // A bath & hygiene room (grab rails, shower chairs) makes personal care quicker.
   const bathroom = state.site.rooms.some((x) => x.type === 'bathroom' && statuses.get(x.id)?.operational);
-  const therapyOpen = state.site.rooms.some((r) => r.type === 'therapy' && statuses.get(r.id)?.operational);
+  const therapyRoom = state.site.rooms.find((r) => r.type === 'therapy' && statuses.get(r.id)?.operational)?.id;
+  const therapyOpen = !!therapyRoom;
 
   const tasks = state.tasks.map((t) => ({ ...t }));
   const smartCall = hasUpgrade(state, 'smart_call');
@@ -140,7 +156,8 @@ export function careTick(state: GameState): GameState {
     for (const t of due) {
       const r = residents.get(t.residentId);
       if (!r) continue;
-      const room = statuses.get(parseBedId(r.bedId).roomId);
+      const roomId = parseBedId(r.bedId).roomId;
+      const room = statuses.get(roomId);
       if (!room?.door) continue; // staff cannot reach the room
       const candidates = [...employees.values()]
         .filter((e) => !e.taskId && e.busyUntil <= now && e.energy >= EXHAUSTED_ENERGY && e.skills.includes(t.skill) && isOnShift(state, e.id, now))
@@ -166,11 +183,19 @@ export function careTick(state: GameState): GameState {
       let base = bathroom && t.kind === 'personal_care' ? Math.round((t.duration * BATHROOM_CARE_PERCENT) / 100) : t.duration;
       // Electronic records: medication and vital-sign checks are quicker.
       if (ehr && (t.kind === 'med_round' || t.kind === 'vital_signs')) base = Math.round((base * EHR_TASK_PERCENT) / 100);
-      const duration = e.energy < 30 ? Math.round(base * 1.5) : base;
+      // Therapy sessions happen in the therapy room; everything else at the resident's bed.
+      const where = TASK_KINDS[t.kind].room === 'therapy' && therapyRoom ? therapyRoom : roomId;
+      // Walks are short next to the 10-minute tick, so they add up and take a tick whenever they pass ten.
+      const walked = (e.walked ?? 0) + walkMinutes(e.atRoomId, where);
+      const walkTicks = Math.floor(walked / 10) * 10;
+      const duration = (e.energy < 30 ? Math.round(base * 1.5) : base) + walkTicks;
       t.status = 'in_progress';
       t.assigneeId = e.id;
       t.finishAt = now + duration;
-      employees.set(e.id, { ...e, taskId: t.id, busyUntil: now + duration });
+      const moved: Employee = { ...e, taskId: t.id, busyUntil: now + duration, atRoomId: where };
+      if (walked - walkTicks > 0) moved.walked = walked - walkTicks;
+      else delete moved.walked;
+      employees.set(e.id, moved);
       work(e.role, 'minutes', duration);
       changed = true;
     }

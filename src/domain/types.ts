@@ -276,6 +276,10 @@ export interface Employee {
   /** Busy with a task until this minute (exclusive). */
   busyUntil: SimMinute;
   taskId: string | null;
+  /** Room of the employee's last task (missing = at the nursing station / not placed yet). */
+  atRoomId?: string;
+  /** Walking minutes not yet charged: the sim runs in 10-minute ticks, so walks add up and cost a tick each time they pass ten. */
+  walked?: number;
   /** Training certificates earned (Chapter 5). */
   certs?: CourseId[];
   /** Placed with a partner organisation on this contract (Chapter 5): off the home's roster. */

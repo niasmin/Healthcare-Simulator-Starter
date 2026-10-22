@@ -175,3 +175,11 @@ export const SKILL_OWNER: Record<Skill, StaffRole> = {
   security: 'security',
   bookkeeping: 'accountant',
 };
+
+/**
+ * Walking between buildings (fictional balancing): a task in another building starts with a walk
+ * along the corridors, a minute for every few tiles (carrying things, holding doors), so a compact
+ * layout gets more care done. Work in the same building needs no walk.
+ */
+export const WALK_TILES_PER_MINUTE = 8;
+export const WALK_MAX_MINUTES = 8;
