@@ -62,3 +62,53 @@ export function findDoor(room: Room, site: Site, reachable: Uint8Array = reachab
   }
   return null;
 }
+
+/**
+ * Steps from `from` to every corridor tile reachable from it, walking only on corridor tiles
+ * (row-major; -1 = cannot get there). `from` must be a corridor tile.
+ */
+export function corridorSteps(site: Site, from: Cell): Int32Array {
+  const { width, height, corridor } = site;
+  const dist = new Int32Array(width * height).fill(-1);
+  if (!inBounds(from.x, from.y, width, height)) return dist;
+  const start = cellIndex(from.x, from.y, width);
+  if (!corridor[start]) return dist;
+  const queue: number[] = [start];
+  dist[start] = 0;
+  for (let head = 0; head < queue.length; head++) {
+    const idx = queue[head];
+    const x = idx % width;
+    const y = (idx - x) / width;
+    for (const d of NEIGHBOURS) {
+      const nx = x + d.x;
+      const ny = y + d.y;
+      if (!inBounds(nx, ny, width, height)) continue;
+      const n = cellIndex(nx, ny, width);
+      if (dist[n] < 0 && corridor[n]) {
+        dist[n] = dist[idx] + 1;
+        queue.push(n);
+      }
+    }
+  }
+  return dist;
+}
+
+/** The corridor tiles walked from `from` to `to` (both included), or null when there is no way. */
+export function corridorPath(site: Site, from: Cell, to: Cell): Cell[] | null {
+  const dist = corridorSteps(site, to);
+  const w = site.width;
+  if (!inBounds(from.x, from.y, w, site.height) || dist[cellIndex(from.x, from.y, w)] < 0) return null;
+  // Walk downhill from `from` towards `to`, in a fixed neighbour order (deterministic).
+  const path: Cell[] = [{ ...from }];
+  let cur = from;
+  while (cur.x !== to.x || cur.y !== to.y) {
+    const here = dist[cellIndex(cur.x, cur.y, w)];
+    const next = NEIGHBOURS.map((d) => ({ x: cur.x + d.x, y: cur.y + d.y })).find(
+      (c) => inBounds(c.x, c.y, w, site.height) && dist[cellIndex(c.x, c.y, w)] === here - 1,
+    );
+    if (!next) return null;
+    path.push(next);
+    cur = next;
+  }
+  return path;
+}

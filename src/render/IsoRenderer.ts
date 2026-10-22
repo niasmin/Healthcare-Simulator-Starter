@@ -6,6 +6,7 @@ import { TownLife } from './TownLife';
 import { EQUIPMENT, ROOMS } from '../data/rooms';
 import { cellIndex } from '../domain/grid';
 import type { RoomStatus } from '../domain/rules/rooms';
+import { corridorPath } from '../domain/rules/navigation';
 import type { Cell, EquipmentId, GameState, Room, RoomType } from '../domain/types';
 import { cellCenter, cellDiamond, cellToWorld, TILE_H, TILE_W, worldToCell } from './iso';
 
@@ -28,6 +29,21 @@ export interface PersonMarker {
   sprite?: string;
   /** A resident out for a stroll: drawn standing in the dining room or the garden instead of in bed. */
   stroll?: boolean;
+}
+
+/** A figure on the move: where it is, where it is heading, and the corridor waypoints in between. */
+interface Walker {
+  node: Container;
+  body: Container;
+  x: number;
+  y: number;
+  tx: number;
+  ty: number;
+  phase: number;
+  sprite: string;
+  roomId: string | null;
+  path: Array<{ x: number; y: number }>;
+  speed: number;
 }
 
 export interface RenderInput {
@@ -138,7 +154,7 @@ export class IsoRenderer {
   /** Townsfolk on the pavements around the lot (made once the sprites are loaded). */
   private town: TownLife | null = null;
   /** Staff figures that walk to where they are needed instead of jumping there. */
-  private walkers = new Map<string, { node: Container; body: Container; x: number; y: number; tx: number; ty: number; phase: number; sprite: string }>();
+  private walkers = new Map<string, Walker>();
   private clock = 0;
   /** Smallest zoom at which the town still covers the whole screen. */
   private minScale = 0.2;
@@ -969,9 +985,15 @@ export class IsoRenderer {
         keep.add(p.key);
         const w = this.walkers.get(p.key);
         if (w && w.sprite === p.sprite) {
+          if (w.roomId !== p.roomId && !snap) w.path = this.route(w.roomId, p.roomId);
+          else if (w.roomId !== p.roomId) w.path = [];
+          w.roomId = p.roomId;
           w.tx = x;
           w.ty = y;
-          if (snap) (w.x = x), (w.y = y);
+          const left = [...w.path, { x, y }].reduce((a, q, i, all) => a + Math.hypot(q.x - (i ? all[i - 1].x : w.x), q.y - (i ? all[i - 1].y : w.y)), 0);
+          // Long walks go a little faster, so nobody is still walking when the next tick moves them on.
+          w.speed = Math.max(110, left / 2.5);
+          if (snap) (w.x = x), (w.y = y), (w.path = []);
           continue;
         }
         if (w) w.node.destroy({ children: true });
@@ -992,7 +1014,7 @@ export class IsoRenderer {
         const sx = from && !snap ? from.x : x;
         const sy = from && !snap ? from.y : y;
         node.position.set(sx, sy);
-        this.walkers.set(p.key, { node, body, x: sx, y: sy, tx: x, ty: y, phase: (p.key.length * 1.7 + x * 0.01) % 6.28, sprite: p.sprite });
+        this.walkers.set(p.key, { node, body, x: sx, y: sy, tx: x, ty: y, phase: (p.key.length * 1.7 + x * 0.01) % 6.28, sprite: p.sprite, roomId: p.roomId, path: [], speed: 110 });
       } else {
         g.ellipse(x, y, 10, 4.5).fill({ color: 0x000000, alpha: 0.2 });
         g.roundRect(x - 7, y - 25, 14, 24, 6).fill(p.color).stroke({ width: 1.2, color: shade(p.color, 0.65) });
@@ -1052,6 +1074,22 @@ export class IsoRenderer {
     return body;
   }
 
+  /**
+   * Waypoints between two rooms, along the corridors: out through one door, the corridor tiles,
+   * in through the other. Empty when either has no door or there is no way (then they walk straight).
+   */
+  private route(from: string | null, to: string | null): Array<{ x: number; y: number }> {
+    const st = this.input?.statuses;
+    const site = this.input?.game.site;
+    if (!st || !site || !from || !to) return [];
+    const a = st.get(from)?.door;
+    const b = st.get(to)?.door;
+    if (!a || !b) return [];
+    const tiles = corridorPath(site, a.outside, b.outside);
+    if (!tiles) return [];
+    return [a.inside, ...tiles, b.inside].map((c) => cellCenter(c.x, c.y));
+  }
+
   /** Where a resident's bed is on the map, or null. */
   private bedPoint(p: PersonMarker): { x: number; y: number } | null {
     const rc = p.roomId ? this.roomCells.get(p.roomId) : undefined;
@@ -1065,16 +1103,30 @@ export class IsoRenderer {
     this.clock += dt;
     const still = this.input?.effects === 'low';
     for (const w of this.walkers.values()) {
-      const dx = w.tx - w.x;
-      const dy = w.ty - w.y;
-      const dist = Math.hypot(dx, dy);
       let moving = false;
-      if (dist > 0.5 && !still) {
-        const step = Math.max(110, dist / 1.1) * dt;
-        if (step >= dist) (w.x = w.tx), (w.y = w.ty);
-        else (w.x += (dx / dist) * step), (w.y += (dy / dist) * step), (moving = true);
-        w.body.scale.x = Math.abs(w.body.scale.x) * (dx < -0.5 ? -1 : 1);
-      } else (w.x = w.tx), (w.y = w.ty);
+      if (still) (w.x = w.tx), (w.y = w.ty), (w.path = []);
+      else {
+        // Follow the corridor waypoints, then the last stretch to the spot.
+        let budget = Math.max(110, w.speed) * dt;
+        while (budget > 0) {
+          const goal = w.path[0] ?? { x: w.tx, y: w.ty };
+          const dx = goal.x - w.x;
+          const dy = goal.y - w.y;
+          const dist = Math.hypot(dx, dy);
+          if (dist <= 0.5) {
+            if (!w.path.length) break;
+            w.path.shift();
+            continue;
+          }
+          w.body.scale.x = Math.abs(w.body.scale.x) * (dx < -0.5 ? -1 : 1);
+          moving = true;
+          if (budget >= dist) {
+            (w.x = goal.x), (w.y = goal.y), (budget -= dist);
+            if (w.path.length) w.path.shift();
+            else break;
+          } else (w.x += (dx / dist) * budget), (w.y += (dy / dist) * budget), (budget = 0);
+        }
+      }
       w.node.position.set(w.x, w.y);
       w.node.zIndex = w.y;
       w.body.y = still ? 1 : moving ? 1 - Math.abs(Math.sin(this.clock * 13 + w.phase)) * 3 : 1 - (Math.sin(this.clock * 2.2 + w.phase) + 1) * 0.35;
