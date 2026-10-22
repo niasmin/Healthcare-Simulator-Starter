@@ -1,3 +1,4 @@
+import { StaffingHelp } from './HelpFaq';
 import { staffPortrait } from '../portraits';
 import { useMemo, useState } from 'react';
 import { ROLES, ROLE_ORDER, SHIFT_SLOTS, SLOT_ORDER, SUPPORT_ROLES } from '../../data/staff';
@@ -174,6 +175,7 @@ export function RosterView() {
 
   return (
     <div className="p-3 flex flex-col gap-4">
+      <StaffingHelp />
       <section className="rounded-2xl bg-white border border-line p-3 overflow-x-auto">
         <h2 className="font-bold text-base mb-2">{t('roster.title')}</h2>
         {mobile && (

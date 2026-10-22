@@ -1,3 +1,4 @@
+import { MoneyHelp } from './HelpFaq';
 import { AUTO_LOAN_DAYS, LOAN_AMOUNTS, LOAN_DAYS, LOAN_INTEREST_PERCENT } from '../../data/loans';
 import { loanInterest, loanOwed, nextInstalment } from '../../sim/systems/loans';
 import { dayOf } from '../../sim/systems/time';
@@ -261,6 +262,7 @@ export function FinanceView() {
         <Kpi tone="plain" label={t('fin.capex')} value={money(v.current.capex)} />
       </div>
 
+      <MoneyHelp />
       <LoanCard />
 
       <div className="grid gap-3 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
