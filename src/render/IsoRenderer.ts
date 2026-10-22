@@ -72,6 +72,9 @@ const SLAB_DEPTH = 14;
 const STOREY_H = 46;
 /** Sprite name for residents who use a wheelchair (drawn from the grandfather until its own art exists). */
 const WHEELCHAIR = 'ch_wheelchair';
+/** Height / width of the standing character sprites, and a seated rider's height against a standing figure. */
+const STANDING_ASPECT = 158 / 66;
+const SEATED_HEIGHT = 0.8;
 const PITCHED: ReadonlySet<RoomType> = new Set<RoomType>(['ward', 'villa', 'staff_room', 'dining_room']);
 const FONT = '"IBM Plex Sans Thai", "Noto Sans Thai", "Leelawadee UI", Tahoma, sans-serif';
 
@@ -957,7 +960,7 @@ export class IsoRenderer {
     return this.tex.has(sprite) || (sprite === WHEELCHAIR && this.tex.has('ch_elder_m'));
   }
 
-  /** A standing figure, or (until its own art arrives) the grandfather seated in a drawn wheelchair. */
+  /** A standing figure (or the wheelchair sprite), or, without that art, the grandfather seated in a drawn wheelchair. */
   private figure(sprite: string): Container {
     const body = new Container();
     body.position.set(0, 1);
@@ -965,7 +968,8 @@ export class IsoRenderer {
     if (t) {
       const sp = new Sprite(t);
       sp.anchor.set(0.5, 0.97);
-      sp.scale.set(PERSON_SPRITE_WIDTH / t.width);
+      // A seated wheelchair rider is wider than tall: size it by height, a little under a standing figure.
+      sp.scale.set(sprite === WHEELCHAIR ? (PERSON_SPRITE_WIDTH * STANDING_ASPECT * SEATED_HEIGHT) / t.height : PERSON_SPRITE_WIDTH / t.width);
       body.addChild(sp);
       return body;
     }
