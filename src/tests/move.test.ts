@@ -1,20 +1,17 @@
-import { applyCommand } from '../sim/engine';
+import { advance, applyCommand } from '../sim/engine';
 import { createInitialState } from '../sim/state';
 import { findDoor } from '../domain/rules/navigation';
 import { reconcile } from '../domain/rules/ledger';
 import { roomStatus } from '../domain/rules/rooms';
-import { moveFee, turnedPlacement } from '../sim/systems/move';
+import { doorFee, moveFee, turnedPlacement, worksMinutes } from '../sim/systems/move';
 import type { GameState } from '../domain/types';
 import { admitPlanned, buildHome, hire, ok, quietEvents } from './helpers';
 
 const room = (s: GameState, type: string) => s.site.rooms.find((r) => r.type === type)!;
 
 describe('moving and turning buildings', () => {
-  it('moves a building with its equipment and residents, for a fee', () => {
+  it('moves a building with its equipment, for a fee, closed while the works last', () => {
     let s = quietEvents(buildHome(createInitialState(1)));
-    [s] = hire(s, 'rn', ['morning']);
-    let rid: string;
-    [s, rid] = admitPlanned(s);
     const therapy = room(s, 'therapy');
     const cash = s.organization.cashSatang;
     const fee = moveFee(therapy);
@@ -24,22 +21,37 @@ describe('moving and turning buildings', () => {
     const moved = room(s, 'therapy');
     expect(moved).toMatchObject({ id: therapy.id, equipment: therapy.equipment, rect: { x: 14, y: 11, w: 3, h: 3 } });
     expect(s.organization.cashSatang).toBe(cash - fee);
-    expect(roomStatus(moved, s.site).operational).toBe(true);
-    // The resident's bed is keyed by the ward's id, so moving the ward keeps them in it.
-    const ward = room(s, 'ward');
-    s = ok(s, { type: 'moveRoom', roomId: ward.id, origin: { x: 3, y: 5 } });
-    expect(room(s, 'ward').rect).toMatchObject({ x: 3, y: 5 });
-    expect(roomStatus(room(s, 'ward'), s.site).operational).toBe(true);
-    expect(s.residents.find((r) => r.id === rid)!.bedId.startsWith(`${ward.id}#`)).toBe(true);
+    expect(roomStatus(moved, s.site)).toMatchObject({ operational: false, issues: [{ kind: 'works', until: s.minute + worksMinutes(therapy) }] });
+    expect(applyCommand(s, { type: 'moveRoom', roomId: therapy.id, origin: { x: 3, y: 11 } }).result).toMatchObject({ ok: false, reason: 'works_active' });
+    s = advance(s, worksMinutes(therapy) / 10);
+    expect(room(s, 'therapy').worksUntil).toBeUndefined();
+    expect(roomStatus(room(s, 'therapy'), s.site).operational).toBe(true);
+    expect(s.log.some((l) => l.key === 'log.works_done')).toBe(true);
     expect(reconcile(s).ok).toBe(true);
   });
 
-  it('refuses a footprint that overlaps, leaves the lot or changes size', () => {
+  it('bigger buildings take longer', () => {
+    const s = buildHome(createInitialState(1));
+    expect(worksMinutes(room(s, 'ward'))).toBeGreaterThan(worksMinutes(room(s, 'therapy')));
+    expect(worksMinutes(room(s, 'ward')) % 10).toBe(0);
+  });
+
+  it('a ward with residents cannot move until it is empty', () => {
+    let s = quietEvents(buildHome(createInitialState(1)));
+    [s] = hire(s, 'rn', ['morning']);
+    [s] = admitPlanned(s);
+    const ward = room(s, 'ward');
+    expect(applyCommand(s, { type: 'moveRoom', roomId: ward.id, origin: { x: 3, y: 5 } }).result).toMatchObject({ ok: false, reason: 'room_occupied' });
+    expect(applyCommand(s, { type: 'turnRoom', roomId: ward.id, turns: 1 }).result).toMatchObject({ ok: false, reason: 'room_occupied' });
+  });
+
+  it('refuses a footprint that overlaps, leaves the lot, stays put or cannot be paid', () => {
     const s = quietEvents(buildHome(createInitialState(1)));
     const therapy = room(s, 'therapy');
     expect(applyCommand(s, { type: 'moveRoom', roomId: therapy.id, origin: { x: 3, y: 6 } }).result).toMatchObject({ ok: false, reason: 'overlap' });
     expect(applyCommand(s, { type: 'moveRoom', roomId: therapy.id, origin: { x: 19, y: 0 } }).result).toMatchObject({ ok: false, reason: 'out_of_bounds' });
     expect(applyCommand(s, { type: 'moveRoom', roomId: 'nope', origin: { x: 0, y: 0 } }).result).toMatchObject({ ok: false, reason: 'not_found' });
+    expect(applyCommand(s, { type: 'moveRoom', roomId: therapy.id, origin: { x: 2, y: 11 } }).result).toMatchObject({ ok: false, reason: 'nothing_to_build' });
     // Over its own old tiles is fine (the building is lifted first).
     expect(applyCommand(s, { type: 'moveRoom', roomId: therapy.id, origin: { x: 3, y: 11 } }).result.ok).toBe(true);
     const poor = { ...s, organization: { ...s.organization, cashSatang: 0 } };
@@ -57,9 +69,8 @@ describe('moving and turning buildings', () => {
     expect(turnedPlacement(r, -1).facing).toBe('e');
   });
 
-  it('turning a square building only moves its door, free', () => {
+  it('turning a square building only moves its door: a small fee, done at once, still open', () => {
     let s = quietEvents(buildHome(createInitialState(1)));
-    // The nursing station (10,7 3x3) touches the crossway below and the spine? Give it corridor on its right too.
     s = ok(s, { type: 'paintCorridor', rect: { x: 13, y: 7, w: 1, h: 3 } });
     const st = room(s, 'nursing_station');
     expect(findDoor(st, s.site)!.outside.y).toBe(10);
@@ -68,23 +79,26 @@ describe('moving and turning buildings', () => {
     const turned = room(s, 'nursing_station');
     expect(turned.rect).toEqual(st.rect);
     expect(turned.facing).toBe('e');
+    expect(turned.worksUntil).toBeUndefined();
     expect(findDoor(turned, s.site)!.outside.x).toBe(13);
-    expect(s.organization.cashSatang).toBe(cash);
+    expect(roomStatus(turned, s.site).operational).toBe(true);
+    expect(s.organization.cashSatang).toBe(cash - doorFee(st));
     // setFacing picks a side directly; a side with no corridor falls back to the usual order.
     s = ok(s, { type: 'setFacing', roomId: st.id, facing: 'n' });
     expect(findDoor(room(s, 'nursing_station'), s.site)!.outside.y).toBe(10);
+    expect(applyCommand(s, { type: 'setFacing', roomId: st.id, facing: 'n' }).result).toMatchObject({ ok: false, reason: 'already_done' });
   });
 
   it('turning a long building in place needs room for its new footprint', () => {
     let s = quietEvents(buildHome(createInitialState(1)));
     const ward = room(s, 'ward');
-    // Turned, the 4x5 ward would become 5x4 and reach x=6, where a flower bed now stands.
     s = ok(s, { type: 'placeDecor', decor: 'flowers', cell: { x: 6, y: 6 } });
     expect(applyCommand(s, { type: 'turnRoom', roomId: ward.id, turns: 1 }).result).toMatchObject({ ok: false, reason: 'overlap' });
     s = { ...s, site: { ...s.site, decor: [] } };
     const cash = s.organization.cashSatang;
     s = ok(s, { type: 'turnRoom', roomId: ward.id, turns: 1 });
     expect(room(s, 'ward').rect).toEqual({ x: 2, y: 5, w: 5, h: 4 });
+    expect(room(s, 'ward').worksUntil).toBe(s.minute + worksMinutes(ward));
     expect(s.organization.cashSatang).toBe(cash - moveFee(ward));
   });
 });

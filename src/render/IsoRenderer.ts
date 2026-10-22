@@ -675,8 +675,58 @@ export class IsoRenderer {
     // label
     const c = cellToWorld(x + w / 2, y + h / 2);
     const badge = ROOM_BADGE[room.type];
-    if (status?.operational) this.addBadge(label, badge.glyph, c.x, c.y - WALL_H - 14, badge.color);
+    if (room.worksUntil !== undefined) this.drawWorks(g, room, WALL_H);
+    if (room.worksUntil !== undefined) this.addBadge(`🚧 ${label}`, null, c.x, c.y - WALL_H - 14, 0xd9822b);
+    else if (status?.operational) this.addBadge(label, badge.glyph, c.x, c.y - WALL_H - 14, badge.color);
     else this.addBadge(`⚠ ${label}`, null, c.x, c.y - WALL_H - 14, 0xc0392b);
+  }
+
+  /** Building works: scaffold poles and planks along the two faces toward the viewer, and warning tape. */
+  private drawWorks(g: Graphics, room: Room, height: number): void {
+    const { x, y, w, h } = room.rect;
+    const L = cellToWorld(x, y + h);
+    const B = cellToWorld(x + w, y + h);
+    const R = cellToWorld(x + w, y);
+    const pole = 0x8a8f96;
+    for (const [a, b, n] of [[L, B, w], [B, R, h]] as const) {
+      const at = (f: number) => ({ x: a.x + (b.x - a.x) * f, y: a.y + (b.y - a.y) * f });
+      for (let i = 0; i <= n; i++) {
+        const p = at(i / n);
+        g.moveTo(p.x, p.y + 4).lineTo(p.x, p.y - height - 6).stroke({ width: 2, color: pole });
+      }
+      // planks at two heights
+      for (const z of [height * 0.45, height + 2]) {
+        const p0 = at(0);
+        const p1 = at(1);
+        g.poly([p0.x, p0.y - z, p1.x, p1.y - z, p1.x, p1.y - z - 3, p0.x, p0.y - z - 3]).fill(0xc79a5b);
+      }
+      // striped tape at the foot
+      const stripes = n * 4;
+      for (let k = 0; k < stripes; k++) {
+        const p0 = at(k / stripes);
+        const p1 = at((k + 1) / stripes);
+        g.poly([p0.x, p0.y - 6, p1.x, p1.y - 6, p1.x, p1.y - 9, p0.x, p0.y - 9]).fill(k % 2 ? 0xffffff : 0xf28c28);
+      }
+    }
+  }
+
+  /** A door on one of the two far sides cannot be seen in the exterior view: mark it with a mat and a canopy over the eave. */
+  private drawBackDoor(g: Graphics, room: Room, door: { inside: Cell; outside: Cell } | null, H: number): void {
+    if (!door) return;
+    const { x, y } = room.rect;
+    let a: { x: number; y: number };
+    let b: { x: number; y: number };
+    if (door.outside.y === y - 1) {
+      a = cellToWorld(door.inside.x, y);
+      b = cellToWorld(door.inside.x + 1, y);
+    } else if (door.outside.x === x - 1) {
+      a = cellToWorld(x, door.inside.y);
+      b = cellToWorld(x, door.inside.y + 1);
+    } else return;
+    g.poly(cellDiamond(door.outside.x, door.outside.y)).fill({ color: 0x9a6b4a, alpha: 0.55 });
+    const m = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 - H };
+    g.poly([a.x, a.y - H - 2, b.x, b.y - H - 2, m.x, m.y - 12]).fill(0x7a5236).stroke({ width: 1.5, color: 0xfbf8f2 });
+    g.circle(m.x, m.y - 5, 2).fill(0xffd166);
   }
 
   /**
@@ -849,11 +899,14 @@ export class IsoRenderer {
       const s1 = { x: L.x + (B.x - L.x) * 0.8, y: L.y + (B.y - L.y) * 0.8 - H + 6 };
       g.poly([s0.x, s0.y + 2, s1.x, s1.y + 2, s1.x, s1.y - 7, s0.x, s0.y - 7]).fill(def.wallColor);
     }
-    if (status && !status.operational) g.poly([t1.x, t1.y, r1.x, r1.y, b1.x, b1.y, l1.x, l1.y]).fill({ color: 0xe5484d, alpha: 0.25 });
+    this.drawBackDoor(g, room, door, H);
+    if (room.worksUntil !== undefined) this.drawWorks(g, room, H);
+    else if (status && !status.operational) g.poly([t1.x, t1.y, r1.x, r1.y, b1.x, b1.y, l1.x, l1.y]).fill({ color: 0xe5484d, alpha: 0.25 });
     const c = cellToWorld(x + w / 2, y + h / 2);
     const badge = ROOM_BADGE[room.type];
     const top = c.y - H - (PITCHED.has(room.type) ? 26 + Math.min(w, h) * 5 : 18);
-    if (status?.operational) this.addBadge(label, badge.glyph, c.x, top, badge.color);
+    if (room.worksUntil !== undefined) this.addBadge(`🚧 ${label}`, null, c.x, top, 0xd9822b);
+    else if (status?.operational) this.addBadge(label, badge.glyph, c.x, top, badge.color);
     else this.addBadge(`⚠ ${label}`, null, c.x, top, 0xc0392b);
   }
 

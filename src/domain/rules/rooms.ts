@@ -4,6 +4,7 @@ import { findDoor, reachableCorridor, type Door } from './navigation';
 
 export type RoomIssue =
   | { kind: 'no_access' }
+  | { kind: 'works'; until: number }
   | { kind: 'missing_equipment'; equipment: EquipmentId; need: number; have: number };
 
 export interface RoomStatus {
@@ -27,6 +28,7 @@ export function roomStatus(room: Room, site: Site, reachable: Uint8Array = reach
   const def = ROOMS[room.type];
   const issues: RoomIssue[] = [];
   const door = findDoor(room, site, reachable);
+  if (room.worksUntil !== undefined) issues.push({ kind: 'works', until: room.worksUntil });
   if (!door) issues.push({ kind: 'no_access' });
   for (const slot of def.equipment) {
     const have = equipmentCount(room, slot.id);
