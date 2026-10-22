@@ -34,6 +34,8 @@ import { goalsDayEnd, goalsTick } from './systems/goals';
 import { loanBlocker, loanDayEnd, loanOwed, repayBlocker, repayLoan, takeLoan } from './systems/loans';
 import { inventoryDayEnd, inventoryTick, orderBlocker, orderCost, orderStock, setInventory } from './systems/inventory';
 import { BULK_MIN_PACKS, STOCK } from '../data/inventory';
+import { DRILL_SATANG, SAFETY_KIT_SATANG } from '../data/standards';
+import { buySafetyKit, drillBlocker, needsReassessment, runDrill, safetyKitBlocker, setStandards, standardsDayEnd } from './systems/standards';
 import { assignManager, closeBranch, networkDayEnd, openBranch, supportBranch } from './systems/network';
 import { acceptOffer, endContract, startTraining, workforceDayEnd, workforceTick } from './systems/workforce';
 
@@ -82,7 +84,10 @@ export type Command =
   | { type: 'setInventory'; on: boolean }
   | { type: 'orderStock'; item: StockItem; packs: number; express?: boolean; bulk?: boolean }
   | { type: 'setStockAuto'; on: boolean }
-  | { type: 'setStockLevel'; item: StockItem; levels: { min: number; max: number } | null };
+  | { type: 'setStockLevel'; item: StockItem; levels: { min: number; max: number } | null }
+  | { type: 'setStandards'; on: boolean }
+  | { type: 'buySafetyKit' }
+  | { type: 'runDrill' };
 
 export interface CommandOutcome {
   state: GameState;
@@ -283,10 +288,18 @@ export function applyCommand(state: GameState, cmd: Command): CommandOutcome {
     case 'createCarePlan': {
       const r = state.residents.find((x) => x.id === cmd.residentId);
       if (!r) return fail(state, 'not_found');
-      if (r.carePlan) return fail(state, 'plan_exists');
+      // A plan can be written again once it is due for its three-monthly review.
+      const review = !!r.carePlan && needsReassessment(state, r.carePlan.createdAt);
+      if (r.carePlan && !review) return fail(state, 'plan_exists');
       // Only an assessment-qualified employee (RN) can write a care plan.
       const author = state.employees.filter((e) => e.skills.includes('assessment')).sort((a, b) => (a.id < b.id ? -1 : 1))[0];
       if (!author) return fail(state, 'no_assessor');
+      if (review) {
+        // The review renews the plan; today's tasks are already on the list.
+        const reviewed: Resident = { ...r, carePlan: { createdAt: state.minute, authorId: author.id } };
+        const s = log({ ...state, residents: state.residents.map((x) => (x.id === r.id ? reviewed : x)) }, 'good', 'log.care_review', { name: r.name.th, nameEn: r.name.en });
+        return { state: s, result: { ok: true } };
+      }
       const updated: Resident = { ...r, carePlan: { createdAt: state.minute, authorId: author.id } };
       let s: GameState = { ...state, residents: state.residents.map((x) => (x.id === r.id ? updated : x)) };
       const dayStart = Math.floor(s.minute / MINUTES_PER_DAY) * MINUTES_PER_DAY;
@@ -428,6 +441,21 @@ export function applyCommand(state: GameState, cmd: Command): CommandOutcome {
         levels[cmd.item] = { min, max };
       } else delete levels[cmd.item];
       return { state: { ...state, inventory: { ...state.inventory, levels } }, result: { ok: true } };
+    }
+
+    case 'setStandards':
+      return { state: setStandards(state, cmd.on), result: { ok: true } };
+
+    case 'buySafetyKit': {
+      const blocker = safetyKitBlocker(state);
+      if (blocker) return fail(state, blocker);
+      return { state: buySafetyKit(state), result: { ok: true, costSatang: SAFETY_KIT_SATANG } };
+    }
+
+    case 'runDrill': {
+      const blocker = drillBlocker(state);
+      if (blocker) return fail(state, blocker);
+      return { state: runDrill(state), result: { ok: true, costSatang: DRILL_SATANG } };
     }
 
     case 'visitPlace': {
@@ -597,6 +625,7 @@ export function step(state: GameState): GameState {
         s = supportDayEnd(s);
         s = goalsDayEnd(s, closingDay);
         s = inventoryDayEnd(s, closingDay);
+        s = standardsDayEnd(s, closingDay);
         s = closeDay(s);
         s = residentDepartures(s);
         s = judgeChapter(s, closingDay);

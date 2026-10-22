@@ -722,6 +722,31 @@ export interface InventoryState {
 }
 
 /** A bank loan: paid back in equal daily instalments of principal and interest. */
+/** Licensing standards checks (data/standards.ts). */
+export type StandardId = 'ratio' | 'night_watch' | 'coordination' | 'common_area' | 'bathroom' | 'safety_kit' | 'drill' | 'assessment' | 'team';
+
+export interface Inspection {
+  day: number;
+  /** Checks that failed on the day. */
+  failed: StandardId[];
+  /** First visit, or the follow-up after a failed one. */
+  followUp: boolean;
+  fineSatang: Satang;
+}
+
+/** Licensing standards mode (off when missing). */
+export interface StandardsState {
+  on: boolean;
+  safetyKit: boolean;
+  /** Last fire drill and CPR refresher (day), if any. */
+  drillDay: number | null;
+  /** Day the inspector next comes (inspected at that day's close). */
+  nextInspection: number;
+  /** The next visit is the follow-up to a failed one. */
+  followUp: boolean;
+  history: Inspection[];
+}
+
 export interface Loan {
   principal: Satang;
   interest: Satang;
@@ -776,6 +801,7 @@ export interface GameState {
   goals?: GoalsState;
   /** A bank loan being paid back (data/loans.ts); absent when there is none. */
   loan?: Loan;
+  standards?: StandardsState;
   /** Care consumables (older saves: absent = the flat daily supplies charge). */
   inventory?: InventoryState;
   // Phase 3
@@ -843,7 +869,8 @@ export type ReasonCode =
   | 'loan_active'
   | 'no_loans'
   | 'min_order'
-  | 'nobody_to_treat';
+  | 'nobody_to_treat'
+  | 'standards_off';
 
 export type CommandResult =
   | { ok: true; id?: string; costSatang?: Satang }

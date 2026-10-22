@@ -12,6 +12,11 @@ import { SKILL_OWNER } from './selectors';
 import { log } from './helpers';
 import { dailyRunningCost, rosterView } from './selectors';
 import { choiceBlocker } from './systems/events';
+import { DRILL_SATANG, SAFETY_KIT_SATANG } from '../data/standards';
+import { needsReassessment, standardsChecklist } from './systems/standards';
+
+/** The autopilot buys the safety kit or books the drill only with this many times the price in hand. */
+const AUTO_STANDARDS_CASH_MULTIPLE = 5;
 
 /**
  * Autopilot: optional helpers that make the routine decisions for the player, so they can just
@@ -97,7 +102,19 @@ function admitAll(state: GameState, apply: Apply): GameState {
 
 function planAll(state: GameState, apply: Apply): GameState {
   let s = state;
-  for (const r of state.residents) if (!r.carePlan) [s] = tryCmd(s, apply, { type: 'createCarePlan', residentId: r.id });
+  for (const r of state.residents) if (!r.carePlan || needsReassessment(s, r.carePlan.createdAt)) [s] = tryCmd(s, apply, { type: 'createCarePlan', residentId: r.id });
+  return s;
+}
+
+/** Licensing standards: keep the safety kit and the yearly drill in order while cash allows. */
+function standardsUpkeep(state: GameState, apply: Apply): GameState {
+  const st = state.standards;
+  if (!st?.on) return state;
+  let s = state;
+  const cash = () => s.organization.cashSatang;
+  if (!st.safetyKit && cash() >= SAFETY_KIT_SATANG * AUTO_STANDARDS_CASH_MULTIPLE) [s] = tryCmd(s, apply, { type: 'buySafetyKit' });
+  const drillOk = standardsChecklist(s).find((c) => c.id === 'drill')?.ok;
+  if (!drillOk && cash() >= DRILL_SATANG * AUTO_STANDARDS_CASH_MULTIPLE) [s] = tryCmd(s, apply, { type: 'runDrill' });
   return s;
 }
 
@@ -196,5 +213,6 @@ export function autopilot(state: GameState, apply: Apply, speed: GameState['spee
   if (a.staff) s = staffAll(s, apply);
   if (a.admit) s = admitAll(s, apply);
   if (a.carePlan) s = planAll(s, apply);
+  if ((a.staff || a.carePlan) && s.minute % (24 * 60) === 20 * 60) s = standardsUpkeep(s, apply);
   return s;
 }
