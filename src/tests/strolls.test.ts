@@ -24,13 +24,15 @@ describe('weather (looks only)', () => {
 });
 
 describe('residents out for a stroll', () => {
-  it('mobile residents stroll in the late morning and afternoon, and are back in bed at night or in the rain', () => {
+  it('mobile residents are up in the late morning (a stroll or the group activity), and back in bed at night or in the rain', () => {
     let s = quietEvents(buildHome(createInitialState(8)));
     [s] = admit(s, { group: 'active_aging', needs: { physical: 80, mobility: 85, mental: 80, happiness: 70, satisfaction: 70, nutrition: 80 } });
     [s] = admit(s, { group: 'bedridden', needs: { physical: 40, mobility: 10, mental: 60, happiness: 60, satisfaction: 60, nutrition: 60 } });
     const dry = dayWith(s, 'clear');
+    // Mid-morning the one who gets about is up: out for a stroll or at the group activity in the therapy room.
     const out = mapMarkers(at(dry, 10)).filter((m) => m.kind === 'resident');
-    expect(out.filter((m) => 'stroll' in m && m.stroll)).toHaveLength(1);
+    const therapy = s.site.rooms.find((r) => r.type === 'therapy')!.id;
+    expect(out.filter((m) => ('stroll' in m && m.stroll) || m.roomId === therapy)).toHaveLength(1);
     expect(mapMarkers(at(dry, 22)).some((m) => 'stroll' in m && m.stroll)).toBe(false);
     expect(mapMarkers(at(dayWith(s, 'rain'), 10)).some((m) => 'stroll' in m && m.stroll)).toBe(false);
   });

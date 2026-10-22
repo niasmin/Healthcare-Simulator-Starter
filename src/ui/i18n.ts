@@ -1633,6 +1633,7 @@ const th: Dict = {
   'log.works_done': '{room}ปรับปรุงเสร็จ เปิดใช้งานได้แล้ว',
   'ledger.move_door': 'ค่าช่างย้ายประตู{room}',
   'reason.works_active': 'อาคารนี้กำลังปรับปรุงอยู่ รอให้เสร็จก่อน',
+  'log.family_worried': 'ญาติคุณ{name}มาเยี่ยมแล้วเป็นห่วงเรื่องการดูแล ลองดูความต้องการของท่านและเวรพนักงาน',
 };
 
 const en: Dict = {
@@ -3266,6 +3267,7 @@ const en: Dict = {
   'log.works_done': '{room} works finished: open again',
   'ledger.move_door': 'Moved the door of {room}',
   'reason.works_active': 'This building is under works: wait until they finish',
+  'log.family_worried': "{name}'s family visited and are worried about the care: check their needs and the roster",
 };
 
 export const DICTS: Record<Lang, Dict> = { th, en };

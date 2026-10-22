@@ -18,7 +18,7 @@ import { cellCenter, cellDiamond, cellToWorld, TILE_H, TILE_W, worldToCell } fro
 /** A person to draw. Positions are resolved by the renderer from room layout. */
 export interface PersonMarker {
   key: string;
-  kind: 'resident' | 'staff';
+  kind: 'resident' | 'staff' | 'visitor';
   color: number;
   roomId: string | null;
   /** Bed index (residents, or staff working at that resident's bed). */
@@ -968,8 +968,9 @@ export class IsoRenderer {
       const c = cellCenter(cell.x, cell.y);
       // Staff working at a bed stand beside it; several idle staff on one tile fan out.
       const fan = p.kind === 'staff' && p.spot !== undefined && rc ? Math.floor(p.spot / Math.max(1, rc.free.length)) : 0;
-      const dx = p.kind === 'staff' ? (p.bed !== undefined ? 18 : -8 + fan * 14) : 0;
-      const dy = p.kind === 'staff' ? (p.bed !== undefined ? 6 : 2 + fan * 4) : 0;
+      // A visiting relative sits on the other side of the bed.
+      const dx = p.kind === 'visitor' ? -20 : p.kind === 'staff' ? (p.bed !== undefined ? 18 : -8 + fan * 14) : 0;
+      const dy = p.kind === 'visitor' ? 8 : p.kind === 'staff' ? (p.bed !== undefined ? 6 : 2 + fan * 4) : 0;
       items.push({ x: c.x + dx, y: c.y + dy, p });
     }
     items.sort((a, b) => a.y - b.y);
@@ -1009,12 +1010,13 @@ export class IsoRenderer {
         node.position.set(x, y);
         node.zIndex = y;
         this.peopleLayer.addChild(node);
-        // A resident setting out walks from their bed.
+        // A resident setting out walks from their bed; a visitor walks in from the gate.
         const from = p.kind === 'resident' ? this.bedPoint(p) : null;
-        const sx = from && !snap ? from.x : x;
-        const sy = from && !snap ? from.y : y;
+        const arrive = p.kind === 'visitor' && !snap ? this.fromGate(p.roomId) : [];
+        const sx = arrive.length ? arrive[0].x : from && !snap ? from.x : x;
+        const sy = arrive.length ? arrive[0].y : from && !snap ? from.y : y;
         node.position.set(sx, sy);
-        this.walkers.set(p.key, { node, body, x: sx, y: sy, tx: x, ty: y, phase: (p.key.length * 1.7 + x * 0.01) % 6.28, sprite: p.sprite, roomId: p.roomId, path: [], speed: 110 });
+        this.walkers.set(p.key, { node, body, x: sx, y: sy, tx: x, ty: y, phase: (p.key.length * 1.7 + x * 0.01) % 6.28, sprite: p.sprite, roomId: p.roomId, path: arrive.slice(1), speed: 140 });
       } else {
         g.ellipse(x, y, 10, 4.5).fill({ color: 0x000000, alpha: 0.2 });
         g.roundRect(x - 7, y - 25, 14, 24, 6).fill(p.color).stroke({ width: 1.2, color: shade(p.color, 0.65) });
@@ -1088,6 +1090,15 @@ export class IsoRenderer {
     const tiles = corridorPath(site, a.outside, b.outside);
     if (!tiles) return [];
     return [a.inside, ...tiles, b.inside].map((c) => cellCenter(c.x, c.y));
+  }
+
+  /** Waypoints from the main entrance along the corridors into a room. */
+  private fromGate(to: string | null): Array<{ x: number; y: number }> {
+    const site = this.input?.game.site;
+    const door = to ? this.input?.statuses.get(to)?.door : null;
+    if (!site || !door) return [];
+    const tiles = corridorPath(site, site.entrance, door.outside);
+    return tiles ? [...tiles, door.inside].map((c) => cellCenter(c.x, c.y)) : [];
   }
 
   /** Where a resident's bed is on the map, or null. */
