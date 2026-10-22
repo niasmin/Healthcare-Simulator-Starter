@@ -1629,6 +1629,10 @@ const th: Dict = {
   'log.family_worried': 'ญาติคุณ{name}มาเยี่ยมแล้วเป็นห่วงเรื่องการดูแล ลองดูความต้องการของท่านและเวรพนักงาน',
   'move.connect': 'ปูทางเดินเชื่อมให้ {n} ช่อง ({cost})',
   'reason.no_route': 'ไม่มีที่ว่างพอจะปูทางเดินไปถึงอาคารนี้ ลองย้ายอาคารหรือรื้อสิ่งที่ขวางอยู่',
+  'error.title': 'มีเวอร์ชันใหม่ หรือหน้านี้โหลดไม่สำเร็จ',
+  'error.body': 'กดโหลดใหม่เพื่อเปิดเกมเวอร์ชันล่าสุด เกมที่เล่นไว้บันทึกอยู่ในเครื่องแล้ว ไม่หายครับ',
+  'error.reload': 'โหลดใหม่',
+  'error.back': 'กลับไปก่อน',
 };
 
 const en: Dict = {
@@ -3258,6 +3262,10 @@ const en: Dict = {
   'log.family_worried': "{name}'s family visited and are worried about the care: check their needs and the roster",
   'move.connect': 'Pave a corridor to it: {n} tiles ({cost})',
   'reason.no_route': 'No free tiles to pave a corridor to this building: move it or clear what is in the way',
+  'error.title': 'A new version is out, or this part did not load',
+  'error.body': 'Reload to open the latest version. Your game is saved on this device and will not be lost.',
+  'error.reload': 'Reload',
+  'error.back': 'Go back',
 };
 
 export const DICTS: Record<Lang, Dict> = { th, en };

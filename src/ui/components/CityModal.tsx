@@ -1,4 +1,6 @@
-import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
+import { lazyWithReload } from '../lazy';
+import { ErrorBoundary } from './ErrorBoundary';
 import { CITY_PLACES, MALL_DEAL_DAYS } from '../../data/city';
 import type { CityPlace, GameState } from '../../domain/types';
 import { RIVALS, rivalSite, townRanking, type CenterStats } from '../../sim/rivals';
@@ -13,7 +15,7 @@ import { supabase, useSaveStatus } from '../saveService';
 import { useGame } from '../store';
 import { useName } from './people';
 
-const VisitCanvas = lazy(() => import('./VisitCanvas').then((m) => ({ default: m.VisitCanvas })));
+const VisitCanvas = lazyWithReload(() => import('./VisitCanvas').then((m) => ({ default: m.VisitCanvas })));
 
 /** The town map: places to visit, rival homes and your own, laid out in blocks between roads. */
 type Spot = { kind: 'place'; id: CityPlace } | { kind: 'rival'; id: string } | { kind: 'you' } | { kind: 'scenery'; id: 'lake' | 'school' };
@@ -71,7 +73,11 @@ export function CityModal({ tab: initialTab, onClose }: { tab: 'city' | 'ranking
         </div>
         {tab === 'city' ? <CityMap onVisit={setVisit} /> : <Ranking onVisit={setVisit} />}
       </div>
-      {visit && <VisitOverlay visit={visit} onClose={() => setVisit(null)} />}
+      {visit && (
+        <ErrorBoundary onClose={() => setVisit(null)}>
+          <VisitOverlay visit={visit} onClose={() => setVisit(null)} />
+        </ErrorBoundary>
+      )}
     </div>
   );
 }

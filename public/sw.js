@@ -2,7 +2,7 @@
 // The page itself is network-first (so a new deploy shows up at once, falling back to the cached
 // copy offline); hashed build files and images are cache-first (their names change when they do).
 // Other origins (Supabase, fonts) are left to the network.
-const CACHE = 'he-v2';
+const CACHE = 'he-v3';
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then((c) => c.addAll(['./', './manifest.webmanifest', './icon-192.png'])));
@@ -34,7 +34,9 @@ self.addEventListener('fetch', (event) => {
       (hit) =>
         hit ||
         fetch(req).then((res) => {
-          if (res.ok) {
+          // A missing build file comes back as the HTML page (the host's fallback): never keep that.
+          const html = (res.headers.get('content-type') || '').includes('text/html');
+          if (res.ok && !html) {
             const copy = res.clone();
             caches.open(CACHE).then((c) => c.put(req, copy));
           }

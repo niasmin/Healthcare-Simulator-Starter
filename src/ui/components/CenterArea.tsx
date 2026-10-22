@@ -1,9 +1,10 @@
 import { useT } from '../hooks';
+import { lazyWithReload } from '../lazy';
 import { useGame, type View } from '../store';
-import { lazy, Suspense } from 'react';
+import { Suspense } from 'react';
 
 // The map (and Pixi with it) loads separately, after the title screen and panels are up.
-const GameCanvas = lazy(() => import('./GameCanvas').then((m) => ({ default: m.GameCanvas })));
+const GameCanvas = lazyWithReload(() => import('./GameCanvas').then((m) => ({ default: m.GameCanvas })));
 import { ResidentsView } from './ResidentsView';
 import { RosterView } from './RosterView';
 import { FinanceView } from './FinanceView';
