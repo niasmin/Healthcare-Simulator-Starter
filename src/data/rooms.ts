@@ -339,8 +339,6 @@ export const MOVE_FEE_PERCENT = 20;
 /** A move or turn closes the building for this long, plus a little more for every tile (fictional). */
 export const WORKS_BASE_MINUTES = 120;
 export const WORKS_MINUTES_PER_TILE = 30;
-/** Moving a door to another side is a small job done while the building stays open. */
-export const DOOR_FEE_PERCENT = 3;
 
 export function roomConstructionCost(type: RoomType, rect: Rect): Satang {
   const def = ROOMS[type];

@@ -1,25 +1,22 @@
-import { BED_ROOMS, DOOR_FEE_PERCENT, MOVE_FEE_PERCENT, WORKS_BASE_MINUTES, WORKS_MINUTES_PER_TILE, roomConstructionCost } from '../../data/rooms';
+import { BED_ROOMS, CORRIDOR_COST_PER_TILE, MOVE_FEE_PERCENT, WORKS_BASE_MINUTES, WORKS_MINUTES_PER_TILE, roomConstructionCost } from '../../data/rooms';
 import { rectArea } from '../../domain/grid';
 import { pctOf } from '../../domain/money';
 import { residentsInRoom } from '../../domain/rules/beds';
-import { FACINGS } from '../../domain/rules/navigation';
+import { reachableCorridor } from '../../domain/rules/navigation';
+import { cellIndex, inBounds, NEIGHBOURS, rectContains } from '../../domain/grid';
 import { validateRoomPlacement, type PlacementCheck } from '../../domain/rules/placement';
-import type { Cell, Facing, GameState, ReasonCode, Rect, Room } from '../../domain/types';
+import type { Cell, GameState, Rect, Room } from '../../domain/types';
 import { log, post } from '../helpers';
 
 /**
  * Moving and turning buildings, as building works. A building keeps its id, equipment and name;
  * a move or a turn of the footprint costs a share of its construction cost and closes it while
  * the builders work (longer for bigger buildings). Residents cannot stay in a building being
- * moved, so a ward or villa must be empty first. Moving only the door is a small job: a smaller
- * fee, done at once, and the building stays open. All costs and times are fictional.
+ * moved, so a ward or villa must be empty first. Doors are placed automatically wherever the
+ * building touches a corridor. All costs and times are fictional.
  */
 export function moveFee(room: Room): number {
   return pctOf(roomConstructionCost(room.type, room.rect), MOVE_FEE_PERCENT);
-}
-
-export function doorFee(room: Room): number {
-  return pctOf(roomConstructionCost(room.type, room.rect), DOOR_FEE_PERCENT);
 }
 
 /** How long a move or turn keeps the building closed, in minutes (a multiple of the 10-minute tick). */
@@ -56,48 +53,67 @@ export function movedRect(room: Room, origin: Cell, rotated = false): Rect {
   return { x: origin.x, y: origin.y, w: rotated ? room.rect.h : room.rect.w, h: rotated ? room.rect.w : room.rect.h };
 }
 
-/** The side the door ends up on after `turns` quarter turns (1 = clockwise on the map, -1 = back). */
-export function turnFacing(facing: Facing | undefined, turns: number): Facing {
-  // Clockwise on the grid: bottom -> left -> top -> right.
-  const ring: Facing[] = ['s', 'w', 'n', 'e'];
-  const i = ring.indexOf(facing ?? 's');
-  return ring[(((i + turns) % 4) + 4) % 4];
-}
-
-/**
- * A quarter turn in place: the footprint turns about its centre (so turning four times comes back
- * to the start) and the door moves round with it.
- */
-export function turnedPlacement(room: Room, turns: 1 | -1): { rect: Rect; facing: Facing } {
+/** A quarter turn in place: the footprint turns about its centre, so four turns come back to the start. */
+export function turnedRect(room: Room): Rect {
   const { x, y, w, h } = room.rect;
   const d = Math.trunc((w - h) / 2);
-  return { rect: { x: x + d, y: y - d, w: h, h: w }, facing: turnFacing(room.facing, turns) };
+  return { x: x + d, y: y - d, w: h, h: w };
 }
 
 /** Put the building on its new footprint and start the works (check moveCheck first). */
-export function startWorks(state: GameState, roomId: string, rect: Rect, facing: Facing | undefined, fee: number): GameState {
+export function startWorks(state: GameState, roomId: string, rect: Rect, fee: number): GameState {
   const room = state.site.rooms.find((r) => r.id === roomId)!;
   const until = state.minute + worksMinutes(room);
-  const moved: Room = { ...room, rect: { ...rect }, ...(facing ? { facing } : {}), worksUntil: until };
+  // Older saves may carry a chosen door side: doors are automatic again, so it goes.
+  const { facing: _side, ...rest } = room as Room & { facing?: unknown };
+  const moved: Room = { ...rest, rect: { ...rect }, worksUntil: until };
   let s: GameState = { ...state, site: { ...state.site, rooms: state.site.rooms.map((r) => (r.id === roomId ? moved : r)) } };
   s = post(s, -fee, 'construction', 'ledger.move_room', { ref: roomId, memoParams: { room: room.type } });
   return log(s, 'info', 'log.works_started', { room: room.type, hours: Math.round((until - state.minute) / 60) });
 }
 
-export function doorBlocker(state: GameState, room: Room): ReasonCode | null {
-  if (room.worksUntil !== undefined) return 'works_active';
-  if (state.organization.cashSatang < doorFee(room)) return 'insufficient_funds';
+/**
+ * The cheapest corridor to pave so a building gets a door: from any corridor already reached from
+ * the entrance, over empty tiles (no room or decoration), to a tile next to the building. Returns
+ * the new tiles to pave (empty when it already has a door), or null when there is no way.
+ */
+export function connectPath(state: GameState, roomId: string): Cell[] | null {
+  const { site } = state;
+  const room = site.rooms.find((r) => r.id === roomId);
+  if (!room) return null;
+  const { width, height } = site;
+  const reach = reachableCorridor(site);
+  const blocked = new Uint8Array(width * height);
+  for (const r of site.rooms) for (let j = r.rect.y; j < r.rect.y + r.rect.h; j++) for (let i = r.rect.x; i < r.rect.x + r.rect.w; i++) if (inBounds(i, j, width, height)) blocked[cellIndex(i, j, width)] = 1;
+  for (const d of site.decor ?? []) blocked[cellIndex(d.cell.x, d.cell.y, width)] = 1;
+  const touches = (x: number, y: number) => NEIGHBOURS.some((d) => rectContains(room.rect, { x: x + d.x, y: y + d.y }));
+  // Breadth-first from every reached corridor tile; already-reached tiles cost nothing.
+  const prev = new Int32Array(width * height).fill(-2);
+  const queue: number[] = [];
+  for (let i = 0; i < reach.length; i++) if (reach[i]) (prev[i] = -1), queue.push(i);
+  for (let head = 0; head < queue.length; head++) {
+    const idx = queue[head];
+    const x = idx % width;
+    const y = (idx - x) / width;
+    if (touches(x, y)) {
+      const out: Cell[] = [];
+      for (let k = idx; k >= 0 && !reach[k]; k = prev[k]) out.push({ x: k % width, y: Math.floor(k / width) });
+      return out.reverse();
+    }
+    for (const d of NEIGHBOURS) {
+      const nx = x + d.x;
+      const ny = y + d.y;
+      if (!inBounds(nx, ny, width, height)) continue;
+      const n = cellIndex(nx, ny, width);
+      if (prev[n] !== -2 || blocked[n]) continue;
+      prev[n] = idx;
+      queue.push(n);
+    }
+  }
   return null;
 }
 
-/** Move the door to another side: a small job, paid and done at once. */
-export function setDoor(state: GameState, roomId: string, facing: Facing): GameState {
-  const room = state.site.rooms.find((r) => r.id === roomId)!;
-  const fee = doorFee(room);
-  let s: GameState = { ...state, site: { ...state.site, rooms: state.site.rooms.map((r) => (r.id === roomId ? { ...r, facing } : r)) } };
-  if (fee > 0) s = post(s, -fee, 'construction', 'ledger.move_door', { ref: roomId, memoParams: { room: room.type } });
-  return log(s, 'info', 'log.room_turned', { room: room.type });
-}
+export const connectCost = (tiles: Cell[]) => tiles.reduce((a, _c) => a + CORRIDOR_COST_PER_TILE, 0);
 
 /** Every tick: buildings whose works are done open again. */
 export function worksTick(state: GameState): GameState {
@@ -113,5 +129,3 @@ export function worksTick(state: GameState): GameState {
   for (const r of done) s = log(s, 'good', 'log.works_done', { room: r.type });
   return s;
 }
-
-export const isFacing = (f: unknown): f is Facing => FACINGS.includes(f as Facing);

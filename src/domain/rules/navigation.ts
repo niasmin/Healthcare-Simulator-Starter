@@ -44,7 +44,7 @@ export interface Door {
  * Doors are placed automatically: the first perimeter cell (in a fixed,
  * deterministic order) that touches a corridor reachable from the entrance.
  * Order: front faces first (bottom edge y+h, then right edge x+w), then back faces,
- * so doors prefer the side facing the camera. A room's `facing` puts its side first.
+ * so doors prefer the side facing the camera.
  */
 export function findDoor(room: Room, site: Site, reachable: Uint8Array = reachableCorridor(site)): Door | null {
   const { x, y, w, h } = room.rect;
@@ -53,9 +53,7 @@ export function findDoor(room: Room, site: Site, reachable: Uint8Array = reachab
   for (let j = 0; j < h; j++) sides.e.push([{ x: x + w - 1, y: y + j }, { x: x + w, y: y + j }]);
   for (let i = 0; i < w; i++) sides.n.push([{ x: x + i, y }, { x: x + i, y: y - 1 }]);
   for (let j = 0; j < h; j++) sides.w.push([{ x, y: y + j }, { x: x - 1, y: y + j }]);
-  // A room turned to face a side tries that side first, then the usual order.
-  const order: Facing[] = room.facing ? [room.facing, ...FACINGS.filter((f) => f !== room.facing)] : FACINGS;
-  const candidates = order.flatMap((f) => sides[f]);
+  const candidates = FACINGS.flatMap((f) => sides[f]);
   for (const [inside, outside] of candidates) {
     if (!inBounds(outside.x, outside.y, site.width, site.height)) continue;
     if (reachable[cellIndex(outside.x, outside.y, site.width)]) return { inside, outside };
