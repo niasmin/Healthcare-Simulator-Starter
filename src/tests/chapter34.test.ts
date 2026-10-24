@@ -135,8 +135,13 @@ describe('chapter 3 rules', () => {
     plain = ok(plain, { type: 'createCarePlan', residentId: plain.residents[0].id });
     let lush = plain;
     for (const [i, type] of (['gazebo', 'gazebo', 'fountain', 'fountain', 'gazebo'] as const).entries()) lush = ok(lush, { type: 'placeDecor', decor: type, cell: NEW_LAND.garden[i] });
-    const a = advance(plain, TICKS_PER_DAY * 10).residents[0].needs.satisfaction;
-    const b = advance(lush, TICKS_PER_DAY * 10).residents[0].needs.satisfaction;
+    const plainLater = advance(plain, TICKS_PER_DAY * 10);
+    const lushLater = advance(lush, TICKS_PER_DAY * 10);
+    // Without a garden the family may already have moved them out: the unhappiest outcome of all.
+    const a = plainLater.residents[0]?.needs.satisfaction ?? 0;
+    if (!plainLater.residents.length) expect(plainLater.log.some((l) => l.key === 'log.withdrawn')).toBe(true);
+    expect(lushLater.residents).toHaveLength(1);
+    const b = lushLater.residents[0].needs.satisfaction;
     expect(b).toBeGreaterThan(a + 5);
   });
 });

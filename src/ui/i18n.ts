@@ -196,6 +196,9 @@ const th: Dict = {
   'admit.btn': 'รับเข้า',
   'admit.no_beds': 'ยังไม่มีเตียงว่างที่พร้อมใช้ สร้างห้องพักและติดตั้งเตียงกับระบบกริ่งก่อน',
   'admit.note': 'ข้อมูลผู้พักทั้งหมดเป็นตัวละครสมมติ',
+  'admit.empty': 'ยังไม่มีครอบครัวติดต่อเข้ามา ครอบครัวใหม่จะติดต่อเข้ามาทุกวัน',
+  'admit.empty_rep_low': 'ยังไม่มีครอบครัวรออยู่ เพราะชื่อเสียงศูนย์ยังต่ำ (⭐ {rep}) ครอบครัวจึงติดต่อมาน้อยและไปหาที่อื่น เมื่อชื่อเสียงถึง {need} จะกลับมาปกติ ดูแลให้พอใจและพลาดงานดูแลให้น้อยลง',
+  'admit.empty_rep_none': 'ไม่มีครอบครัวติดต่อมาเลย เพราะชื่อเสียงศูนย์ต่ำมาก (⭐ {rep}) ชื่อเสียงต้องถึง {need} ครอบครัวจึงจะกลับมาปกติ ดูแลให้พอใจและพลาดงานดูแลให้น้อยลง',
 
   'roster.title': 'ตารางเวร — สถานีพยาบาล',
   'roster.role': 'ตำแหน่ง',
@@ -1834,6 +1837,9 @@ const en: Dict = {
   'admit.btn': 'Admit',
   'admit.no_beds': 'No free operational bed. Build a ward and install beds plus a call bell system first.',
   'admit.note': 'All residents are fictional characters.',
+  'admit.empty': 'No families are waiting yet. New families get in touch every day.',
+  'admit.empty_rep_low': 'Nobody is waiting because the home\'s reputation is low (⭐ {rep}), so few families enquire and those waiting look elsewhere. Things return to normal at {need}: keep residents happy and miss fewer care tasks.',
+  'admit.empty_rep_none': 'No families are enquiring because the home\'s reputation is very low (⭐ {rep}). It needs to reach {need} for families to return: keep residents happy and miss fewer care tasks.',
 
   'roster.title': 'Shift schedule — nursing station',
   'roster.role': 'Role',
