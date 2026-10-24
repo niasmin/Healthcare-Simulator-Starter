@@ -70,7 +70,7 @@ interface Fly { g: Graphics; ax: number; ay: number; phase: number; speed: numbe
 interface Wisp { g: Graphics; x: number; y: number; speed: number; phase: number }
 
 /** How dark the night gets away from any light (on top of the tint). */
-const NIGHT_DARK = 0.5;
+export const NIGHT_DARK = 0.5;
 /** A path lamp on about one corridor tile in this many. */
 const LAMP_EVERY = 5;
 const FIREFLIES = 36;
