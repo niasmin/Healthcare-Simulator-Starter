@@ -3,6 +3,7 @@ import type { Site } from '../domain/types';
 import { cellCenter } from './iso';
 import { DROP, townRoads } from './WorldBackdrop';
 import type { Weather } from './Ambience';
+import { dispose } from './dispose';
 
 /**
  * Life in the town around the home: people walking along the pavements, joggers, cyclists, a
@@ -61,7 +62,7 @@ export class TownLife {
   /** (Re)build the town's people for this site; the sale plot, when listed, widens the town. */
   build(site: Site, saleToX: number | null): void {
     this.site = site;
-    for (const f of this.folk) f.node.destroy({ children: true });
+    for (const f of this.folk) dispose(f.node);
     this.folk = [];
     const r = townRoads(site, saleToX);
     // Pavement lanes on both sides of every road, except where the side is the lot itself.
@@ -201,7 +202,7 @@ export class TownLife {
   }
 
   destroy(): void {
-    for (const f of this.folk) f.node.destroy({ children: true });
+    for (const f of this.folk) dispose(f.node);
     this.folk = [];
   }
 }

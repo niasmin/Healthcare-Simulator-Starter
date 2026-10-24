@@ -10,6 +10,7 @@ import { corridorPath } from '../domain/rules/navigation';
 import { pathLamps } from './Ambience';
 import type { Cell, EquipmentId, GameState, Room, RoomType } from '../domain/types';
 import { cellCenter, cellDiamond, cellToWorld, TILE_H, TILE_W, worldToCell } from './iso';
+import { dispose } from './dispose';
 
 /**
  * Rendering layer. Reads game state, never mutates it. All gameplay decisions
@@ -460,8 +461,8 @@ export class IsoRenderer {
   }
 
   private makeCars(site: GameState['site']): void {
-    for (const c of this.carsLayer.removeChildren()) c.destroy();
-    for (const c of this.carsBack.removeChildren()) c.destroy();
+    for (const c of this.carsLayer.removeChildren()) dispose(c);
+    for (const c of this.carsBack.removeChildren()) dispose(c);
     const colors = [0xd9534f, 0x2f6aa5, 0xf2f2f2, 0x3f8f86, 0xe0a23b, 0x7d6aa0, 0x2b2522, 0xf2b631];
     const r = townRoads(site, this.input?.sale?.toX ?? null);
     // Roads: the front street (busiest), the ring road round the block and the second street.
@@ -531,8 +532,8 @@ export class IsoRenderer {
 
   private drawStatic(input: RenderInput): void {
     const { site } = input.game;
-    for (const c of this.staticLayer.removeChildren()) c.destroy({ children: true });
-    for (const c of this.labelLayer.removeChildren()) c.destroy({ children: true });
+    for (const c of this.staticLayer.removeChildren()) dispose(c);
+    for (const c of this.labelLayer.removeChildren()) dispose(c);
     this.roomCells.clear();
 
     const g = new Graphics();
@@ -1040,7 +1041,7 @@ export class IsoRenderer {
           if (snap) (w.x = x), (w.y = y), (w.path = []);
           continue;
         }
-        if (w) w.node.destroy({ children: true });
+        if (w) dispose(w.node);
         const node = new Container();
         // Staff stand on a role-coloured ring; residents on a soft shadow.
         node.addChild(
@@ -1070,7 +1071,7 @@ export class IsoRenderer {
     }
     for (const [k, w] of this.walkers)
       if (!keep.has(k)) {
-        w.node.destroy({ children: true });
+        dispose(w.node);
         this.walkers.delete(k);
       }
   }

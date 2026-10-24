@@ -1,6 +1,10 @@
 import { Container, Graphics } from 'pixi.js';
 import type { GameState, Room } from '../domain/types';
 import { cellCenter, cellToWorld } from './iso';
+import { dispose } from './dispose';
+
+/** Most build puffs and sparkles alive at once (one building makes 24–34). */
+const MAX_PUFFS = 160;
 
 /**
  * Ambient effects drawn around the map. Purely visual: they read the game clock and the site,
@@ -231,8 +235,8 @@ export class Ambience {
   drawLights(site: GameState['site']): void {
     if (site === this.lastLightsSite) return;
     this.lastLightsSite = site;
-    for (const c of this.lights.removeChildren()) if (c !== this.flyLayer) c.destroy();
-    for (const c of this.dark.removeChildren()) c.destroy();
+    for (const c of this.lights.removeChildren()) if (c !== this.flyLayer) dispose(c);
+    for (const c of this.dark.removeChildren()) dispose(c);
     this.dark.cacheAsTexture(false);
     const sources = this.lightSources(site);
     const g = new Graphics();
@@ -331,6 +335,8 @@ export class Ambience {
   }
 
   private puffAt(room: Room): void {
+    // Rapid building: cap the live effects so a burst of taps can't pile up hundreds of shapes.
+    if (this.puffs.length >= MAX_PUFFS) return;
     const { x, y, w, h } = room.rect;
     const c = cellCenter(x + (w - 1) / 2, y + (h - 1) / 2);
     const n = 14 + Math.min(10, w * h);
@@ -351,7 +357,7 @@ export class Ambience {
   }
 
   private makeClouds(): void {
-    for (const c of this.cloudLayer.removeChildren()) c.destroy();
+    for (const c of this.cloudLayer.removeChildren()) dispose(c);
     this.clouds = [];
     for (let i = 0; i < 5; i++) {
       const g = new Graphics();
