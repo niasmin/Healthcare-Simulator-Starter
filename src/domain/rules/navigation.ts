@@ -4,17 +4,27 @@ import type { Cell, Facing, Room, Site } from '../types';
 /** Door sides in the default order: the two facing the camera first. */
 export const FACINGS: Facing[] = ['s', 'e', 'n', 'w'];
 
+/** True for a tile on the lot's edge, where a path meets the street outside. */
+export function onLotEdge(site: Site, x: number, y: number): boolean {
+  return x === 0 || y === 0 || x === site.width - 1 || y === site.height - 1;
+}
+
 /**
- * Breadth-first search over corridor tiles starting at the site entrance.
- * Returns a row-major mask: 1 = corridor reachable from the entrance.
+ * Breadth-first search over corridor tiles starting at the site entrance and at every corridor
+ * tile on the edge of the lot (a path that reaches the fence opens onto the street there).
+ * Returns a row-major mask: 1 = corridor reachable from outside.
  */
 export function reachableCorridor(site: Site): Uint8Array {
   const { width, height, corridor, entrance } = site;
   const seen = new Uint8Array(width * height);
-  const start = cellIndex(entrance.x, entrance.y, width);
-  if (!corridor[start]) return seen;
-  const queue: number[] = [start];
-  seen[start] = 1;
+  const queue: number[] = [];
+  const seed = (x: number, y: number) => {
+    const i = cellIndex(x, y, width);
+    if (corridor[i] && !seen[i]) (seen[i] = 1), queue.push(i);
+  };
+  seed(entrance.x, entrance.y);
+  for (let x = 0; x < width; x++) seed(x, 0), seed(x, height - 1);
+  for (let y = 0; y < height; y++) seed(0, y), seed(width - 1, y);
   for (let head = 0; head < queue.length; head++) {
     const idx = queue[head];
     const x = idx % width;

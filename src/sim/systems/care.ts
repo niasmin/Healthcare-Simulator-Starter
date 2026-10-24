@@ -99,8 +99,9 @@ export function careTick(state: GameState): GameState {
     if (!a || !b) return 0;
     let dist = stepsFrom.get(fromRoom);
     if (!dist) stepsFrom.set(fromRoom, (dist = corridorSteps(state.site, a.outside)));
-    const steps = dist[cellIndex(b.outside.x, b.outside.y, state.site.width)];
-    if (steps < 0) return 0;
+    let steps = dist[cellIndex(b.outside.x, b.outside.y, state.site.width)];
+    // Paths that only meet out on the street: the walk goes round by the street.
+    if (steps < 0) steps = Math.round((Math.abs(a.outside.x - b.outside.x) + Math.abs(a.outside.y - b.outside.y)) * 1.5);
     return Math.min(WALK_MAX_MINUTES, Math.round(steps / WALK_TILES_PER_MINUTE));
   };
 

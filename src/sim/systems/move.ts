@@ -4,7 +4,7 @@ import { pctOf } from '../../domain/money';
 import { residentsInRoom } from '../../domain/rules/beds';
 import { roomStatus } from '../../domain/rules/rooms';
 import { applyNeedDelta } from './needs';
-import { reachableCorridor } from '../../domain/rules/navigation';
+import { onLotEdge, reachableCorridor } from '../../domain/rules/navigation';
 import { cellIndex, inBounds, NEIGHBOURS, rectContains } from '../../domain/grid';
 import { validateRoomPlacement, type PlacementCheck } from '../../domain/rules/placement';
 import type { Cell, GameState, Rect, Room } from '../../domain/types';
@@ -103,7 +103,8 @@ export function startWorks(state: GameState, roomId: string, rect: Rect, fee: nu
 
 /**
  * The cheapest corridor to pave so a building gets a door: from any corridor already reached from
- * the entrance, over empty tiles (no room or decoration), to a tile next to the building. Returns
+ * outside, or from the fence (where a path opens onto the street), over empty tiles (no room or
+ * decoration), to a tile next to the building. Returns
  * the new tiles to pave (empty when it already has a door), or null when there is no way.
  */
 export function connectPath(state: GameState, roomId: string): Cell[] | null {
@@ -120,6 +121,12 @@ export function connectPath(state: GameState, roomId: string): Cell[] | null {
   const prev = new Int32Array(width * height).fill(-2);
   const queue: number[] = [];
   for (let i = 0; i < reach.length; i++) if (reach[i]) (prev[i] = -1), queue.push(i);
+  // A new path can also start at the fence, where it opens onto the street.
+  for (let i = 0; i < reach.length; i++) {
+    const x = i % width;
+    const y = (i - x) / width;
+    if (!reach[i] && !blocked[i] && onLotEdge(site, x, y)) (prev[i] = -1), queue.push(i);
+  }
   for (let head = 0; head < queue.length; head++) {
     const idx = queue[head];
     const x = idx % width;
