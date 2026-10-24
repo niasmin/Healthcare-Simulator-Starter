@@ -1,0 +1,82 @@
+{
+ "b_accounting_office_2x2": [
+  69.0,
+  85.0
+ ],
+ "b_bathroom_2x2": [
+  69.0,
+  85.0
+ ],
+ "b_dining_room_3x3": [
+  111.0,
+  116.0
+ ],
+ "b_homecare_office_4x3": [
+  117.0,
+  109.0
+ ],
+ "b_laundry_room_2x2": [
+  69.0,
+  85.0
+ ],
+ "b_neuro_clinic_4x3": [
+  117.0,
+  109.0
+ ],
+ "b_nursing_station_3x3": [
+  101.0,
+  101.0
+ ],
+ "b_pharmacy_2x2": [
+  69.0,
+  85.0
+ ],
+ "b_reception_3x2": [
+  85.0,
+  93.0
+ ],
+ "b_staff_room_2x2": [
+  79.0,
+  101.0
+ ],
+ "b_staff_room_2x3": [
+  94.0,
+  109.0
+ ],
+ "b_storage_room_2x2": [
+  69.0,
+  85.0
+ ],
+ "b_stroke_unit_4x3": [
+  117.0,
+  109.0
+ ],
+ "b_therapy_3x3": [
+  101.0,
+  101.0
+ ],
+ "b_training_room_2x3": [
+  85.0,
+  93.0
+ ],
+ "b_villa_3x3": [
+  111.0,
+  116.0
+ ],
+ "b_ward_4x5": [
+  158.0,
+  173.0
+ ],
+ "b_ward_5x6": [
+  190.0,
+  188.0
+ ],
+ "dc_sala3d": [
+  47.0,
+  99.0
+ ],
+ "dc_thai_house": [
+  49.0,
+  115.0
+ ]
+}

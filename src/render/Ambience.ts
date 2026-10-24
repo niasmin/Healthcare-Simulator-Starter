@@ -217,7 +217,7 @@ export class Ambience {
         out.push({ x: c.x, y: c.y + 3, r: 30, color: 0x48d6ff, k: 0.35 });
       }
     for (const d of site.decor ?? []) {
-      if (d.type === 'lantern' || d.type === 'sala') {
+      if (d.type === 'lantern' || d.type === 'sala' || d.type === 'thai_house') {
         const c = cellCenter(d.cell.x, d.cell.y);
         out.push(d.type === 'lantern' ? { x: c.x, y: c.y - 6, r: 44, color: 0xffc46a, k: 0.65 } : { x: c.x, y: c.y - 14, r: 50, color: 0xffb04a, k: 0.6 });
         continue;

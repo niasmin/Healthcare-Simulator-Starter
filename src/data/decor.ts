@@ -29,6 +29,8 @@ export const DECOR: Record<DecorType, DecorDef> = {
   pond: { type: 'pond', costSatang: thb(4_000), appeal: 1.5 },
   // A Thai pavilion on stilts: beside a pond its posts stand in the water.
   sala: { type: 'sala', costSatang: thb(35_000), appeal: 6 },
+  // A Thai house on stilts (ruean thai) with a veranda: the grandest garden piece.
+  thai_house: { type: 'thai_house', costSatang: thb(60_000), appeal: 8 },
   // A small garden lantern on a post; it lights the lawn at night.
   lantern: { type: 'lantern', costSatang: thb(600), appeal: 0.5 },
   // Star shop: exclusive pieces bought with stars from daily missions and achievements.
@@ -44,7 +46,7 @@ export function starsLeft(goals: { stars: number; spent?: number } | undefined):
   return Math.max(0, (goals?.stars ?? 0) - (goals?.spent ?? 0));
 }
 
-export const DECOR_ORDER: DecorType[] = ['tree', 'tree2', 'sakura', 'flowers', 'hedge', 'planter', 'pond', 'lamp', 'lantern', 'umbrella', 'fountain', 'gazebo', 'sala'];
+export const DECOR_ORDER: DecorType[] = ['tree', 'tree2', 'sakura', 'flowers', 'hedge', 'planter', 'pond', 'lamp', 'lantern', 'umbrella', 'fountain', 'gazebo', 'sala', 'thai_house'];
 
 /** Appeal stops helping beyond this total. */
 export const MAX_APPEAL = 30;
