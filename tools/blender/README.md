@@ -50,3 +50,18 @@ python3 tools/blender/pack_sprites.py /tmp/town2 src/assets/sprites src/assets/s
 - Where each house, shop, tree, lamp, pole and crossing goes comes from `townLayout` in
   `src/render/WorldBackdrop.ts` (a hash of the cell, never the game's random numbers).
 - Roads are two lanes; traffic keeps left, as in Thailand. The cables between poles are drawn.
+
+## Title screen
+
+```sh
+# Fredoka Bold (SIL OFL) from @fontsource/fredoka, converted to .ttf with overlaps removed:
+#   fontTools: TTFont("fredoka-latin-700-normal.woff2") -> flavor=None, removeOverlaps(), save
+blender -b --python tools/blender/render_hero.py -- /tmp/hero /path/to/fredoka700.ttf [0.3 for a quick look]
+python3 tools/blender/compose_hero.py /tmp/hero src/assets/title
+```
+
+- `bg_portrait` and `bg_wide` are the campus from the air in the evening sun, with the town, the
+  city and the hills behind; `cast` is the characters at eye level; `logo` the 3D title.
+- `compose_hero.py` writes `hero_portrait.jpg` (phones, logo and cast baked in where the page's
+  buttons leave room), `hero.jpg` (wider screens, cast on the left) and `logo3d.webp`.
+- A full render takes about 20 minutes on 4 CPU cores.
