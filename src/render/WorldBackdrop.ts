@@ -1,6 +1,7 @@
 import { Container, Graphics, Sprite, Text, type Texture } from 'pixi.js';
 import type { Site } from '../domain/types';
 import { cellCenter, cellDiamond, cellToWorld } from './iso';
+import { dispose } from './dispose';
 
 /**
  * The town around the lot: lawns, roads, neighbouring houses, shophouses, trees and a pond, plus
@@ -112,7 +113,7 @@ export function townRoads(site: Site, saleToX: number | null) {
 
 /** Draw the whole town into `container` (cleared first). */
 export function drawWorld(container: Container, site: Site, opts: WorldOptions): void {
-  for (const c of container.removeChildren()) c.destroy({ children: true });
+  for (const c of container.removeChildren()) dispose(c);
   const roads = townRoads(site, opts.sale ? opts.sale.toX : null);
   const { minX, maxX, minY, maxY, eastEdge } = roads;
   const isRoad = (x: number, y: number) => x === roads.west || y === roads.north || x === roads.east || y === roads.front || y === roads.front2;
