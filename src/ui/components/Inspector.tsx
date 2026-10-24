@@ -5,6 +5,7 @@ import type { EquipmentId } from '../../domain/types';
 import { connectCost, connectPath, moveCost, movingResidents, OCCUPIED_MOVE_EXTRA_PERCENT, worksMinutes } from '../../sim/systems/move';
 import { dayOf, formatClock } from '../../sim/systems/time';
 import { useMemo, useState } from 'react';
+import { layoutRoom } from '../../domain/rules/layout';
 import { EQUIP_SPRITE, spriteUrl } from '../../render/sprites';
 import { rosterView } from '../../sim/selectors';
 import { EXHAUSTED_ENERGY } from '../../sim/systems/staffing';
@@ -28,6 +29,8 @@ function RoomInspector({ roomId }: { roomId: string }) {
   if (!room) return null;
   const def = ROOMS[room.type];
   const st = summary.statuses.get(room.id)!;
+  // Equipment packed so tight that a piece has no clear tile beside it, or the floor is cut in two.
+  const tight = layoutRoom(room, st.door).issues.length > 0;
   let equipValue = 0;
   for (const [id, n] of Object.entries(room.equipment) as [EquipmentId, number][]) equipValue += EQUIPMENT[id].costSatang * n;
   const refund = pctOf(roomConstructionCost(room.type, room.rect) + equipValue, REFUND_PERCENT);
@@ -60,7 +63,12 @@ function RoomInspector({ roomId }: { roomId: string }) {
         )}
         <dt className="text-ink-soft">{t('inspector.upkeep')}</dt>
         <dd className="tabular">{money(def.upkeepPerTileSatang * area)}</dd>
+        <dt className="text-ink-soft">{t('inspector.layout')}</dt>
+        <dd data-testid="room-layout" className={tight ? 'text-bad' : 'text-teal'}>
+          {tight ? t('inspector.layout_tight') : t('inspector.layout_ok')}
+        </dd>
       </dl>
+      {tight && <p className="text-xs rounded-lg bg-bad/10 text-bad px-2 py-1.5 leading-snug">⚠ {t('inspector.layout_tight_hint')}</p>}
 
       {link && link.length > 0 && (
         <button

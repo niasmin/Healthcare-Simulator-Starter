@@ -1,14 +1,15 @@
 import { Application, Container, Graphics, Sprite, Text, type Texture } from 'pixi.js';
-import { DECOR_SPRITE, EQUIP_SPRITE, ROOM_BADGE, PERSON_SPRITE_WIDTH, RENDERED_ANCHORS, loadSpriteTextures, renderedBuilding } from './sprites';
+import { DECOR_SPRITE, EQUIP_SPRITE, ROOM_BADGE, PERSON_SPRITE_WIDTH, RENDERED_ANCHORS, figureBase, loadSpriteTextures, renderedBuilding, renderedView } from './sprites';
 import { drawWorld, townRoads, worldBounds } from './WorldBackdrop';
 import { Ambience, lightAt, type Weather } from './Ambience';
 import { TownLife } from './TownLife';
 import { EQUIPMENT, ROOMS } from '../data/rooms';
-import { cellIndex } from '../domain/grid';
+import { cellIndex, NEIGHBOURS } from '../domain/grid';
+import { layoutRoom } from '../domain/rules/layout';
 import type { RoomStatus } from '../domain/rules/rooms';
 import { corridorPath } from '../domain/rules/navigation';
 import { pathLamps } from './Ambience';
-import type { Cell, EquipmentId, GameState, Room, RoomType } from '../domain/types';
+import type { Cell, EquipmentId, Facing, GameState, Room, RoomType } from '../domain/types';
 import { cellCenter, cellDiamond, cellToWorld, TILE_H, TILE_W, worldToCell } from './iso';
 import { dispose } from './dispose';
 
@@ -46,6 +47,8 @@ interface Walker {
   roomId: string | null;
   path: Array<{ x: number; y: number }>;
   speed: number;
+  /** A 3D figure's front and back views (the game shows the one that matches the way they walk). */
+  views?: { front: Sprite; back: Sprite };
 }
 
 export interface RenderInput {
@@ -93,6 +96,8 @@ const WHEELCHAIR = 'ch_wheelchair';
 /** Height / width of the standing character sprites, and a seated rider's height against a standing figure. */
 const STANDING_ASPECT = 158 / 66;
 const SEATED_HEIGHT = 0.8;
+/** One step in game cells for each facing. */
+const FACING_STEP: Record<Facing, [number, number]> = { s: [0, 1], n: [0, -1], e: [1, 0], w: [-1, 0] };
 const PITCHED: ReadonlySet<RoomType> = new Set<RoomType>(['ward', 'villa', 'staff_room', 'dining_room']);
 const FONT = '"IBM Plex Sans Thai", "Noto Sans Thai", "Leelawadee UI", Tahoma, sans-serif';
 
@@ -168,7 +173,7 @@ export class IsoRenderer {
   private peopleShapes = new Graphics();
   private lastPeople = '';
   /** Per room: cells holding beds (in bed order) and free floor cells, for placing people. */
-  private roomCells = new Map<string, { beds: Cell[]; free: Cell[] }>();
+  private roomCells = new Map<string, { beds: Cell[]; bedFacing: Facing[]; bedSide: Array<Cell | null>; free: Cell[] }>();
   /** Where strolling residents go: dining-room floor first, then lawn beside the garden and the paths. */
   private strollSpots: Cell[] = [];
   private ready = false;
@@ -715,23 +720,23 @@ export class IsoRenderer {
     for (let j = 0; j < h; j++)
       if (!isDoor({ x, y: y + j }, { x: x - 1, y: y + j })) seg(x, y + j, x, y + j + 1, WALL_H, shade(wall, 0.85));
 
-    // equipment props spread across the floor, skipping the door tile
-    const cells: Cell[] = [];
-    for (let j = y; j < y + h; j++) for (let i = x; i < x + w; i++) if (!door || door.inside.x !== i || door.inside.y !== j) cells.push({ x: i, y: j });
-    const props: EquipmentId[] = [];
-    for (const slot of def.equipment) for (let k = 0; k < (room.equipment[slot.id] ?? 0); k++) props.push(slot.id);
-    const stride = props.length ? Math.max(1, Math.floor(cells.length / props.length)) : 1;
-    const placed = props.map((id, k) => ({ id, cell: cells[Math.min(cells.length - 1, k * stride)] })).filter((p) => p.cell);
-    const used = new Set(placed.map((p) => `${p.cell.x},${p.cell.y}`));
+    // equipment where the layout rules put it (domain/rules/layout.ts), turned to face the room
+    const layout = layoutRoom(room, door);
+    const bedItems = layout.items.filter((it) => it.id === 'care_bed');
+    const freeKeys = new Set(layout.free.map((c) => `${c.x},${c.y}`));
     this.roomCells.set(room.id, {
-      beds: placed.filter((p) => p.id === 'care_bed').map((p) => p.cell),
-      free: cells.filter((c) => !used.has(`${c.x},${c.y}`)),
+      beds: layout.beds,
+      bedFacing: bedItems.map((b) => b.facing),
+      // The clear tile beside each bed, where a carer stands.
+      bedSide: bedItems.map((b) => NEIGHBOURS.map((d) => ({ x: b.cell.x + d.x, y: b.cell.y + d.y })).find((c) => freeKeys.has(`${c.x},${c.y}`)) ?? null),
+      free: layout.free.filter((c) => !door || c.x !== door.inside.x || c.y !== door.inside.y),
     });
-    placed.sort((a, b) => a.cell.x + a.cell.y - (b.cell.x + b.cell.y));
+    const placed = layout.items.slice().sort((a, b) => a.cell.x + a.cell.y - (b.cell.x + b.cell.y) || Number(!!a.mounted) - Number(!!b.mounted));
     const spriteProps: typeof placed = [];
     for (const p of placed) {
-      if (EQUIP_SPRITE[p.id] && this.tex.has(EQUIP_SPRITE[p.id]!.name)) spriteProps.push(p);
-      else this.drawProp(g, p.id, p.cell);
+      if (renderedView(`eq3_${p.id}`, p.facing) && this.tex.has(renderedView(`eq3_${p.id}`, p.facing)!.name)) spriteProps.push(p);
+      else if (EQUIP_SPRITE[p.id] && this.tex.has(EQUIP_SPRITE[p.id]!.name)) spriteProps.push(p);
+      else if (!p.mounted) this.drawProp(g, p.id, p.cell);
     }
 
     // front walls (low cutaway so the interior stays visible)
@@ -741,7 +746,26 @@ export class IsoRenderer {
       if (!isDoor({ x: x + i, y: y + h - 1 }, { x: x + i, y: y + h })) seg(x + i, y + h, x + i + 1, y + h, FRONT_WALL_H, shade(wall, 0.95));
 
     // equipment sprites go above the floor and low front walls
+    const slots = new Map<string, number>();
     for (const p of spriteProps) {
+      const view = renderedView(`eq3_${p.id}`, p.facing);
+      if (view && this.tex.has(view.name)) {
+        let ox = 0;
+        let oy = 0;
+        if (p.mounted && p.id !== 'call_system' && p.id !== 'door_sensor') {
+          // Bedside kit stands at the head of the bed, beside it on the aisle side, one slot each.
+          const k = `${p.cell.x},${p.cell.y}`;
+          const n = slots.get(k) ?? 0;
+          slots.set(k, n + 1);
+          const [fx, fy] = FACING_STEP[p.facing];
+          const side = n % 2 ? -1 : 1;
+          ox = -fx * 0.28 + -fy * side * 0.42;
+          oy = -fy * 0.28 + fx * side * 0.42;
+        }
+        this.placeRendered(view.name, p.cell.x + 0.5 + ox, p.cell.y + 0.5 + oy, view.mirror);
+        continue;
+      }
+      if (p.mounted) continue;
       const spec = EQUIP_SPRITE[p.id]!;
       const c0 = cellCenter(p.cell.x, p.cell.y);
       this.placeSprite(spec.name, c0.x, c0.y + 6, spec.width, 0.85);
@@ -818,10 +842,11 @@ export class IsoRenderer {
     sp.anchor.set(a[0] / t.width, a[1] / t.height);
     const p = cellToWorld(cx, cy);
     sp.position.set(p.x, p.y);
-    if (mirror) sp.scale.x = -1;
+    const k = 1 / (a[2] ?? 1);
+    sp.scale.set(mirror ? -k : k, k);
     if (tint !== undefined) sp.tint = tint;
     this.staticLayer.addChild(sp);
-    return p.y - a[1];
+    return p.y - a[1] * k;
   }
 
   /** The front door drawn over a rendered building, on whichever front face it opens. */
@@ -1062,7 +1087,7 @@ export class IsoRenderer {
     g.clear();
     const keep = new Set<string>();
     if (g.parent !== this.peopleLayer) this.peopleLayer.addChild(g);
-    const items: Array<{ x: number; y: number; p: PersonMarker }> = [];
+    const items: Array<{ x: number; y: number; p: PersonMarker; facing?: Facing }> = [];
     let strolling = 0;
     for (const raw of people) {
       // A stroller whose sprite isn't drawn yet (the wheelchair) walks with the grandfather's.
@@ -1081,6 +1106,20 @@ export class IsoRenderer {
       else if (rc && p.spot !== undefined) cell = rc.free.length ? rc.free[p.spot % rc.free.length] : rc.beds[0];
       if (!cell) continue;
       const c = cellCenter(cell.x, cell.y);
+      const side = rc && p.bed !== undefined && rc.beds[p.bed] ? rc.bedSide[p.bed] : null;
+      if (side && rc && p.bed !== undefined && (p.kind === 'staff' || p.kind === 'visitor')) {
+        // At a bed: on the clear tile beside it (the aisle side); a visiting relative nearer the foot.
+        const [fx, fy] = FACING_STEP[rc.bedFacing[p.bed]];
+        const t = p.kind === 'visitor' ? 0.6 : 0.62;
+        const gx = (side.x - cell.x) * t + (p.kind === 'visitor' ? fx * 0.3 : -fx * 0.05);
+        const gy = (side.y - cell.y) * t + (p.kind === 'visitor' ? fy * 0.3 : -fy * 0.05);
+        items.push({ x: c.x + (gx - gy) * (TILE_W / 2), y: c.y + (gx + gy) * (TILE_H / 2), p });
+        continue;
+      }
+      if (rc && p.bed !== undefined && p.kind === 'resident' && rc.beds[p.bed]) {
+        items.push({ x: c.x, y: c.y, p, facing: rc.bedFacing[p.bed] });
+        continue;
+      }
       // Staff working at a bed stand beside it; several idle staff on one tile fan out.
       const fan = p.kind === 'staff' && p.spot !== undefined && rc ? Math.floor(p.spot / Math.max(1, rc.free.length)) : 0;
       // A visiting relative sits on the other side of the bed.
@@ -1090,8 +1129,23 @@ export class IsoRenderer {
     }
     items.sort((a, b) => a.y - b.y);
     const snap = this.input?.effects === 'low';
-    for (const { x, y, p } of items) {
-      if (p.kind === 'resident' && !((p.stroll || p.bed === undefined) && p.sprite && this.canDraw(p.sprite))) {
+    for (const { x, y, p, facing } of items) {
+      if (p.kind === 'resident' && facing && !p.stroll) {
+        // Lying in bed along its length: head on the pillow, blanket in the care-group colour.
+        const [fx, fy] = FACING_STEP[facing];
+        const at = (along: number, across: number, lift: number) => {
+          const gx = fx * along - fy * across;
+          const gy = fy * along + fx * across;
+          return [x + (gx - gy) * (TILE_W / 2), y + (gx + gy) * (TILE_H / 2) - lift];
+        };
+        g.poly([...at(-0.12, -0.2, 12), ...at(-0.12, 0.2, 12), ...at(0.38, 0.2, 12), ...at(0.38, -0.2, 12)])
+          .fill({ color: p.color, alpha: 0.95 })
+          .stroke({ width: 1, color: shade(p.color, 0.7) });
+        g.poly([...at(-0.05, -0.12, 15), ...at(-0.05, 0.12, 15), ...at(0.2, 0.12, 14), ...at(0.2, -0.12, 14)]).fill({ color: shade(p.color, 1.12), alpha: 0.9 });
+        const [hx, hy] = at(-0.27, 0, 14);
+        g.circle(hx, hy, 5.5).fill(0xf1c9a5).stroke({ width: 1.2, color: 0x9b7653 });
+        g.ellipse(hx, hy - 3.5, 5.5, 2.8).fill(0xe2ddd4);
+      } else if (p.kind === 'resident' && !((p.stroll || p.bed === undefined) && p.sprite && this.canDraw(p.sprite))) {
         // Lying in bed: head on the pillow, blanket in the care-group colour.
         g.ellipse(x + 1, y - 9, 13, 6.5).fill({ color: p.color, alpha: 0.95 }).stroke({ width: 1, color: shade(p.color, 0.7) });
         g.circle(x - 12, y - 14, 6).fill(0xf1c9a5).stroke({ width: 1.2, color: 0x9b7653 });
@@ -1120,7 +1174,7 @@ export class IsoRenderer {
             ? new Graphics().ellipse(0, 0, 11, 5).fill({ color: p.color, alpha: 0.45 }).stroke({ width: 1.2, color: shade(p.color, 0.7), alpha: 0.8 })
             : new Graphics().ellipse(0, 0, 10, 4.5).fill({ color: 0x000000, alpha: 0.18 }),
         );
-        const body = this.figure(p.sprite);
+        const { body, views } = this.figure(p.sprite);
         node.addChild(body);
         node.position.set(x, y);
         node.zIndex = y;
@@ -1131,7 +1185,7 @@ export class IsoRenderer {
         const sx = arrive.length ? arrive[0].x : from && !snap ? from.x : x;
         const sy = arrive.length ? arrive[0].y : from && !snap ? from.y : y;
         node.position.set(sx, sy);
-        this.walkers.set(p.key, { node, body, x: sx, y: sy, tx: x, ty: y, phase: (p.key.length * 1.7 + x * 0.01) % 6.28, sprite: p.sprite, roomId: p.roomId, path: arrive.slice(1), speed: 140 });
+        this.walkers.set(p.key, { node, body, x: sx, y: sy, tx: x, ty: y, phase: (p.key.length * 1.7 + x * 0.01) % 6.28, sprite: p.sprite, roomId: p.roomId, path: arrive.slice(1), speed: 140, views });
       } else {
         g.ellipse(x, y, 10, 4.5).fill({ color: 0x000000, alpha: 0.2 });
         g.roundRect(x - 7, y - 25, 14, 24, 6).fill(p.color).stroke({ width: 1.2, color: shade(p.color, 0.65) });
@@ -1153,9 +1207,26 @@ export class IsoRenderer {
   }
 
   /** A standing figure (or the wheelchair sprite), or, without that art, the grandfather seated in a drawn wheelchair. */
-  private figure(sprite: string): Container {
+  private figure(sprite: string): { body: Container; views?: { front: Sprite; back: Sprite } } {
     const body = new Container();
     body.position.set(0, 1);
+    const base = figureBase(sprite);
+    if (base && this.tex.has(`${base}_s`) && this.tex.has(`${base}_n`)) {
+      // Rendered in 3D: front and back views, placed by the feet.
+      const view = (name: string) => {
+        const t = this.tex.get(name)!;
+        const a = RENDERED_ANCHORS[name];
+        const sp = new Sprite(t);
+        sp.anchor.set(a[0] / t.width, a[1] / t.height);
+        sp.scale.set(1 / (a[2] ?? 1));
+        body.addChild(sp);
+        return sp;
+      };
+      const front = view(`${base}_s`);
+      const back = view(`${base}_n`);
+      back.visible = false;
+      return { body, views: { front, back } };
+    }
     const t = this.tex.get(sprite);
     if (t) {
       const sp = new Sprite(t);
@@ -1163,7 +1234,7 @@ export class IsoRenderer {
       // A seated wheelchair rider is wider than tall: size it by height, a little under a standing figure.
       sp.scale.set(sprite === WHEELCHAIR ? (PERSON_SPRITE_WIDTH * STANDING_ASPECT * SEATED_HEIGHT) / t.height : PERSON_SPRITE_WIDTH / t.width);
       body.addChild(sp);
-      return body;
+      return { body };
     }
     const elder = this.tex.get('ch_elder_m')!;
     const chair = new Graphics();
@@ -1188,7 +1259,7 @@ export class IsoRenderer {
     front.moveTo(-3, -6).lineTo(9, -6).stroke({ width: 1, color: 0x47505a, alpha: 0.6 });
     front.circle(10, -1, 1.6).fill(0x2b2522);
     body.addChild(front);
-    return body;
+    return { body };
   }
 
   /**
@@ -1244,7 +1315,13 @@ export class IsoRenderer {
             w.path.shift();
             continue;
           }
-          w.body.scale.x = Math.abs(w.body.scale.x) * (dx < -0.5 ? -1 : 1);
+          if (w.views) {
+            // Front view walking down the screen, back view walking up; mirrored for the other diagonal.
+            const up = dy < -0.5;
+            w.views.front.visible = !up;
+            w.views.back.visible = up;
+            w.body.scale.x = (up ? dx < -0.5 : dx > 0.5) ? -1 : 1;
+          } else w.body.scale.x = Math.abs(w.body.scale.x) * (dx < -0.5 ? -1 : 1);
           moving = true;
           if (budget >= dist) {
             (w.x = goal.x), (w.y = goal.y), (budget -= dist);

@@ -24,6 +24,8 @@ ONLY = set(ARGS[1:])
 PX_PER_UNIT = 64 / math.sqrt(2)  # one tile (1 unit) spans 64 px across
 STOREY = 46 / (PX_PER_UNIT * math.sin(math.radians(60)))  # the game's storey height in units
 SAMPLES = 48
+# Pixels per world pixel: 1 for buildings; props and people render at 2 so they stay sharp when zoomed in.
+DENSITY = 1
 
 
 def hex_rgb(h, f=1.0):
@@ -254,7 +256,7 @@ def setup(w, h, res):
     s.collection.objects.link(cam)
     s.camera = cam
     cam.data.type = "ORTHO"
-    cam.data.ortho_scale = res / PX_PER_UNIT
+    cam.data.ortho_scale = res / (PX_PER_UNIT * DENSITY)
     target = Vector((w / 2, -h / 2, 0))
     d = Vector((1, -1, 0)).normalized() * math.cos(math.radians(30)) + Vector((0, 0, math.sin(math.radians(30))))
     cam.location = target + d * 40
@@ -280,7 +282,7 @@ def setup(w, h, res):
 def render(name, w, h, build, res=None):
     if ONLY and name not in ONLY:
         return
-    res = res or int(32 * (w + h) + 220)
+    res = res or int((32 * (w + h) + 220) * DENSITY)
     setup(w, h, res)
     build()
     bpy.context.scene.render.filepath = f"{OUT}/{name}.png"
@@ -302,7 +304,8 @@ SIZES = [
     ("accounting_office", 2, 2), ("staff_room", 2, 2),
 ]
 
-for kind, w, h in SIZES:
-    render(f"b_{kind}_{w}x{h}", w, h, lambda kind=kind, w=w, h=h: building(kind, w, h, ACCENT[kind]))
-render("dc_thai_house", 1, 1, thai_house, res=260)
-render("dc_sala3d", 1, 1, sala, res=220)
+if __name__ == "__main__":
+    for kind, w, h in SIZES:
+        render(f"b_{kind}_{w}x{h}", w, h, lambda kind=kind, w=w, h=h: building(kind, w, h, ACCENT[kind]))
+    render("dc_thai_house", 1, 1, thai_house, res=260)
+    render("dc_sala3d", 1, 1, sala, res=220)
