@@ -1,0 +1,57 @@
+"""Lay out the title screen art from render_hero.py's layers.
+
+    python3 tools/blender/compose_hero.py <render_dir> <out_dir>
+
+hero_portrait.jpg (phones): the scene with the 3D logo near the top and the cast in the lower
+middle, above where the buttons sit. hero.jpg (wider screens): the scene with the cast on the
+left; the page draws the logo over the top-left corner. Also writes logo3d.webp for the page.
+"""
+import sys
+from pathlib import Path
+
+from PIL import Image, ImageFilter
+
+src, out = Path(sys.argv[1]), Path(sys.argv[2])
+
+
+def crop_alpha(im):
+    a = im.getchannel("A").point(lambda v: 0 if v < 10 else v)
+    im.putalpha(a)
+    return im.crop(a.point(lambda v: 255 if v > 20 else 0).getbbox())
+
+
+def fit(im, width):
+    return im.resize((width, round(im.height * width / im.width)), Image.LANCZOS)
+
+
+def shadowed(layer, blur=14, alpha=0.35):
+    """A soft drop shadow behind a cut-out layer, so it sits on the busy scene."""
+    pad = blur * 3
+    base = Image.new("RGBA", (layer.width + pad * 2, layer.height + pad * 2), (0, 0, 0, 0))
+    sh = Image.new("RGBA", layer.size, (10, 30, 20, 0))
+    sh.putalpha(layer.getchannel("A").point(lambda v: int(v * alpha)))
+    base.alpha_composite(sh, (pad, pad + blur // 2))
+    base = base.filter(ImageFilter.GaussianBlur(blur))
+    base.alpha_composite(layer, (pad, pad))
+    return base, pad
+
+
+logo = crop_alpha(Image.open(src / "logo.png").convert("RGBA"))
+cast = crop_alpha(Image.open(src / "cast.png").convert("RGBA"))
+
+# phones
+bg = Image.open(src / "bg_portrait.png").convert("RGBA").resize((1080, 1920), Image.LANCZOS)
+lg, pad = shadowed(fit(logo, 860))
+bg.alpha_composite(lg, ((1080 - lg.width) // 2, 150 - pad))
+cs, pad = shadowed(fit(cast, 1180), 18, 0.45)
+bg.alpha_composite(cs, ((1080 - cs.width) // 2, 1590 - cs.height + pad))
+bg.convert("RGB").save(out / "hero_portrait.jpg", quality=84, optimize=True, progressive=True)
+
+# wider screens
+bg = Image.open(src / "bg_wide.png").convert("RGBA").resize((2400, 1000), Image.LANCZOS)
+cs, pad = shadowed(fit(cast, 1200), 18, 0.45)
+bg.alpha_composite(cs, (-pad + 10, 1000 - cs.height + pad + 40))
+bg.convert("RGB").save(out / "hero.jpg", quality=84, optimize=True, progressive=True)
+
+fit(logo, 900).save(out / "logo3d.webp", "WEBP", quality=90, method=6)
+print("composed")
