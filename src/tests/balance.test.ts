@@ -1,4 +1,4 @@
-import { advance, applyCommand, MISSED_TASK_REP, NATURAL_LEAVE_AFTER_DAYS, step, WITHDRAW_SATISFACTION } from '../sim/engine';
+import { advance, applyCommand, MISSED_SHARE_REP, MAX_MISSED_REP_PENALTY, NATURAL_LEAVE_AFTER_DAYS, step, WITHDRAW_SATISFACTION } from '../sim/engine';
 import { createInitialState } from '../sim/state';
 import { entryDay, totalsOf } from '../sim/selectors';
 import { DAYS_PER_MONTH, monthlyFee, monthOfDay } from '../data/finance';
@@ -171,14 +171,28 @@ describe('consequences of poor care', () => {
     expect(JSON.stringify(play())).toBe(JSON.stringify(play()));
   });
 
-  it('missed care tasks cost reputation at day end', () => {
+  it('missed care costs reputation by the share of tasks missed, not the count', () => {
     let s = quietEvents(buildHome(createInitialState(4)));
     [s] = admit(s);
     s = advance(s, (1440 - 10 - s.minute) / 10); // 23:50 on day 1
-    const withMissed = step({ ...s, today: { ...s.today, missed: 20 } });
-    const without = step({ ...s, today: { ...s.today, missed: 0 } });
-    const diff = without.organization.reputation - withMissed.organization.reputation;
-    expect(diff).toBeCloseTo(20 * MISSED_TASK_REP, 1);
+    const closeWith = (done: number, missed: number) => step({ ...s, today: { done, missed } }).organization.reputation;
+    const base = closeWith(100, 0);
+    // A quarter of the day's care missed costs 2 points…
+    expect(base - closeWith(75, 25)).toBeCloseTo(0.25 * MISSED_SHARE_REP, 1);
+    // …and the same share costs the same in a home ten times the size.
+    expect(base - closeWith(750, 250)).toBeCloseTo(base - closeWith(75, 25), 5);
+    // Capped per day.
+    expect(base - closeWith(0, 500)).toBeCloseTo(MAX_MISSED_REP_PENALTY, 1);
+  });
+
+  it('a big, well-run campus that misses a few tasks still gains reputation (player report)', () => {
+    // 129 residents, ~1,300 tasks a day, 4% missed, satisfaction 93: reputation used to fall 0.8 a day.
+    let s = quietEvents(buildHome(createInitialState(4)));
+    [s] = admit(s, { needs: { physical: 90, mobility: 80, mental: 90, happiness: 90, satisfaction: 93, nutrition: 90 } });
+    s = advance(s, (1440 - 10 - s.minute) / 10);
+    s = { ...s, residents: s.residents.map((r) => ({ ...r, needs: { ...r.needs, satisfaction: 93 } })), organization: { ...s.organization, reputation: 18.3 } };
+    const after = step({ ...s, today: { done: 1250, missed: 52 } }).organization.reputation;
+    expect(after).toBeGreaterThan(18.3 + 1.5);
   });
 
   it('a poor reputation dries up new enquiries', () => {

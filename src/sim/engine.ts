@@ -562,9 +562,17 @@ function removeResident(state: GameState, r: Resident): GameState {
   return refundUnusedDays(billFinal(s, r), r);
 }
 
-/** Each missed care task costs this much reputation at day end (capped per day). */
-export const MISSED_TASK_REP = 0.08;
+/**
+ * Missed care costs reputation at day end, by the SHARE of the day's tasks that were missed
+ * (not the count, so a 130-resident campus isn't punished for being big): 5% missed costs
+ * 0.4 points, 25% costs 2. Capped per day.
+ */
+export const MISSED_SHARE_REP = 8;
 export const MAX_MISSED_REP_PENALTY = 3;
+export function missedRepPenalty(done: number, missed: number): number {
+  const total = done + missed;
+  return total ? Math.min(MAX_MISSED_REP_PENALTY, (missed / total) * MISSED_SHARE_REP) : 0;
+}
 /** Below this satisfaction a family may move their relative out. */
 export const WITHDRAW_SATISFACTION = 40;
 /** Daily chance (percent) per point of satisfaction below the threshold. */
@@ -636,7 +644,7 @@ function closeDay(state: GameState): GameState {
   let reputation = state.organization.reputation;
   if (n) {
     const sat = state.residents.reduce((a, r) => a + r.needs.satisfaction, 0) / n;
-    const missedPenalty = Math.min(MAX_MISSED_REP_PENALTY, state.today.missed * MISSED_TASK_REP);
+    const missedPenalty = missedRepPenalty(state.today.done, state.today.missed);
     // Shop upgrade: a family app keeps families informed, which helps the name while they are content.
     const app = hasUpgrade(state, 'family_app') && sat >= FAMILY_APP_SATISFACTION_LINE ? FAMILY_APP_REPUTATION : 0;
     reputation = Math.max(0, Math.min(100, Math.round((reputation + (sat - 60) / 15 - missedPenalty + app) * 10) / 10));

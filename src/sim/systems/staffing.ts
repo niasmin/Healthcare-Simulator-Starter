@@ -109,6 +109,11 @@ export function seedCandidates(state: GameState): GameState {
   return s;
 }
 
+/** Below this reputation fewer families enquire and waiting families start looking elsewhere. */
+export const ENQUIRY_LOW_REP = 30;
+/** Below this reputation no new families enquire at all. */
+export const ENQUIRY_NONE_REP = 15;
+
 /** Daily refresh: the two oldest applicants leave, new ones arrive; the waitlist grows by 1–2. */
 export function refreshCandidates(state: GameState): GameState {
   let s: GameState = { ...state, applicants: state.applicants.slice(Math.min(2, state.applicants.length)) };
@@ -129,10 +134,10 @@ export function refreshCandidates(state: GameState): GameState {
   if (hasUpgrade(s, 'online_marketing')) add += MARKETING_EXTRA_ENQUIRIES;
   // A staffed front desk answers more calls.
   if (supportActive(s, 'receptionist')) add += RECEPTION_EXTRA_ENQUIRIES;
-  if (s.organization.reputation < 30) add = Math.max(0, add - 1);
-  if (s.organization.reputation < 15) add = 0;
+  if (s.organization.reputation < ENQUIRY_LOW_REP) add = Math.max(0, add - 1);
+  if (s.organization.reputation < ENQUIRY_NONE_REP) add = 0;
   // ...and families already waiting look elsewhere (the oldest leave first; urgent referrals are separate).
-  const drop = s.organization.reputation < 15 ? 2 : s.organization.reputation < 30 ? 1 : 0;
+  const drop = s.organization.reputation < ENQUIRY_NONE_REP ? 2 : s.organization.reputation < ENQUIRY_LOW_REP ? 1 : 0;
   if (drop) {
     const leaving = new Set(s.waitlist.filter((c) => !c.referralDeadline).slice(0, drop).map((c) => c.id));
     s = { ...s, waitlist: s.waitlist.filter((c) => !leaving.has(c.id)) };

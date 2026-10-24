@@ -18,6 +18,7 @@ import { Avatar, GROUP_COLOR, RoleChip, StatBar, useName } from './people';
 import { WorkforcePanel } from './WorkforcePanel';
 import { HospitalPanel } from './HospitalPanel';
 import { NetworkPanel } from './NetworkPanel';
+import { ENQUIRY_LOW_REP, ENQUIRY_NONE_REP } from '../../sim/systems/staffing';
 
 /** Room pictures from the Game Assets Pack. */
 const ROOM_ART: Record<RoomType, string> = {
@@ -286,6 +287,20 @@ function AdmitList() {
       <div className={`text-xs rounded-lg px-2.5 py-1.5 ${free ? 'bg-ok/10 text-ok' : 'bg-warn/12 text-warn'}`}>
         {free ? t('admit.free_beds', { n: free }) : t('admit.no_beds')}
       </div>
+      {!game.waitlist.some((c) => !c.referralDeadline) && (
+        // Say why nobody is waiting, instead of a silent empty list.
+        <div
+          data-testid="waitlist-empty"
+          className={`text-xs rounded-lg px-2.5 py-2 leading-relaxed ${game.organization.reputation < ENQUIRY_LOW_REP ? 'bg-warn/12 text-warn' : 'bg-sand text-ink-soft'}`}
+        >
+          {game.organization.reputation < ENQUIRY_LOW_REP
+            ? t(game.organization.reputation < ENQUIRY_NONE_REP ? 'admit.empty_rep_none' : 'admit.empty_rep_low', {
+                rep: Math.round(game.organization.reputation * 10) / 10,
+                need: ENQUIRY_LOW_REP,
+              })
+            : t('admit.empty')}
+        </div>
+      )}
       {game.waitlist.map((c) => (
         <div key={c.id} className="rounded-xl border border-line bg-white p-2.5 flex flex-col gap-1.5">
           <div className="flex items-center gap-2">
