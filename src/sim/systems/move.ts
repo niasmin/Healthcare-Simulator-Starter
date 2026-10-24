@@ -2,6 +2,8 @@ import { BED_ROOMS, CORRIDOR_COST_PER_TILE, MOVE_FEE_PERCENT, WORKS_BASE_MINUTES
 import { rectArea } from '../../domain/grid';
 import { pctOf } from '../../domain/money';
 import { residentsInRoom } from '../../domain/rules/beds';
+import { roomStatus } from '../../domain/rules/rooms';
+import { applyNeedDelta } from './needs';
 import { reachableCorridor } from '../../domain/rules/navigation';
 import { cellIndex, inBounds, NEIGHBOURS, rectContains } from '../../domain/grid';
 import { validateRoomPlacement, type PlacementCheck } from '../../domain/rules/placement';
@@ -11,12 +13,30 @@ import { log, post } from '../helpers';
 /**
  * Moving and turning buildings, as building works. A building keeps its id, equipment and name;
  * a move or a turn of the footprint costs a share of its construction cost and closes it while
- * the builders work (longer for bigger buildings). Residents cannot stay in a building being
- * moved, so a ward or villa must be empty first. Doors are placed automatically wherever the
- * building touches a corridor. All costs and times are fictional.
+ * the builders work (longer for bigger buildings). A ward or villa can move with its residents:
+ * they keep their beds (bed ids follow the building's id), the move costs more, the upheaval
+ * upsets them a little, and the new spot must have a door so staff can keep caring for them
+ * while the works go on. Doors are placed automatically wherever the building touches a
+ * corridor. All costs and times are fictional.
  */
 export function moveFee(room: Room): number {
   return pctOf(roomConstructionCost(room.type, room.rect), MOVE_FEE_PERCENT);
+}
+
+/** Moving a building with people in it costs this much more (careful moving, extra hands). */
+export const OCCUPIED_MOVE_EXTRA_PERCENT = 50;
+/** One-off drop in each moved resident's satisfaction and happiness. */
+export const MOVE_UPSET = 5;
+
+/** Residents living in a building (wards and villas only). */
+export function movingResidents(state: GameState, room: Room) {
+  return BED_ROOMS.includes(room.type) ? residentsInRoom(state, room.id) : [];
+}
+
+/** What a move or turn of this building costs right now. */
+export function moveCost(state: GameState, room: Room): number {
+  const fee = moveFee(room);
+  return movingResidents(state, room).length ? fee + pctOf(fee, OCCUPIED_MOVE_EXTRA_PERCENT) : fee;
 }
 
 /** How long a move or turn keeps the building closed, in minutes (a multiple of the 10-minute tick). */
@@ -32,9 +52,8 @@ export function moveCheck(state: GameState, roomId: string, rect: Rect): Placeme
   if (!room) return { ok: false, reason: 'not_found', costSatang: 0 };
   const turned = rect.w === room.rect.h && rect.h === room.rect.w;
   if (!(rect.w === room.rect.w && rect.h === room.rect.h) && !turned) return { ok: false, reason: 'invalid_choice', costSatang: 0 };
-  const fee = moveFee(room);
+  const fee = moveCost(state, room);
   if (room.worksUntil !== undefined) return { ok: false, reason: 'works_active', costSatang: fee };
-  if (BED_ROOMS.includes(room.type) && residentsInRoom(state, room.id).length > 0) return { ok: false, reason: 'room_occupied', costSatang: fee };
   // Lift the building off the lot (and lend it the fee's worth of cash) to reuse the build check.
   const lifted: GameState = {
     ...state,
@@ -44,6 +63,11 @@ export function moveCheck(state: GameState, roomId: string, rect: Rect): Placeme
   const check = validateRoomPlacement(lifted, room.type, rect);
   if (!check.ok) return { ...check, costSatang: fee };
   if (sameRect(rect, room.rect)) return { ok: false, reason: 'nothing_to_build', costSatang: fee };
+  // People stay inside during the works, so staff must be able to reach the new spot.
+  if (movingResidents(state, room).length) {
+    const placed = { ...lifted.site, rooms: [...lifted.site.rooms, { ...room, rect, worksUntil: undefined }] };
+    if (!roomStatus({ ...room, rect, worksUntil: undefined }, placed).door) return { ok: false, reason: 'occupied_needs_door', costSatang: fee };
+  }
   if (state.organization.cashSatang < fee) return { ok: false, reason: 'insufficient_funds', costSatang: fee };
   return { ok: true, costSatang: fee, cells: check.cells };
 }
@@ -67,9 +91,14 @@ export function startWorks(state: GameState, roomId: string, rect: Rect, fee: nu
   // Older saves may carry a chosen door side: doors are automatic again, so it goes.
   const { facing: _side, ...rest } = room as Room & { facing?: unknown };
   const moved: Room = { ...rest, rect: { ...rect }, worksUntil: until };
+  const people = new Set(movingResidents(state, room).map((r) => r.id));
   let s: GameState = { ...state, site: { ...state.site, rooms: state.site.rooms.map((r) => (r.id === roomId ? moved : r)) } };
   s = post(s, -fee, 'construction', 'ledger.move_room', { ref: roomId, memoParams: { room: room.type } });
-  return log(s, 'info', 'log.works_started', { room: room.type, hours: Math.round((until - state.minute) / 60) });
+  s = log(s, 'info', 'log.works_started', { room: room.type, hours: Math.round((until - state.minute) / 60) });
+  if (!people.size) return s;
+  // The residents move with their building: same beds, a little upset by the upheaval.
+  s = { ...s, residents: s.residents.map((r) => (people.has(r.id) ? { ...r, needs: applyNeedDelta(r.needs, { satisfaction: -MOVE_UPSET, happiness: -MOVE_UPSET }) } : r)) };
+  return log(s, 'info', 'log.moved_with_residents', { room: room.type, n: people.size });
 }
 
 /**
