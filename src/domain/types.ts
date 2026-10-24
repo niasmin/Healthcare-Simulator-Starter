@@ -70,7 +70,7 @@ export interface Room {
 /** A side of a room's footprint: s = bottom edge (y + h), e = right (x + w), n = top, w = left. */
 export type Facing = 's' | 'e' | 'n' | 'w';
 
-export type DecorType = 'tree' | 'sakura' | 'tree2' | 'flowers' | 'hedge' | 'planter' | 'lamp' | 'umbrella' | 'fountain' | 'gazebo' | 'gold_fountain' | 'sakura_arch' | 'statue' | 'gold_lantern' | 'pond';
+export type DecorType = 'tree' | 'sakura' | 'tree2' | 'flowers' | 'hedge' | 'planter' | 'lamp' | 'umbrella' | 'fountain' | 'gazebo' | 'gold_fountain' | 'sakura_arch' | 'statue' | 'gold_lantern' | 'pond' | 'sala' | 'lantern';
 
 export interface Decor {
   id: string;

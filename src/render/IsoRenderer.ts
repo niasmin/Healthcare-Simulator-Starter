@@ -639,6 +639,13 @@ export class IsoRenderer {
             this.staticLayer.addChild(pg);
             return;
           }
+          if (d.type === 'sala' || d.type === 'lantern') {
+            const dg = new Graphics();
+            if (d.type === 'sala') drawSala(dg, d.cell, ponds);
+            else drawLantern(dg, d.cell);
+            this.staticLayer.addChild(dg);
+            return;
+          }
           const g2 = new Graphics().ellipse(c.x, c.y + 4, spec.width * 0.32, spec.width * 0.12).fill({ color: 0x000000, alpha: 0.12 });
           this.staticLayer.addChild(g2);
           if (d.type === 'statue') {
@@ -1372,4 +1379,49 @@ function drawPond(g: Graphics, cell: Cell, ponds: Set<string>): void {
     g.ellipse(fx, fy - 1.5, 2.2, 3.6).fill(0xfbc9dc);
     g.circle(fx, fy, 1.2).fill(0xffe36e);
   }
+}
+
+/** A Thai pavilion (sala) on stilts: posts, a teak floor, and a steep two-tier roof with gilded finials. */
+function drawSala(g: Graphics, cell: Cell, ponds: Set<string>): void {
+  const { x, y } = cell;
+  const wet = [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => ponds.has(`${x + dx},${y + dy}`));
+  const c = cellCenter(x, y);
+  const lift = 12;
+  const hw = 26;
+  const hh = 13;
+  // Stilts (standing in a ripple when the pond is next door).
+  if (wet) for (const [px, py] of [[-hw + 6, 0], [hw - 6, 0], [0, hh - 3], [0, -hh + 3]]) g.ellipse(c.x + px, c.y + py + 2, 6, 2.5).stroke({ width: 1, color: 0xd8f1f6, alpha: 0.7 });
+  else g.ellipse(c.x, c.y + 3, hw, hh * 0.7).fill({ color: 0x000000, alpha: 0.14 });
+  for (const [px, py] of [[-hw + 6, 0], [hw - 6, 0], [0, hh - 3]]) g.rect(c.x + px - 1.6, c.y + py - lift, 3.2, lift + 2).fill(0x6b4a2e);
+  // Floor: a teak deck with a darker edge.
+  const floor = (dz: number) => [c.x, c.y - hh - dz, c.x + hw, c.y - dz, c.x, c.y + hh - dz, c.x - hw, c.y - dz];
+  g.poly([c.x - hw, c.y - lift, c.x, c.y + hh - lift, c.x, c.y + hh - lift + 4, c.x - hw, c.y - lift + 4]).fill(0x7a4f2e);
+  g.poly([c.x, c.y + hh - lift, c.x + hw, c.y - lift, c.x + hw, c.y - lift + 4, c.x, c.y + hh - lift + 4]).fill(0x5f3c22);
+  g.poly(floor(lift)).fill(0xb98352).stroke({ width: 1, color: 0x7a4f2e });
+  // Four slim columns.
+  const top = lift + 26;
+  for (const [px, py] of [[-hw + 7, 0], [hw - 7, 0], [0, hh - 4], [0, -hh + 4]]) g.rect(c.x + px - 1.4, c.y + py - top, 2.8, top - lift).fill(0xf3e7cf);
+  // Roof: lower tier, then a steeper upper tier, red tiles with a gold trim and finials.
+  const tier = (base: number, w: number, peak: number, color: number) => {
+    const h2 = w / 2;
+    g.poly([c.x - w, c.y - base, c.x, c.y + h2 - base, c.x, c.y - base - peak]).fill(color);
+    g.poly([c.x, c.y + h2 - base, c.x + w, c.y - base, c.x, c.y - base - peak]).fill(shade(color, 0.82));
+    g.moveTo(c.x - w, c.y - base).lineTo(c.x, c.y + h2 - base).lineTo(c.x + w, c.y - base).stroke({ width: 2, color: 0xe0b23c });
+  };
+  tier(top, hw + 6, 16, 0xb8452f);
+  tier(top + 11, hw - 6, 18, 0xc9573a);
+  // Gilded finials (chofa) at the ridge ends and the peak.
+  g.moveTo(c.x, c.y - top - 29).lineTo(c.x, c.y - top - 36).stroke({ width: 2, color: 0xe0b23c });
+  g.circle(c.x, c.y - top - 37, 2).fill(0xf0c84e);
+  for (const sx of [-1, 1]) g.moveTo(c.x + sx * (hw + 6), c.y - top).quadraticCurveTo(c.x + sx * (hw + 10), c.y - top - 4, c.x + sx * (hw + 8), c.y - top - 8).stroke({ width: 1.8, color: 0xe0b23c });
+}
+
+/** A small garden lantern on a dark post, with a warm paper shade. */
+function drawLantern(g: Graphics, cell: Cell): void {
+  const c = cellCenter(cell.x, cell.y);
+  g.ellipse(c.x, c.y + 2, 6, 2.5).fill({ color: 0x000000, alpha: 0.16 });
+  g.rect(c.x - 1.3, c.y - 20, 2.6, 21).fill(0x3d3a36);
+  g.roundRect(c.x - 4.5, c.y - 30, 9, 11, 3).fill(0xffd27a).stroke({ width: 1, color: 0x8a5a2e });
+  g.moveTo(c.x - 4.5, c.y - 25).lineTo(c.x + 4.5, c.y - 25).stroke({ width: 0.8, color: 0xc0884a, alpha: 0.8 });
+  g.poly([c.x - 6, c.y - 30, c.x, c.y - 35, c.x + 6, c.y - 30]).fill(0x3d3a36);
 }

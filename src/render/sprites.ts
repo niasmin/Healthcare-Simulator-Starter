@@ -82,6 +82,8 @@ export const DECOR_SPRITE: Record<DecorType, { name: string; width: number; tint
   gold_lantern: { name: 'dc_lamp', width: 22, tint: 0xffcf4d },
   // Drawn (no art in the pack); the menu shows the emoji.
   pond: { name: 'pond', width: 64, emoji: '🪷' },
+  sala: { name: 'sala', width: 70, emoji: '🛕' },
+  lantern: { name: 'lantern', width: 16, emoji: '🏮' },
 };
 
 /** Decode every sprite once and turn it into a Pixi texture. Missing or failed images are skipped. */
