@@ -461,13 +461,35 @@ def render_logo():
     sun.rotation_euler = (math.radians(35), math.radians(-20), math.radians(10))
     font = bpy.data.fonts.load(FONT)
 
+    def faced(face, side):
+        """Light on the front of the letters, darker on the extruded sides (by the surface normal)."""
+        m = bpy.data.materials.new("letters")
+        m.use_nodes = True
+        nt = m.node_tree
+        b = nt.nodes["Principled BSDF"]
+        b.inputs["Roughness"].default_value = 0.3
+        b.inputs["Coat Weight"].default_value = 0.6
+        geo = nt.nodes.new("ShaderNodeNewGeometry")
+        dot = nt.nodes.new("ShaderNodeVectorMath")
+        dot.operation = "DOT_PRODUCT"
+        dot.inputs[1].default_value = (0, -1, 0)
+        ramp = nt.nodes.new("ShaderNodeValToRGB")
+        ramp.color_ramp.elements[0].position = 0.55
+        ramp.color_ramp.elements[0].color = ra.hex_rgb(side)
+        ramp.color_ramp.elements[1].position = 0.9
+        ramp.color_ramp.elements[1].color = ra.hex_rgb(face)
+        nt.links.new(geo.outputs["Normal"], dot.inputs[0])
+        nt.links.new(dot.outputs["Value"], ramp.inputs["Fac"])
+        nt.links.new(ramp.outputs["Color"], b.inputs["Base Color"])
+        return m
+
     def word(text, size, z, face, side, depth=0.22):
         cu = bpy.data.curves.new("w", "FONT")
         cu.body = text
         cu.font = font
         cu.size = size
         cu.extrude = depth
-        cu.bevel_depth = 0.075  # a deep bevel makes the thick dark outline
+        cu.bevel_depth = 0.03
         cu.bevel_resolution = 3
         cu.align_x = "CENTER"
         cu.align_y = "CENTER"
@@ -475,17 +497,7 @@ def render_logo():
         bpy.context.collection.objects.link(o)
         o.location = (0, 0, z)
         o.rotation_euler = (math.pi / 2, 0, 0)
-        o.data.materials.append(mat(side, 1.0, 0.35))
-        # the face of the letters a lighter colour, slightly proud of the outline
-        cu2 = cu.copy()
-        cu2.extrude = 0.02
-        cu2.bevel_depth = 0.015
-        o2 = bpy.data.objects.new("w2", cu2)
-        bpy.context.collection.objects.link(o2)
-        o2.location = (0, -depth - 0.08, z)
-        o2.rotation_euler = (math.pi / 2, 0, 0)
-        o2.data.materials.clear()
-        o2.data.materials.append(mat(face, 1.0, 0.25))
+        o.data.materials.append(faced(face, side))
         return o
 
     word("Healthcare", 1.35, 0.95, 0x5FD0F2, 0x1D4F7A)
@@ -524,7 +536,7 @@ def render_logo():
 
 if __name__ == "__main__":
     # Portrait: a high view down the avenue from the gate; wide: lower and further right.
-    render_bg("bg_portrait", 1080, 1920, (21, 33, 13), (12, 10, 0), 30)
-    render_bg("bg_wide", 2400, 1000, (27, 33, 10), (10, 10, 1), 26)
+    render_bg("bg_portrait", 1080, 1920, (15, 33, 13), (11.5, 10.5, 0), 30)
+    render_bg("bg_wide", 2400, 1000, (24, 33, 10), (10, 11, 1), 26)
     render_cast()
     render_logo()

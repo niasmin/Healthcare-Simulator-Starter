@@ -36,7 +36,21 @@ def shadowed(layer, blur=14, alpha=0.35):
     return base, pad
 
 
-logo = crop_alpha(Image.open(src / "logo.png").convert("RGBA"))
+def outlined(im, width, colour):
+    """A solid outline round a cut-out (the classic game-logo edge)."""
+    a = im.getchannel("A").point(lambda v: 255 if v > 40 else 0)
+    grown = a.filter(ImageFilter.MaxFilter(width * 2 + 1)).filter(ImageFilter.GaussianBlur(1.2))
+    base = Image.new("RGBA", im.size, colour + (0,))
+    base.putalpha(grown)
+    base.alpha_composite(im)
+    return base
+
+
+raw = Image.open(src / "logo.png").convert("RGBA")
+pad = 40
+big = Image.new("RGBA", (raw.width + pad * 2, raw.height + pad * 2), (0, 0, 0, 0))
+big.alpha_composite(raw, (pad, pad))
+logo = crop_alpha(outlined(outlined(big, 5, (255, 255, 255)), 9, (20, 52, 92)))
 cast = crop_alpha(Image.open(src / "cast.png").convert("RGBA"))
 
 # phones
