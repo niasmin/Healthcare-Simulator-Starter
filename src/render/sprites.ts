@@ -1,5 +1,6 @@
 import type { Texture } from 'pixi.js';
 import type { DecorType, EquipmentId, RoomType, StaffRole } from '../domain/types';
+import anchors from '../assets/sprite_anchors.json';
 
 /** Sprite art cut from the project's Game Assets Pack (fictional, owned by the project). */
 const urls = import.meta.glob('../assets/sprites/*.webp', { eager: true, import: 'default' }) as Record<string, string>;
@@ -65,6 +66,20 @@ export const RESIDENT_SPRITE = { f: 'ch_elder_f', m: 'ch_elder_m', chair: 'ch_wh
 export const PERSON_SPRITE_WIDTH = 24;
 
 /** Garden sprites; star-shop pieces reuse the pack's art with a tint (the statue is drawn). */
+/**
+ * Sprites rendered in Blender (tools/blender): where the footprint's ground centre sits in each
+ * image, in pixels. Buildings are named b_<type>_<w>x<h>; a building turned the other way uses
+ * the mirror image of the same render.
+ */
+export const RENDERED_ANCHORS = anchors as unknown as Record<string, [number, number]>;
+
+/** The rendered sprite for a building's footprint, if there is one: name and whether to mirror it. */
+export function renderedBuilding(type: string, w: number, h: number): { name: string; mirror: boolean } | null {
+  if (RENDERED_ANCHORS[`b_${type}_${w}x${h}`]) return { name: `b_${type}_${w}x${h}`, mirror: false };
+  if (RENDERED_ANCHORS[`b_${type}_${h}x${w}`]) return { name: `b_${type}_${h}x${w}`, mirror: true };
+  return null;
+}
+
 export const DECOR_SPRITE: Record<DecorType, { name: string; width: number; tint?: number; emoji?: string }> = {
   tree: { name: 'dc_tree', width: 70 },
   tree2: { name: 'dc_tree2', width: 64 },
@@ -82,7 +97,8 @@ export const DECOR_SPRITE: Record<DecorType, { name: string; width: number; tint
   gold_lantern: { name: 'dc_lamp', width: 22, tint: 0xffcf4d },
   // Drawn (no art in the pack); the menu shows the emoji.
   pond: { name: 'pond', width: 64, emoji: '🪷' },
-  sala: { name: 'sala', width: 70, emoji: '🛕' },
+  sala: { name: 'dc_sala3d', width: 70 },
+  thai_house: { name: 'dc_thai_house', width: 90 },
   lantern: { name: 'lantern', width: 16, emoji: '🏮' },
 };
 

@@ -1,5 +1,5 @@
 import { Application, Container, Graphics, Sprite, Text, type Texture } from 'pixi.js';
-import { DECOR_SPRITE, EQUIP_SPRITE, ROOM_BADGE, PERSON_SPRITE_WIDTH, loadSpriteTextures } from './sprites';
+import { DECOR_SPRITE, EQUIP_SPRITE, ROOM_BADGE, PERSON_SPRITE_WIDTH, RENDERED_ANCHORS, loadSpriteTextures, renderedBuilding } from './sprites';
 import { drawWorld, townRoads, worldBounds } from './WorldBackdrop';
 import { Ambience, lightAt, type Weather } from './Ambience';
 import { TownLife } from './TownLife';
@@ -653,6 +653,8 @@ export class IsoRenderer {
             this.staticLayer.addChild(pg);
             return;
           }
+          // Garden pieces rendered in Blender sit by their footprint centre.
+          if ((d.type === 'sala' || d.type === 'thai_house') && this.placeRendered(DECOR_SPRITE[d.type].name, d.cell.x + 0.5, d.cell.y + 0.5, false)) return;
           if (d.type === 'sala' || d.type === 'lantern') {
             const dg = new Graphics();
             if (d.type === 'sala') drawSala(dg, d.cell, ponds);
@@ -807,11 +809,67 @@ export class IsoRenderer {
    * the viewer with windows and the front door, then a roof (pitched for homes, flat with rooftop
    * units for clinical and service rooms). People and interiors are hidden in this view.
    */
+  /** Place a Blender-rendered sprite with its footprint centre at cell (cx, cy). Returns its top edge (world y), or null. */
+  private placeRendered(name: string, cx: number, cy: number, mirror: boolean, tint?: number): number | null {
+    const t = this.tex.get(name);
+    const a = RENDERED_ANCHORS[name];
+    if (!t || !a) return null;
+    const sp = new Sprite(t);
+    sp.anchor.set(a[0] / t.width, a[1] / t.height);
+    const p = cellToWorld(cx, cy);
+    sp.position.set(p.x, p.y);
+    if (mirror) sp.scale.x = -1;
+    if (tint !== undefined) sp.tint = tint;
+    this.staticLayer.addChild(sp);
+    return p.y - a[1];
+  }
+
+  /** The front door drawn over a rendered building, on whichever front face it opens. */
+  private drawFrontDoor(g: Graphics, room: Room, door: { inside: Cell; outside: Cell } | null): void {
+    if (!door) return;
+    const { x, y, w, h } = room.rect;
+    let a: { x: number; y: number };
+    let b: { x: number; y: number };
+    if (door.outside.y === y + h) {
+      a = cellToWorld(door.inside.x + 0.25, y + h);
+      b = cellToWorld(door.inside.x + 0.75, y + h);
+    } else if (door.outside.x === x + w) {
+      a = cellToWorld(x + w, door.inside.y + 0.25);
+      b = cellToWorld(x + w, door.inside.y + 0.75);
+    } else return;
+    g.poly([a.x, a.y - 1, b.x, b.y - 1, b.x, b.y - 24, a.x, a.y - 24]).fill(0x7a5236);
+    g.poly([a.x + 2, a.y - 3, b.x - 2, b.y - 3, b.x - 2, b.y - 21, a.x + 2, a.y - 21]).stroke({ width: 1, color: 0x5a3a24, alpha: 0.8 });
+    g.poly([a.x - 3, a.y - 26, b.x + 3, b.y - 26, b.x + 3, b.y - 30, a.x - 3, a.y - 30]).fill(shade(ROOMS[room.type].wallColor, 1.1));
+    g.poly([a.x - 2, a.y + 2, b.x + 2, b.y + 2, b.x + 2, b.y - 1, a.x - 2, a.y - 1]).fill(0xd8d2c4);
+  }
+
   private drawBuilding(room: Room, status: RoomStatus | undefined, label: string): void {
     const def = ROOMS[room.type];
+    const { x, y, w, h } = room.rect;
+    // A footprint with a Blender render (and no solar roof to draw) uses the rendered building.
+    const rendered = renderedBuilding(room.type, w, h);
+    if (rendered && !this.input?.game.upgrades?.includes('solar_roof')) {
+      const broken = status && !status.operational && room.worksUntil === undefined;
+      const top = this.placeRendered(rendered.name, x + w / 2, y + h / 2, rendered.mirror, broken ? 0xffb4a8 : undefined);
+      if (top !== null) {
+        const og = new Graphics();
+        this.staticLayer.addChild(og);
+        const door = status?.door ?? null;
+        this.drawFrontDoor(og, room, door);
+        // (A door on a far side is hidden behind the rendered walls, as it would be.)
+        const H = STOREY_H * (room.type === 'ward' && w * h >= 20 ? 1.75 : 1);
+        if (room.worksUntil !== undefined) this.drawWorks(og, room, H);
+        const c = cellToWorld(x + w / 2, y + h / 2);
+        const badge = ROOM_BADGE[room.type];
+        const at = top + 6;
+        if (room.worksUntil !== undefined) this.addBadge(`🚧 ${label}`, null, c.x, at, 0xd9822b);
+        else if (status?.operational) this.addBadge(label, badge.glyph, c.x, at, badge.color);
+        else this.addBadge(`⚠ ${label}`, null, c.x, at, 0xc0392b);
+        return;
+      }
+    }
     const g = new Graphics();
     this.staticLayer.addChild(g);
-    const { x, y, w, h } = room.rect;
     // Big wards read as two-storey blocks.
     const floors = room.type === 'ward' && w * h >= 20 ? 2 : 1;
     const H = STOREY_H * (floors === 2 ? 1.75 : 1);
