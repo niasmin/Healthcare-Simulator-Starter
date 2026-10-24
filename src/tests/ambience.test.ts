@@ -1,10 +1,12 @@
-import { lightAt } from '../render/Ambience';
+import { lightAt, NIGHT_DARK } from '../render/Ambience';
 
 describe('map light through the day', () => {
   it('is clear by day, dark at night, and warm at dawn and dusk', () => {
     expect(lightAt(12 * 60)).toMatchObject({ alpha: 0, night: 0 });
     expect(lightAt(2 * 60).night).toBe(1);
-    expect(lightAt(2 * 60).alpha).toBeGreaterThan(0.3);
+    // The tint is lighter at night than it was: the darkness sheet (cut around lights) does the rest.
+    expect(lightAt(2 * 60).alpha).toBeGreaterThan(0.25);
+    expect(lightAt(2 * 60).alpha + NIGHT_DARK).toBeGreaterThan(0.7);
     const dusk = lightAt(18 * 60 + 30);
     expect(dusk.alpha).toBeGreaterThan(0.1);
     expect(dusk.night).toBeLessThan(0.5);
