@@ -50,15 +50,16 @@ raw = Image.open(src / "logo.png").convert("RGBA")
 pad = 40
 big = Image.new("RGBA", (raw.width + pad * 2, raw.height + pad * 2), (0, 0, 0, 0))
 big.alpha_composite(raw, (pad, pad))
-logo = crop_alpha(outlined(outlined(big, 5, (255, 255, 255)), 9, (20, 52, 92)))
+k = max(1, raw.width // 400)  # outline widths scale with the render size
+logo = crop_alpha(outlined(outlined(big, 2 * k, (255, 255, 255)), 4 * k, (20, 52, 92)))
 cast = crop_alpha(Image.open(src / "cast.png").convert("RGBA"))
 
 # phones
 bg = Image.open(src / "bg_portrait.png").convert("RGBA").resize((1080, 1920), Image.LANCZOS)
 lg, pad = shadowed(fit(logo, 860))
 bg.alpha_composite(lg, ((1080 - lg.width) // 2, 150 - pad))
-cs, pad = shadowed(fit(cast, 1180), 18, 0.45)
-bg.alpha_composite(cs, ((1080 - cs.width) // 2, 1590 - cs.height + pad))
+cs, pad = shadowed(fit(cast, 1010), 18, 0.45)
+bg.alpha_composite(cs, ((1080 - cs.width) // 2, 1600 - cs.height + pad))
 bg.convert("RGB").save(out / "hero_portrait.jpg", quality=84, optimize=True, progressive=True)
 
 # wider screens

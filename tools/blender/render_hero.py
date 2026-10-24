@@ -479,7 +479,10 @@ def render_logo():
         ramp.color_ramp.elements[1].position = 0.9
         ramp.color_ramp.elements[1].color = ra.hex_rgb(face)
         nt.links.new(geo.outputs["Normal"], dot.inputs[0])
-        nt.links.new(dot.outputs["Value"], ramp.inputs["Fac"])
+        absv = nt.nodes.new("ShaderNodeMath")
+        absv.operation = "ABSOLUTE"  # some caps come out facing backwards; both caps are "front"
+        nt.links.new(dot.outputs["Value"], absv.inputs[0])
+        nt.links.new(absv.outputs["Value"], ramp.inputs["Fac"])
         nt.links.new(ramp.outputs["Color"], b.inputs["Base Color"])
         return m
 
