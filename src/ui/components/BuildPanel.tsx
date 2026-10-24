@@ -204,7 +204,13 @@ function BuildTools() {
                 active ? 'border-teal bg-teal text-white' : 'border-line bg-white hover:border-teal/50'
               }`}
             >
-              <img src={spriteUrl(DECOR_SPRITE[type].name)} alt="" className="h-12 w-full object-contain" draggable={false} />
+              {spriteUrl(DECOR_SPRITE[type].name) ? (
+                <img src={spriteUrl(DECOR_SPRITE[type].name)} alt="" className="h-12 w-full object-contain" draggable={false} />
+              ) : (
+                <span className="h-12 grid place-items-center text-3xl" aria-hidden>
+                  {DECOR_SPRITE[type].emoji}
+                </span>
+              )}
               <span className="text-xs font-semibold leading-tight mt-0.5">{t(`decor.${type}`)}</span>
               <span className={`text-[10px] tabular ${active ? 'text-white/80' : 'text-ink-soft'}`}>
                 {money(DECOR[type].costSatang)} · ✿{DECOR[type].appeal}

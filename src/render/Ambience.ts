@@ -68,6 +68,7 @@ interface Drop { g: Graphics; x: number; y: number; v: number }
 interface Puff { g: Graphics; age: number; life: number; vx: number; vy: number; grow: number; sparkle: boolean }
 interface Fly { g: Graphics; ax: number; ay: number; phase: number; speed: number; r: number }
 interface Wisp { g: Graphics; x: number; y: number; speed: number; phase: number }
+interface Glint { g: Graphics; phase: number; speed: number }
 
 /** How dark the night gets away from any light (on top of the tint). */
 export const NIGHT_DARK = 0.5;
@@ -114,6 +115,8 @@ export class Ambience {
   private flies: Fly[] = [];
   private flyLayer = new Container();
   private wisps: Wisp[] = [];
+  private glints: Glint[] = [];
+  private glintLayer = new Container();
   private mistLayer = new Container();
   private bounds = { minX: -600, maxX: 600, minY: -200, maxY: 600 };
   /** The lot itself (world px), where the mist lies. */
@@ -126,7 +129,7 @@ export class Ambience {
     this.worldFx.eventMode = 'none';
     this.screenFx.eventMode = 'none';
     this.flyLayer.blendMode = 'add';
-    this.worldFx.addChild(this.mistLayer, this.cloudLayer, this.puffLayer);
+    this.worldFx.addChild(this.glintLayer, this.mistLayer, this.cloudLayer, this.puffLayer);
     this.lights.addChild(this.flyLayer);
     this.screenFx.addChild(this.gloom, this.rainLayer);
   }
@@ -144,6 +147,7 @@ export class Ambience {
     this.effects = on;
     this.cloudLayer.visible = on;
     this.mistLayer.visible = on;
+    this.glintLayer.visible = on;
     this.flyLayer.visible = on;
     this.petals.forEach((p) => (p.g.visible = on));
     this.rainLayer.visible = on;
@@ -202,6 +206,12 @@ export class Ambience {
       const c = cellCenter(lamp.x, lamp.y);
       out.push({ x: c.x + 18, y: c.y - 4, r: 48, color: 0xffd58a, k: 0.55 });
     }
+    // Water holds a faint cool glow at night, like the lit stream in the evening.
+    for (const d of site.decor ?? [])
+      if (d.type === 'pond') {
+        const c = cellCenter(d.cell.x, d.cell.y);
+        out.push({ x: c.x, y: c.y + 3, r: 30, color: 0x48d6ff, k: 0.35 });
+      }
     for (const d of site.decor ?? []) {
       if (d.type !== 'lamp' && d.type !== 'gold_lantern') continue;
       const c = cellCenter(d.cell.x, d.cell.y);
@@ -238,9 +248,26 @@ export class Ambience {
     this.dark.addChild(sheet, holes);
     this.dark.cacheAsTexture({ resolution: 0.5 });
     this.makeFireflies(site);
+    this.makeGlints(site);
     const corners = [cellToWorld(0, 0), cellToWorld(site.width, 0), cellToWorld(site.width, site.height), cellToWorld(0, site.height)];
     this.lot = { minX: Math.min(...corners.map((c) => c.x)), maxX: Math.max(...corners.map((c) => c.x)), minY: Math.min(...corners.map((c) => c.y)), maxY: Math.max(...corners.map((c) => c.y)) };
     if (this.wisps.length) this.makeMist();
+  }
+
+  /** Sun glints twinkling on the ponds by day. */
+  private makeGlints(site: GameState['site']): void {
+    for (const gl of this.glints.splice(0)) gl.g.destroy();
+    let n = 0;
+    for (const d of site.decor ?? []) {
+      if (d.type !== 'pond') continue;
+      for (let k = 0; k < 2; k++, n++) {
+        const c = cellCenter(d.cell.x + (jitter(n * 3.3) - 0.5) * 0.6, d.cell.y + (jitter(n * 5.1) - 0.5) * 0.6);
+        const g = new Graphics().moveTo(-4, 0).lineTo(4, 0).moveTo(0, -2).lineTo(0, 2).stroke({ width: 1.2, color: 0xffffff, alpha: 0.9 });
+        g.position.set(c.x, c.y + 3);
+        this.glintLayer.addChild(g);
+        this.glints.push({ g, phase: jitter(n * 7.7) * 6.28, speed: 1.5 + jitter(n * 2.9) * 2 });
+      }
+    }
   }
 
   /** Firefly anchors over open lawn and garden tiles (repeatable: no Math.random). */
@@ -388,6 +415,9 @@ export class Ambience {
         w.g.position.set(w.x, w.y + Math.sin(this.time * 0.2 + w.phase) * 6);
       }
     }
+    // Glints on the water twinkle in sunshine.
+    const sun = day * (this.weather === 'clear' ? 1 : this.weather === 'cloudy' ? 0.35 : 0);
+    for (const gl of this.glints) gl.g.alpha = sun * Math.max(0, Math.sin(this.time * gl.speed + gl.phase)) ** 3;
     // Fireflies wander round their spot and blink, on dry nights only.
     const flyOn = this.night > 0.6 && this.weather !== 'rain';
     this.flyLayer.visible = flyOn;

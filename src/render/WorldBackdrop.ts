@@ -207,11 +207,45 @@ export function drawWorld(container: Container, site: Site, opts: WorldOptions):
         things.push({ key: bx + by + 1, draw: () => tree(container, opts.textures, bx + 0.5, by + 0.5, kind, width) });
       }
     }
+  // Undergrowth: shrubs along the outside of the fence and here and there on town lawns, grass
+  // tufts on most free tiles, so the town reads green and lived-in rather than a bare grid. It is
+  // all low, so one shape under the houses and trees (drawn back to front) keeps it cheap.
+  const under = new Graphics();
+  for (let y = minY; y < maxY; y++)
+    for (let x = minX; x < maxX; x++) {
+      if (inLot(x, y) || inSale(x, y) || isRoad(x, y) || inPond(x, y)) continue;
+      const nearLot = x >= -2 && x <= eastEdge + 1 && y >= -2 && y <= site.height + 1;
+      const n = hash(x + 911, y + 433);
+      if ((nearLot && n < 0.55) || (n < 0.05 && free(x, y, 0, 0))) shrub(under, x, y, n);
+      else if (n < 0.5) tufts(under, x, y, n);
+    }
+  container.addChild(under);
   // A few trees around the pond.
   for (const [x, y] of [[pond.x - 1, pond.y + 1], [pond.x + pond.w, pond.y], [pond.x + 2, pond.y + pond.h]] as const)
     things.push({ key: x + y + 1, draw: () => tree(container, opts.textures, x + 0.5, y + 0.5, 'dc_tree2', 56) });
   things.sort((p, q) => p.key - q.key);
   for (const t of things) t.draw();
+}
+
+/** A low shrub: a few overlapping leafy blobs, sometimes with flowers. */
+function shrub(g: Graphics, x: number, y: number, n: number): void {
+  const c = cellCenter(x + (hash(x, y + 9) - 0.5) * 0.5, y + (hash(x + 9, y) - 0.5) * 0.5);
+  const cy = c.y + DROP;
+  const size = 0.8 + n * 0.8;
+  g.ellipse(c.x, cy + 2, 13 * size, 5 * size).fill({ color: 0x000000, alpha: 0.12 });
+  const greens = [0x4f8a45, 0x5f9e4e, 0x6fb05a];
+  for (let k = 0; k < 4; k++) g.circle(c.x + (k - 1.5) * 5 * size, cy - 4 * size - (k % 2) * 3, (6 + (k % 3)) * size).fill(greens[(k + Math.floor(n * 10)) % 3]);
+  if (hash(x + 3, y + 7) < 0.35) for (let k = 0; k < 3; k++) g.circle(c.x + (k - 1) * 5 * size, cy - 9 * size, 1.6).fill(hash(x, k) < 0.5 ? 0xffe36e : 0xf3a0bf);
+}
+
+/** Grass tufts on a town lawn tile. */
+function tufts(g: Graphics, x: number, y: number, n: number): void {
+  for (let k = 0; k < 2; k++) {
+    const c = cellCenter(x + (hash(x + k, y) - 0.5) * 0.7, y + (hash(x, y + k) - 0.5) * 0.7);
+    const cy = c.y + DROP;
+    const green = n < 0.3 ? 0x6f9b4f : 0x7fae5a;
+    for (const a of [-0.5, 0, 0.45]) g.moveTo(c.x, cy).lineTo(c.x + a * 6, cy - 5).stroke({ width: 1.2, color: green, alpha: 0.85 });
+  }
 }
 
 /** World extents (cells) for camera limits. */

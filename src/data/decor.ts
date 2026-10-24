@@ -25,6 +25,8 @@ export const DECOR: Record<DecorType, DecorDef> = {
   umbrella: { type: 'umbrella', costSatang: thb(8_000), appeal: 3 },
   fountain: { type: 'fountain', costSatang: thb(25_000), appeal: 5 },
   gazebo: { type: 'gazebo', costSatang: thb(30_000), appeal: 6 },
+  // A tile of lotus pond: neighbouring tiles join into one pond (or a canal along a path).
+  pond: { type: 'pond', costSatang: thb(4_000), appeal: 1.5 },
   // Star shop: exclusive pieces bought with stars from daily missions and achievements.
   gold_fountain: { type: 'gold_fountain', costSatang: 0, appeal: 6, stars: 40 },
   sakura_arch: { type: 'sakura_arch', costSatang: 0, appeal: 5, stars: 30 },
@@ -38,7 +40,7 @@ export function starsLeft(goals: { stars: number; spent?: number } | undefined):
   return Math.max(0, (goals?.stars ?? 0) - (goals?.spent ?? 0));
 }
 
-export const DECOR_ORDER: DecorType[] = ['tree', 'tree2', 'sakura', 'flowers', 'hedge', 'planter', 'lamp', 'umbrella', 'fountain', 'gazebo'];
+export const DECOR_ORDER: DecorType[] = ['tree', 'tree2', 'sakura', 'flowers', 'hedge', 'planter', 'pond', 'lamp', 'umbrella', 'fountain', 'gazebo'];
 
 /** Appeal stops helping beyond this total. */
 export const MAX_APPEAL = 30;

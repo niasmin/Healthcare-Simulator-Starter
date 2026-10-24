@@ -556,6 +556,16 @@ export class IsoRenderer {
         const color = corridor ? ((x + y) % 2 ? 0xf3ede0 : 0xeee6d5) : (x + y) % 2 ? 0xa9bf86 : 0xa2b97f;
         g.poly(cellDiamond(x, y)).fill(color).stroke({ width: 1, color: corridor ? 0xd8cdb6 : 0x93aa71, alpha: 0.7 });
       }
+    // Grass tufts and wild flowers on the open lawn, so it reads as a garden rather than a grid.
+    const built = new Set<number>();
+    for (const r of site.rooms) for (let j = r.rect.y; j < r.rect.y + r.rect.h; j++) for (let i = r.rect.x; i < r.rect.x + r.rect.w; i++) built.add(cellIndex(i, j, site.width));
+    for (const d of site.decor ?? []) built.add(cellIndex(d.cell.x, d.cell.y, site.width));
+    for (let y = 0; y < site.height; y++)
+      for (let x = 0; x < site.width; x++) {
+        const i = cellIndex(x, y, site.width);
+        if (built.has(i) || site.corridor[i]) continue;
+        lawnTufts(g, x, y, 0);
+      }
 
     // A low white fence around the lot, with a gap at the entrance, so the home reads apart from the town.
     const fence = new Graphics();
@@ -615,12 +625,20 @@ export class IsoRenderer {
       });
     for (const room of site.rooms)
       items.push({ key: room.rect.x + room.rect.w - 1 + room.rect.y + room.rect.h - 1, draw: () => (input.exterior ? this.drawBuilding(room, input.statuses.get(room.id), input.labelFor(room)) : this.drawRoom(room, input.statuses.get(room.id), input.labelFor(room))) });
+    const ponds = new Set((site.decor ?? []).filter((d) => d.type === 'pond').map((d) => `${d.cell.x},${d.cell.y}`));
     for (const d of site.decor ?? [])
       items.push({
-        key: d.cell.x + d.cell.y + 0.5,
+        // Water lies flat: drawn before anything standing on the tiles around it.
+        key: d.type === 'pond' ? -1 : d.cell.x + d.cell.y + 0.5,
         draw: () => {
           const c = cellCenter(d.cell.x, d.cell.y);
           const spec = DECOR_SPRITE[d.type];
+          if (d.type === 'pond') {
+            const pg = new Graphics();
+            drawPond(pg, d.cell, ponds);
+            this.staticLayer.addChild(pg);
+            return;
+          }
           const g2 = new Graphics().ellipse(c.x, c.y + 4, spec.width * 0.32, spec.width * 0.12).fill({ color: 0x000000, alpha: 0.12 });
           this.staticLayer.addChild(g2);
           if (d.type === 'statue') {
@@ -1298,4 +1316,60 @@ export function strollSpots(site: GameState['site'], diningFloor: (roomId: strin
         }
     }
   return out;
+}
+
+/** A few grass blades, sometimes with a flower, on a lawn tile (deterministic by position). */
+export function lawnTufts(g: Graphics, x: number, y: number, dy: number): void {
+  const h = (k: number) => {
+    const v = Math.sin((x * 12.9898 + y * 78.233 + k * 37.719) * 1.3) * 43758.5453;
+    return v - Math.floor(v);
+  };
+  const n = h(0) < 0.45 ? 1 + Math.floor(h(1) * 3) : 0;
+  for (let k = 0; k < n; k++) {
+    const c = cellCenter(x + (h(k + 2) - 0.5) * 0.7, y + (h(k + 5) - 0.5) * 0.7);
+    const cy = c.y + dy;
+    const green = h(k + 9) < 0.5 ? 0x6f9b4f : 0x7fae5a;
+    for (const a of [-0.5, 0, 0.45]) g.moveTo(c.x, cy).lineTo(c.x + a * 6, cy - 5 - h(k + 11) * 3).stroke({ width: 1.3, color: green, alpha: 0.9 });
+    if (h(k + 13) < 0.3) g.circle(c.x + 2, cy - 6, 1.6).fill(h(k + 17) < 0.5 ? 0xffe36e : 0xf7a8c4);
+  }
+}
+
+/** One tile of lotus pond: water, a stone rim on the sides with no pond next door, pads and a flower. */
+function drawPond(g: Graphics, cell: Cell, ponds: Set<string>): void {
+  const { x, y } = cell;
+  const has = (dx: number, dy: number) => ponds.has(`${x + dx},${y + dy}`);
+  const T = cellToWorld(x, y);
+  const R = cellToWorld(x + 1, y);
+  const B = cellToWorld(x + 1, y + 1);
+  const L = cellToWorld(x, y + 1);
+  const sink = 3;
+  g.poly([T.x, T.y + sink, R.x, R.y + sink, B.x, B.y + sink, L.x, L.y + sink]).fill(0x3f8fa8);
+  // A lighter band toward the middle reads as depth.
+  const c = cellCenter(x, y);
+  g.ellipse(c.x, c.y + sink, 20, 10).fill({ color: 0x67b3c7, alpha: 0.75 });
+  g.ellipse(c.x - 6, c.y + sink - 2, 7, 2).fill({ color: 0xd8f1f6, alpha: 0.5 });
+  // Rims: top-right edge is y-1, bottom-right x+1, bottom-left y+1, top-left x-1.
+  const rim = (a: { x: number; y: number }, b: { x: number; y: number }, front: boolean) => {
+    g.moveTo(a.x, a.y).lineTo(b.x, b.y).stroke({ width: 4, color: front ? 0xd9d2bf : 0xe8e2d2 });
+    g.moveTo(a.x, a.y + 2).lineTo(b.x, b.y + 2).stroke({ width: 1, color: 0x9d957f, alpha: 0.7 });
+  };
+  if (!has(0, -1)) rim(T, R, false);
+  if (!has(-1, 0)) rim(T, L, false);
+  if (!has(1, 0)) rim(R, B, true);
+  if (!has(0, 1)) rim(L, B, true);
+  // Lily pads and now and then a lotus flower.
+  const v = Math.abs(Math.sin(x * 91.7 + y * 47.3)) * 1000;
+  for (let k = 0; k < 3; k++) {
+    const px = c.x + (((v * (k + 1)) % 30) - 15);
+    const py = c.y + sink + ((((v * (k + 3)) % 14) - 7) * 0.8);
+    g.ellipse(px, py, 5, 2.6).fill(0x4f9a52).stroke({ width: 0.8, color: 0x3a7a3e });
+  }
+  if (v % 3 < 1.4) {
+    const fx = c.x + ((v % 20) - 10);
+    const fy = c.y + sink - 2;
+    g.ellipse(fx - 2.5, fy, 2.4, 3.2).fill(0xf6a9c8);
+    g.ellipse(fx + 2.5, fy, 2.4, 3.2).fill(0xf6a9c8);
+    g.ellipse(fx, fy - 1.5, 2.2, 3.6).fill(0xfbc9dc);
+    g.circle(fx, fy, 1.2).fill(0xffe36e);
+  }
 }
