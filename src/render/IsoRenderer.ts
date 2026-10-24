@@ -570,13 +570,26 @@ export class IsoRenderer {
 
     // A low white fence around the lot, with a gap at the entrance, so the home reads apart from the town.
     const fence = new Graphics();
-    const corners = [cellToWorld(0, 0), cellToWorld(site.width, 0), cellToWorld(site.width, site.height), cellToWorld(0, site.height)];
-    for (let i = 0; i < 4; i++) {
-      const a = corners[i];
-      const b = corners[(i + 1) % 4];
-      fence.moveTo(a.x, a.y - 5).lineTo(b.x, b.y - 5);
+    // One rail per edge tile, left open wherever a path meets the fence (a side gate onto the street).
+    const path = (x: number, y: number) => !!site.corridor[cellIndex(x, y, site.width)];
+    const gates: Array<[{ x: number; y: number }, { x: number; y: number }]> = [];
+    const rail = (ax: number, ay: number, bx: number, by: number, open: boolean) => {
+      const a = cellToWorld(ax, ay);
+      const b = cellToWorld(bx, by);
+      if (open) gates.push([a, b]);
+      else fence.moveTo(a.x, a.y - 5).lineTo(b.x, b.y - 5);
+    };
+    for (let x = 0; x < site.width; x++) {
+      rail(x, 0, x + 1, 0, path(x, 0));
+      rail(x, site.height, x + 1, site.height, path(x, site.height - 1) && x !== site.entrance.x);
+    }
+    for (let y = 0; y < site.height; y++) {
+      rail(0, y, 0, y + 1, path(0, y));
+      rail(site.width, y, site.width, y + 1, path(site.width - 1, y));
     }
     fence.stroke({ width: 2.5, color: 0xfbf8f2, alpha: 0.95 });
+    // Side gates: a post each side of the opening.
+    for (const [a, b] of gates) for (const p of [a, b]) fence.rect(p.x - 2, p.y - 12, 4, 12).fill(0xd8cdb6);
     for (let x = 0; x <= site.width; x += 2) for (const yy of [0, site.height]) {
       const p = cellToWorld(x, yy);
       fence.rect(p.x - 1.2, p.y - 8, 2.4, 8).fill(0xfbf8f2);
