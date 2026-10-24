@@ -1,5 +1,5 @@
 import type { Texture } from 'pixi.js';
-import type { DecorType, EquipmentId, RoomType, StaffRole } from '../domain/types';
+import type { DecorType, EquipmentId, Facing, RoomType, StaffRole } from '../domain/types';
 import anchors from '../assets/sprite_anchors.json';
 
 /** Sprite art cut from the project's Game Assets Pack (fictional, owned by the project). */
@@ -65,13 +65,28 @@ export const RESIDENT_SPRITE = { f: 'ch_elder_f', m: 'ch_elder_m', chair: 'ch_wh
 /** Map width of a standing character, in world px. */
 export const PERSON_SPRITE_WIDTH = 24;
 
-/** Garden sprites; star-shop pieces reuse the pack's art with a tint (the statue is drawn). */
 /**
  * Sprites rendered in Blender (tools/blender): where the footprint's ground centre sits in each
- * image, in pixels. Buildings are named b_<type>_<w>x<h>; a building turned the other way uses
- * the mirror image of the same render.
+ * image, in pixels, and the pixel density when it is not 1. Buildings are named b_<type>_<w>x<h>;
+ * a building turned the other way uses the mirror image of the same render. Equipment (eq3_<id>)
+ * and people (ch3_<name>) come in two views, _s (front to the viewer) and _n (back to the viewer).
  */
-export const RENDERED_ANCHORS = anchors as unknown as Record<string, [number, number]>;
+export const RENDERED_ANCHORS = anchors as unknown as Record<string, [number, number] | [number, number, number]>;
+
+/**
+ * The rendered view of a piece of equipment or a person facing one way. Mirroring the image
+ * swaps the game's x and y axes, so south and east share one render and north and west the other.
+ */
+export function renderedView(base: string, facing: Facing): { name: string; mirror: boolean } | null {
+  const name = `${base}_${facing === 's' || facing === 'e' ? 's' : 'n'}`;
+  return RENDERED_ANCHORS[name] ? { name, mirror: facing === 'e' || facing === 'w' } : null;
+}
+
+/** The 3D figure for a character sprite (ch_nurse → ch3_nurse), when it has been rendered. */
+export function figureBase(sprite: string): string | null {
+  const base = sprite.replace(/^ch_/, 'ch3_');
+  return RENDERED_ANCHORS[`${base}_s`] && RENDERED_ANCHORS[`${base}_n`] ? base : null;
+}
 
 /** The rendered sprite for a building's footprint, if there is one: name and whether to mirror it. */
 export function renderedBuilding(type: string, w: number, h: number): { name: string; mirror: boolean } | null {
@@ -80,6 +95,7 @@ export function renderedBuilding(type: string, w: number, h: number): { name: st
   return null;
 }
 
+/** Garden sprites; star-shop pieces reuse the pack's art with a tint (the statue is drawn). */
 export const DECOR_SPRITE: Record<DecorType, { name: string; width: number; tint?: number; emoji?: string }> = {
   tree: { name: 'dc_tree', width: 70 },
   tree2: { name: 'dc_tree2', width: 64 },
