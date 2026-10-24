@@ -14,8 +14,8 @@ from PIL import Image, ImageFilter
 src, out = Path(sys.argv[1]), Path(sys.argv[2])
 
 
-def crop_alpha(im):
-    a = im.getchannel("A").point(lambda v: 0 if v < 10 else v)
+def crop_alpha(im, floor=10):
+    a = im.getchannel("A").point(lambda v: 0 if v < floor else v)
     im.putalpha(a)
     return im.crop(a.point(lambda v: 255 if v > 20 else 0).getbbox())
 
@@ -52,7 +52,8 @@ big = Image.new("RGBA", (raw.width + pad * 2, raw.height + pad * 2), (0, 0, 0, 0
 big.alpha_composite(raw, (pad, pad))
 k = max(1, raw.width // 400)  # outline widths scale with the render size
 logo = crop_alpha(outlined(outlined(big, 2 * k, (255, 255, 255)), 4 * k, (20, 52, 92)))
-cast = crop_alpha(Image.open(src / "cast.png").convert("RGBA"))
+# The shadow catcher leaves a faint haze round the cast; keep only the figures and their contact shadows.
+cast = crop_alpha(Image.open(src / "cast.png").convert("RGBA"), 60)
 
 # phones
 bg = Image.open(src / "bg_portrait.png").convert("RGBA").resize((1080, 1920), Image.LANCZOS)

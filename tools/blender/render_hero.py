@@ -114,15 +114,19 @@ def water_mat():
 
 
 def sign(text, x, y, z, width, colour, icon=0xE5484D, face="y", size=0.34):
-    """A white sign board with a coloured icon and the name in 3D letters, on a front face."""
+    """A free-standing sign on two posts in front of a building: a white board with a coloured icon
+    and the name in 3D letters, facing game south (toward the camera)."""
     font = bpy.data.fonts.load(FONT, check_existing=True)
     h = size * 1.55
 
     def build():
-        rbox(0, -0.06, 0, width, 0.0, h, mat(0xFBF8F2, 1.0, 0.4), 0.04)
-        rbox(0.08, -0.08, 0.08, 0.08 + h - 0.16, -0.05, h - 0.08, mat(icon, 1.0, 0.4), 0.03)
-        box(0.08 + (h - 0.16) / 2 - 0.035, -0.1, 0.16, 0.08 + (h - 0.16) / 2 + 0.035, -0.07, h - 0.16, mat(0xFFFFFF))
-        box(0.16, -0.1, h / 2 - 0.035, h - 0.16, -0.07, h / 2 + 0.035, mat(0xFFFFFF))
+        for px in (0.3, width - 0.3):
+            box(px - 0.04, 0.0, -z, px + 0.04, 0.08, 0, mat(0x8D97A1, 1.0, 0.4))
+        rbox(0, 0.0, 0, width, 0.1, h, mat(0xFBF8F2, 1.0, 0.4), 0.04)
+        rbox(0.08, 0.1, 0.08, 0.08 + h - 0.16, 0.13, h - 0.08, mat(icon, 1.0, 0.4), 0.03)
+        c = 0.08 + (h - 0.16) / 2
+        box(c - 0.035, 0.13, 0.16, c + 0.035, 0.15, h - 0.16, mat(0xFFFFFF))
+        box(0.16, 0.13, h / 2 - 0.035, h - 0.16, 0.15, h / 2 + 0.035, mat(0xFFFFFF))
         cu = bpy.data.curves.new("t", "FONT")
         cu.body = text
         cu.font = font
@@ -133,7 +137,7 @@ def sign(text, x, y, z, width, colour, icon=0xE5484D, face="y", size=0.34):
         bpy.context.collection.objects.link(o)
         o.data.materials.append(mat(colour, 1.0, 0.4))
         o.rotation_euler = (math.pi / 2, 0, 0)
-        o.location = (h + 0.04, 0.09, h / 2)
+        o.location = (h + 0.04, -0.13, h / 2)
         bpy.context.view_layer.update()
         o.location.x = h + 0.04 + (width - h - 0.12 - o.dimensions.x) / 2
 
@@ -297,16 +301,16 @@ def campus(rnd):
 
     # the buildings, with their signs
     place(lambda: ra.building("ward", 6, 4, 0x4F8A80), 8, 3)
-    sign("NURSING HOME", 8.8, 7.0, 1.0, 4.4, 0x1F4F8A, 0x2F74D8)
+    sign("NURSING HOME", 8.6, 7.7, 0.35, 4.8, 0x1F4F8A, 0x2F74D8, size=0.46)
     place(lambda: ra.building("therapy", 4, 3, 0x6B8F4E), 1.5, 9.8)
-    sign("REHABILITATION", 1.6, 12.8, 0.55, 3.8, 0x1F4F8A, 0x1E9E6A, size=0.26)
+    sign("REHABILITATION", 1.4, 13.5, 0.3, 4.4, 0x1F4F8A, 0x1E9E6A, size=0.36)
     place(lambda: ra.building("neuro_clinic", 4, 3, 0x3B5BA5), 16, 3.5)
-    sign("NEUROCLINIC", 16.2, 6.5, 0.55, 3.6, 0x1F4F8A, 0x6A4FDC, size=0.28)
+    sign("NEUROCLINIC", 16.0, 7.3, 0.3, 4.0, 0x1F4F8A, 0x6A4FDC, size=0.38)
     place(lambda: ra.building("villa", 3, 3, 0xB08850), 16.5, 10.5)
     place(lambda: ra.building("villa", 3, 3, 0xB08850), 20.2, 12.5)
-    sign("TRANQUILA", 16.6, 13.5, 1.15, 2.8, 0x5A3E28, 0xC7862A, size=0.28)
+    sign("TRANQUILA", 16.4, 13.9, 0.3, 3.6, 0x5A3E28, 0xC7862A, size=0.38)
     place(lambda: ra.building("homecare_office", 4, 3, 0x3F7F9A), 2, 17)
-    sign("HOME CARE", 2.2, 20.0, 0.55, 3.4, 0x1F4F8A, 0x1E9E6A, size=0.3)
+    sign("HOME CARE", 1.8, 20.5, 0.3, 3.8, 0x1F4F8A, 0x1E9E6A, size=0.38)
     place(lambda: ra.building("dining_room", 3, 3, 0xC9771F), 2.5, 3.5)
     place(ra.thai_house, 18.5, 17.5, s=1.6)
     place(ra.sala, 14.6, 19.6, s=1.5)
@@ -540,6 +544,6 @@ def render_logo():
 if __name__ == "__main__":
     # Portrait: a high view down the avenue from the gate; wide: lower and further right.
     render_bg("bg_portrait", 1080, 1920, (15, 33, 13), (11.5, 10.5, 0), 30)
-    render_bg("bg_wide", 2400, 1000, (24, 33, 10), (10, 11, 1), 26)
+    render_bg("bg_wide", 2400, 1000, (21, 32, 10), (13.5, 11, 1), 26)
     render_cast()
     render_logo()
