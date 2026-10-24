@@ -530,11 +530,12 @@ def wheelchair_rider():
 
 def kid():
     """A schoolchild: the same figure in a school uniform, scaled down."""
+    before = set(bpy.context.scene.objects)
     person(0xFFFFFF, 0x2B3A55, 0x2B2522, extra="book")
     bpy.context.view_layer.update()
     k = Matrix.Translation((0.5, -0.5, 0)) @ Matrix.Scale(0.72, 4) @ Matrix.Translation((-0.5, 0.5, 0))
-    for o in bpy.context.scene.objects:
-        if o.type == "MESH" and not o.is_shadow_catcher:
+    for o in set(bpy.context.scene.objects) - before:  # only the child, not the rest of a scene
+        if o.type == "MESH":
             o.matrix_world = k @ o.matrix_world
 
 
