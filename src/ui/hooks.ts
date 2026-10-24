@@ -5,7 +5,7 @@ import type { Room } from '../domain/types';
 import { localeOf, translate } from './i18n';
 import { useGame } from './store';
 import { MS_PER_TICK_1X } from './constants';
-import { AWAY_GAP_MS, autopilotOn, runAway, ticksFor } from './away';
+import { AWAY_GAP_MS, autopilotOn, offerAway } from './away';
 
 export function useT() {
   const lang = useGame((s) => s.lang);
@@ -37,10 +37,11 @@ export function useGameLoop() {
       const wall = Date.now();
       const gap = wall - lastWall;
       lastWall = wall;
-      const { game, tick, away, awayPlay, started } = useGame.getState();
+      const { game, tick, away, awayOffer, awayPlay, started } = useGame.getState();
       // Back after the tab was hidden or the screen slept: an autopilot game catches up the time away.
-      if (gap > AWAY_GAP_MS && awayPlay && started && game.speed > 0 && autopilotOn(game) && !away) runAway(ticksFor(gap, game.speed, MS_PER_TICK_1X));
-      if (away) acc.current = 0;
+      if (gap > AWAY_GAP_MS && awayPlay && started && game.speed > 0 && autopilotOn(game) && !away && !awayOffer) offerAway(gap, game.speed, MS_PER_TICK_1X);
+      // The clock waits while the time away is being played out or the player is choosing.
+      if (away || useGame.getState().awayOffer) acc.current = 0;
       else if (game.speed > 0) {
         acc.current += dt * game.speed;
         const n = Math.min(32, Math.floor(acc.current / MS_PER_TICK_1X));

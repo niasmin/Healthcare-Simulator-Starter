@@ -6,7 +6,7 @@ import type { Lang } from './i18n';
 import type { GameTemplate } from '../sim/templates';
 import type { AwayReport } from './away';
 import { newGameState } from '../sim/modes';
-import { autopilotOn, runAway, ticksFor } from './away';
+import { autopilotOn, offerAway } from './away';
 import { MS_PER_TICK_1X } from './constants';
 
 export type Tool = { kind: 'select' } | { kind: 'corridor' } | { kind: 'bulldoze' } | { kind: 'room'; roomType: RoomType } | { kind: 'decor'; decor: DecorType } | { kind: 'prefab'; prefab: string; rotated: boolean } | { kind: 'move'; roomId: string; rotated: boolean };
@@ -114,6 +114,10 @@ interface UIStore {
   away: { done: number; total: number } | null;
   awayReport: AwayReport | null;
   setAwayReport: (r: AwayReport | null) => void;
+  /** Back after a long absence: the catch-up waits for the player to choose (ticks, real ms away). */
+  awayOffer: { ticks: number; ms: number } | null;
+  /** Carry on from now without playing out the time away. */
+  skipAway: () => void;
   /** The tutorial card is folded into a small chip (remembered per browser). */
   tutorialHidden: boolean;
   setTutorialHidden: (v: boolean) => void;
@@ -227,6 +231,8 @@ export const useGame = create<UIStore>((set, get) => ({
   away: null,
   awayReport: null,
   setAwayReport: (awayReport) => set({ awayReport }),
+  awayOffer: null,
+  skipAway: () => set({ awayOffer: null }),
 
   dispatch: (cmd) => {
     const { state, result } = applyCommand(get().game, cmd);
@@ -270,7 +276,7 @@ export const useGame = create<UIStore>((set, get) => ({
     // An autopilot game saved while running carries on from where it was, catching up the time away.
     const resume = savedAt !== undefined && get().awayPlay && game.speed > 0 && autopilotOn(game);
     set({ game: resume ? game : { ...game, speed: 0 }, selectedRoomId: null, drag: null, tool: { kind: 'select' }, view: 'map', sheet: null, started: true, saveOpen: false, chapterSeen: !!game.chapter.result });
-    if (resume) runAway(ticksFor(Date.now() - savedAt, game.speed, MS_PER_TICK_1X));
+    if (resume) offerAway(Date.now() - savedAt, game.speed, MS_PER_TICK_1X);
   },
   started: false,
   setStarted: (started) => set({ started }),

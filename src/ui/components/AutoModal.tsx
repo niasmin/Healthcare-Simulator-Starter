@@ -3,6 +3,7 @@ import { AUTO_GROUPS, AUTO_KEYS, CHAPTERS_COVER, autoSettings, type AutoKey } fr
 import { useMoney, useT } from '../hooks';
 import { useGame } from '../store';
 import { askNotifyPermission } from '../alerts';
+import { runAway, stopAway } from '../away';
 
 const ICON: Record<AutoKey, string> = {
   events: '✉️',
@@ -110,6 +111,44 @@ export function AwayProgress() {
         <span className="block h-full bg-[#f2b631]" style={{ width: `${pct}%` }} />
       </span>
       <span className="tabular">{pct}%</span>
+      <button type="button" data-testid="away-stop" onClick={stopAway} className="rounded-lg bg-white/15 hover:bg-white/25 px-2 py-0.5 text-xs font-semibold">
+        ⏹ {t('away.stop')}
+      </button>
+    </div>
+  );
+}
+
+/** Back after a long absence: play out the time away, or carry on from now. */
+export function AwayOfferModal() {
+  const t = useT();
+  const offer = useGame((s) => s.awayOffer);
+  if (!offer) return null;
+  const days = Math.round((offer.ticks / 144) * 10) / 10;
+  const mins = Math.round(offer.ms / 60000);
+  const away = mins >= 60 ? t('away.offer.hours', { h: Math.floor(mins / 60), m: mins % 60 }) : t('away.offer.minutes', { m: Math.max(1, mins) });
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-ink/55 p-3" role="dialog" aria-modal="true" aria-label={t('away.offer.title')}>
+      <div className="w-full max-w-sm rounded-2xl bg-paper shadow-2xl p-4 flex flex-col gap-3">
+        <h2 className="font-bold text-lg">🌙 {t('away.offer.title')}</h2>
+        <p className="text-sm text-ink-soft">{t('away.offer.body', { away, days })}</p>
+        <button
+          type="button"
+          data-testid="away-play"
+          onClick={() => runAway(offer.ticks)}
+          className="w-full rounded-xl bg-teal text-white px-3 py-2 text-sm font-bold"
+        >
+          ⏩ {t('away.offer.play', { days })}
+        </button>
+        <button
+          type="button"
+          data-testid="away-skip"
+          onClick={() => useGame.getState().skipAway()}
+          className="w-full rounded-xl border border-line bg-white px-3 py-2 text-sm font-semibold"
+        >
+          ▶ {t('away.offer.skip')}
+        </button>
+        <p className="text-xs text-ink-soft">{t('away.offer.note')}</p>
+      </div>
     </div>
   );
 }
@@ -149,6 +188,7 @@ export function AwayReportModal() {
           </div>
         </dl>
         {r.stoppedEarly && <p className="text-xs text-warn">{t('away.stopped')}</p>}
+        {r.stoppedByPlayer && <p className="text-xs text-ink-soft">{t('away.stopped_by_you')}</p>}
         <button type="button" onClick={close} className="w-full rounded-xl bg-teal text-white px-3 py-2 text-sm font-bold">
           {t('away.ok')}
         </button>
