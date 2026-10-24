@@ -7,6 +7,7 @@ import { EQUIPMENT, ROOMS } from '../data/rooms';
 import { cellIndex } from '../domain/grid';
 import type { RoomStatus } from '../domain/rules/rooms';
 import { corridorPath } from '../domain/rules/navigation';
+import { pathLamps } from './Ambience';
 import type { Cell, EquipmentId, GameState, Room, RoomType } from '../domain/types';
 import { cellCenter, cellDiamond, cellToWorld, TILE_H, TILE_W, worldToCell } from './iso';
 
@@ -215,7 +216,8 @@ export class IsoRenderer {
     this.app.canvas.style.touchAction = 'none';
     this.peopleLayer.sortableChildren = true;
     this.town = new TownLife(this.tex);
-    this.world.addChild(this.backdropLayer, this.carsBack, this.town.back, this.staticLayer, this.carsLayer, this.overlay, this.peopleLayer, this.town.front, this.amb.worldFx, this.labelLayer);
+    // Night darkness sits in the world under the labels, so building names stay readable.
+    this.world.addChild(this.backdropLayer, this.carsBack, this.town.back, this.staticLayer, this.carsLayer, this.overlay, this.peopleLayer, this.town.front, this.amb.worldFx, this.amb.dark, this.labelLayer);
     this.app.stage.addChild(this.world, this.amb.tint, this.amb.lights, this.amb.screenFx);
     this.app.ticker.add((tk) => {
       this.driveCars(tk.deltaMS);
@@ -595,6 +597,22 @@ export class IsoRenderer {
 
     // Rooms and garden items, back to front (painter's order by their front-most tile)
     const items: Array<{ key: number; draw: () => void }> = [];
+    // Path lamps: a slim post with a lantern on the corridor tiles that light up at night.
+    for (const lamp of pathLamps(site))
+      items.push({
+        key: lamp.x + lamp.y,
+        draw: () => {
+          const c = cellCenter(lamp.x, lamp.y);
+          const lg = new Graphics();
+          const px = c.x + 18;
+          const py = c.y + 2;
+          lg.ellipse(px, py + 1, 4, 2).fill({ color: 0x000000, alpha: 0.18 });
+          lg.rect(px - 1.2, py - 30, 2.4, 30).fill(0x3d4a52);
+          lg.roundRect(px - 3.5, py - 36, 7, 7, 2).fill(0xfff1c2).stroke({ width: 1, color: 0x3d4a52 });
+          lg.rect(px - 4.5, py - 38, 9, 2).fill(0x3d4a52);
+          this.staticLayer.addChild(lg);
+        },
+      });
     for (const room of site.rooms)
       items.push({ key: room.rect.x + room.rect.w - 1 + room.rect.y + room.rect.h - 1, draw: () => (input.exterior ? this.drawBuilding(room, input.statuses.get(room.id), input.labelFor(room)) : this.drawRoom(room, input.statuses.get(room.id), input.labelFor(room))) });
     for (const d of site.decor ?? [])
