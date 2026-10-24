@@ -10,7 +10,7 @@ import { ShopModal } from './components/ShopModal';
 import { CityModal } from './components/CityModal';
 import { GoalsModal, useGoalToasts } from './components/GoalsModal';
 import { CommunityModal } from './components/CommunityModal';
-import { AutoModal, AwayProgress, AwayReportModal } from './components/AutoModal';
+import { AutoModal, AwayOfferModal, AwayProgress, AwayReportModal } from './components/AutoModal';
 import { useEffect } from 'react';
 import { SaveModal } from './components/SaveModal';
 import { ChaptersModal } from './components/ChaptersModal';
@@ -88,6 +88,7 @@ export function App() {
       {autoOpen && <AutoModal onClose={() => useGame.getState().setAutoOpen(false)} />}
       {accountOpen && <AccountModal onClose={() => useGame.getState().setAccountOpen(false)} />}
       <AwayProgress />
+      <AwayOfferModal />
       <AwayReportModal />
     </>
   );
