@@ -543,7 +543,7 @@ def render_logo():
 
 if __name__ == "__main__":
     # Portrait: a high view down the avenue from the gate; wide: lower and further right.
-    render_bg("bg_portrait", 1080, 1920, (15, 33, 13), (11.5, 10.5, 0), 30)
-    render_bg("bg_wide", 2400, 1000, (21, 32, 10), (13.5, 11, 1), 26)
+    render_bg("bg_portrait", 1080, 1920, (16.5, 43, 18.5), (11.5, 11, 0), 30)
+    render_bg("bg_wide", 2400, 1000, (24, 40, 13.5), (13, 11, 1), 26)
     render_cast()
     render_logo()
