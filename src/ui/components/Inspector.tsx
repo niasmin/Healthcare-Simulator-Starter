@@ -1,9 +1,8 @@
-import { BED_ROOMS, EQUIPMENT, REFUND_PERCENT, ROOMS, roomConstructionCost } from '../../data/rooms';
+import { EQUIPMENT, REFUND_PERCENT, ROOMS, roomConstructionCost } from '../../data/rooms';
 import { cellIndex, rectArea } from '../../domain/grid';
 import { pctOf } from '../../domain/money';
 import type { EquipmentId } from '../../domain/types';
-import { connectCost, connectPath, moveFee, worksMinutes } from '../../sim/systems/move';
-import { residentsInRoom } from '../../domain/rules/beds';
+import { connectCost, connectPath, moveCost, movingResidents, OCCUPIED_MOVE_EXTRA_PERCENT, worksMinutes } from '../../sim/systems/move';
 import { dayOf, formatClock } from '../../sim/systems/time';
 import { useMemo, useState } from 'react';
 import { EQUIP_SPRITE, spriteUrl } from '../../render/sprites';
@@ -33,11 +32,11 @@ function RoomInspector({ roomId }: { roomId: string }) {
   for (const [id, n] of Object.entries(room.equipment) as [EquipmentId, number][]) equipValue += EQUIPMENT[id].costSatang * n;
   const refund = pctOf(roomConstructionCost(room.type, room.rect) + equipValue, REFUND_PERCENT);
   const area = rectArea(room.rect);
-  const fee = moveFee(room);
+  const fee = moveCost(game, room);
   const square = room.rect.w === room.rect.h;
   const link = st.door ? null : connectPath(game, room.id);
   const works = room.worksUntil !== undefined;
-  const occupied = BED_ROOMS.includes(room.type) && residentsInRoom(game, room.id).length > 0;
+  const movers = movingResidents(game, room).length;
   const hours = Math.round(worksMinutes(room) / 60);
 
   return (
@@ -145,25 +144,25 @@ function RoomInspector({ roomId }: { roomId: string }) {
               st.setTool({ kind: 'move', roomId: room.id, rotated: false });
               if (st.sheet) st.setSheet(null);
             }}
-            disabled={cash < fee || works || occupied}
+            disabled={cash < fee || works}
             className="flex-1 rounded-lg bg-teal text-white text-sm font-semibold py-1.5 disabled:opacity-40"
           >
             ✥ {t('move.move', { fee: money(fee) })}
           </button>
           {!square && (
-          <button type="button" disabled={works || occupied} onClick={() => dispatch({ type: 'turnRoom', roomId: room.id, turns: -1 })} className="px-3 rounded-lg border border-line bg-white text-sm font-bold" aria-label={t('move.turn_left')} title={t('move.turn_left')}>
+          <button type="button" disabled={works} onClick={() => dispatch({ type: 'turnRoom', roomId: room.id, turns: -1 })} className="px-3 rounded-lg border border-line bg-white text-sm font-bold" aria-label={t('move.turn_left')} title={t('move.turn_left')}>
             ⟲
           </button>
           )}
           {!square && (
-          <button type="button" disabled={works || occupied} onClick={() => dispatch({ type: 'turnRoom', roomId: room.id, turns: 1 })} className="px-3 rounded-lg border border-line bg-white text-sm font-bold" aria-label={t('move.turn_right')} title={t('move.turn_right')}>
+          <button type="button" disabled={works} onClick={() => dispatch({ type: 'turnRoom', roomId: room.id, turns: 1 })} className="px-3 rounded-lg border border-line bg-white text-sm font-bold" aria-label={t('move.turn_right')} title={t('move.turn_right')}>
             ⟳
           </button>
           )}
         </div>
         <p className="text-[11px] text-ink-soft leading-snug">
           {t(square ? 'move.hint_square' : 'move.hint_long', { fee: money(fee), hours })}
-          {occupied && <span className="block text-bad mt-0.5">{t('move.occupied')}</span>}
+          {movers > 0 && <span className="block text-warn mt-0.5" data-testid="move-occupied">{t('move.occupied', { n: movers, pct: OCCUPIED_MOVE_EXTRA_PERCENT })}</span>}
         </p>
       </div>
 

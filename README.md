@@ -452,6 +452,7 @@ All hospital work is abstract: a consultation, a nursing round and a doctor's ro
   - Move-in villa (Chapter 3) and Home Care centre (Chapter 4).
   - Each costs exactly what building it by hand costs, goes through the same placement and equipment rules, and is all-or-nothing.
   - ⟳ (or R) rotates the room. Dragging on a phone moves the ghost footprint, and lifting your finger places it.
+- **Moving a ward or villa with its residents:** residents keep their beds and move with the building. The move costs 50% more, upsets each resident a little (−5 satisfaction and happiness, once), and the new spot must touch a corridor so staff keep caring for them during the works (`occupied_needs_door` otherwise). Empty buildings can still move anywhere and be connected later.
 - **New game choice:** **ศูนย์เริ่มต้นสำเร็จรูป** (recommended) starts with a corridor spine, a ready nursing station and staff room, and plants at the gate, all paid from capital; **ที่ดินเปล่า** is the original empty lot.
 - **Try a chapter again:** a failed chapter can be replayed with the same business (↻ on the result card and the tutorial card); its days count from the retry.
 - **Less clutter:** the controls hint at the bottom of the map hides after 45 seconds. Placement previews still show there.

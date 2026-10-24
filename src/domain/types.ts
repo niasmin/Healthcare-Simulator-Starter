@@ -846,6 +846,8 @@ export type ReasonCode =
   | 'no_free_bed'
   | 'room_occupied'
   | 'works_active'
+  /** A building with residents can only move where staff can reach it (touching a corridor). */
+  | 'occupied_needs_door'
   | 'no_route'
   | 'bed_occupied'
   | 'shift_overlap'
