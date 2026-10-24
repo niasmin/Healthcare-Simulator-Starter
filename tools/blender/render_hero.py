@@ -232,20 +232,21 @@ def car(build, x, y, rot):
 
 
 def mountains(rnd):
-    cols = (0x6F9A8A, 0x7FA796, 0x8FB3A5, 0x5F8A7C)
-    for k in range(16):
-        x = -90 + k * 14 + rnd.uniform(-5, 5)
-        y = -110 - rnd.uniform(0, 40)
-        hgt = rnd.uniform(16, 32)
-        bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=3, radius=1, location=(x, -y, -hgt * 0.15))
-        o = bpy.context.object
-        o.scale = (rnd.uniform(18, 30), rnd.uniform(14, 22), hgt)
-        o.data.materials.append(mat(cols[k % 4], 1.0, 0.95))
-        bpy.ops.object.shade_smooth()
+    """Faceted low-poly hills in two bands; the far band paler and bluer, as in the haze."""
+    for band, (y0, cols, hmin, hmax) in enumerate(((-210, (0xA9BCD0, 0xB4C6D8, 0x9FB4CA), 40, 70), (-140, (0x6F9A8A, 0x7FA796, 0x5F8A7C), 22, 40))):
+        for k in range(14):
+            x = -160 + k * 24 + rnd.uniform(-8, 8)
+            y = y0 - rnd.uniform(0, 30)
+            hgt = rnd.uniform(hmin, hmax)
+            bpy.ops.mesh.primitive_cone_add(vertices=7, radius1=1, radius2=0.12, depth=1, location=(x, -y, hgt / 2 - 2))
+            o = bpy.context.object
+            o.scale = (rnd.uniform(28, 44), rnd.uniform(18, 28), hgt)
+            o.rotation_euler.z = rnd.uniform(0, 6.28)
+            o.data.materials.append(mat(cols[k % 3], 1.0, 0.95))
     # a golden chedi on the highest hill, like Doi Suthep above Chiang Mai
-    bpy.ops.mesh.primitive_cone_add(radius1=1.4, radius2=0, depth=5, location=(-8, 128, 27))
+    bpy.ops.mesh.primitive_cone_add(radius1=1.8, radius2=0, depth=6, location=(-6, 150, 39))
     bpy.context.object.data.materials.append(mat(0xE0B23C, 1.0, 0.25, 0.3))
-    bpy.ops.mesh.primitive_cylinder_add(radius=1.6, depth=1.4, location=(-8, 128, 24))
+    bpy.ops.mesh.primitive_cylinder_add(radius=2.1, depth=1.6, location=(-6, 150, 35.5))
     bpy.context.object.data.materials.append(mat(0xE0B23C, 1.0, 0.25, 0.3))
 
 
@@ -408,6 +409,7 @@ def render_bg(name, w, h, loc, target, lens):
     sky(s)
     campus(rnd)
     camera(s, loc, target, lens, w, h, 96)
+    s.view_settings.exposure = -0.6
     s.render.film_transparent = False
     s.render.filepath = f"{OUT}/{name}.png"
     bpy.ops.render.render(write_still=True)
@@ -431,12 +433,12 @@ def render_cast():
         sun.data.angle = math.radians(10)
         sun.data.color = c
         sun.rotation_euler = (math.radians(90 - e), 0, math.radians(r))
-    cast = [("owner_m", -2.35, 0.1), ("nurse", -1.45, -0.15), ("wheelchair", -0.45, 0.25), ("caregiver", 0.45, -0.1), ("pt", 1.4, 0.15), ("ot", 2.3, -0.05)]
+    cast = [("owner_m", -1.75, 0.15), ("nurse", -1.05, -0.2), ("wheelchair", -0.3, 0.35), ("caregiver", 0.45, -0.15), ("pt", 1.15, 0.2), ("ot", 1.85, 0.0)]
     for name, x, y in cast:
         place(rp.PEOPLE[name], x - 0.5, y - 0.5, rot=-x * 0.12)
     bpy.ops.mesh.primitive_plane_add(size=30, location=(0, 0, 0))
     bpy.context.object.is_shadow_catcher = True
-    camera(s, (0, 7.5, 1.3), (0, 0, 0.62), 50, 1600, 700, 96)
+    camera(s, (0, 6.2, 1.15), (0, 0, 0.6), 55, 1600, 760, 96)
     s.render.film_transparent = True
     s.render.filepath = f"{OUT}/cast.png"
     bpy.ops.render.render(write_still=True)
@@ -513,10 +515,6 @@ def render_logo():
     bpy.context.object.data.materials.append(mat(0xE5484D, 1.0, 0.3))
     box(-2.95, -0.25, 1.75, -2.85, -0.22, 2.07, mat(0xFFFFFF))
     box(-3.06, -0.25, 1.86, -2.74, -0.22, 1.96, mat(0xFFFFFF))
-    # leaves either side of the ribbon
-    for sx in (-1, 1):
-        for k in range(4):
-            sphere(sx * (3.0 + k * 0.05), 0.1, -1.0 - k * 0.15 + 0.4, 0.17 - k * 0.02, mat((0x5F9E4E, 0x6FB05A)[k % 2]))
     camera(s, (0, 14, 0.2), (0, 0, 0.1), 60, 1200, 760, 64)
     s.camera.location = (0, -14, 0.2)
     s.camera.rotation_euler = (Vector((0, 0, 0.1)) - s.camera.location).to_track_quat("-Z", "Y").to_euler()
@@ -528,7 +526,7 @@ def render_logo():
 
 if __name__ == "__main__":
     # Portrait: a high view down the avenue from the gate; wide: lower and further right.
-    render_bg("bg_portrait", 1080, 1920, (24, 46, 19), (10, 7, 0), 30)
-    render_bg("bg_wide", 2400, 1000, (30, 40, 13), (8, 9, 1), 30)
+    render_bg("bg_portrait", 1080, 1920, (22, 38, 15), (11, 8, 0), 28)
+    render_bg("bg_wide", 2400, 1000, (28, 36, 11), (9, 9, 1), 26)
     render_cast()
     render_logo()

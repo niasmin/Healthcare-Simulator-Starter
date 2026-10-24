@@ -463,6 +463,8 @@ def person(top, bottom, hair, skin=SKIN[0], style="short", coat=None, hat=None, 
     blob(cx, cy, hz, 0.21, 0.19, 0.2, sk)
     for dx in (-0.075, 0.075):
         blob(cx + dx, cy + 0.17, hz - 0.01, 0.024, 0.012, 0.032, mat(0x2B2522, 1.0, 0.3))
+        blob(cx + dx + 0.008, cy + 0.178, hz + 0.008, 0.008, 0.005, 0.009, mat(0xFFFFFF, 1.0, 0.2))  # catch-light
+        rod((cx + dx - 0.03, cy + 0.165, hz + 0.06), (cx + dx + 0.03, cy + 0.165, hz + 0.065), 0.008, mat(0x3A2A22, 1.0, 0.6))  # brow
         blob(cx + dx * 1.35, cy + 0.15, hz - 0.08, 0.03, 0.01, 0.018, mat(0xF2A6A0, 1.0, 0.7))  # cheeks
     blob(cx, cy + 0.18, hz - 0.1, 0.03, 0.008, 0.01, mat(0xB5654F, 1.0, 0.5))  # smile
     hm = mat(hair, 1.0, 0.6)
