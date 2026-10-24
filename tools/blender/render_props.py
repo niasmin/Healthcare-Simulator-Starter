@@ -526,6 +526,16 @@ def wheelchair_rider():
     blob(cx, cy - 0.07, hz + 0.06, 0.215, 0.19, 0.17, mat(0xD8D8D4, 1.0, 0.6))
 
 
+def kid():
+    """A schoolchild: the same figure in a school uniform, scaled down."""
+    person(0xFFFFFF, 0x2B3A55, 0x2B2522, extra="book")
+    bpy.context.view_layer.update()
+    k = Matrix.Translation((0.5, -0.5, 0)) @ Matrix.Scale(0.72, 4) @ Matrix.Translation((-0.5, 0.5, 0))
+    for o in bpy.context.scene.objects:
+        if o.type == "MESH" and not o.is_shadow_catcher:
+            o.matrix_world = k @ o.matrix_world
+
+
 PEOPLE = {
     "nurse": lambda: person(0xFFFFFF, 0xFFFFFF, 0x2B2522, style="bun", hat="nurse", shoes=0xFFFFFF, extra="badge"),
     "caregiver": lambda: person(0xF08AA8, 0xD9728F, 0x3A2A22, style="bun", extra="badge"),
@@ -545,6 +555,8 @@ PEOPLE = {
     "elder_m": lambda: person(0xDCE6F0, 0x8D7A64, 0xD8D8D4, extra="cane", shoes=0x8A5A3C),
     "resident": lambda: person(0x9FCFE0, 0x9FCFE0, 0xD8D8D4, shoes=0xF4F2EC),
     "wheelchair": wheelchair_rider,
+    "jogger": lambda: person(0xF29E4C, 0x2F3A48, 0x2B2522, SKIN[1], shoes=0xFFFFFF),
+    "kid": kid,
 }
 
 

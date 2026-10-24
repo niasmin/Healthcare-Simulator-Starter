@@ -54,7 +54,9 @@ describe('the town around the home', () => {
     const { townRoads } = await import('../render/WorldBackdrop');
     const s = createInitialState(8);
     const r = townRoads(s.site, 32);
-    expect(r.front).toBe(s.site.height);
+    // A pavement runs between the fence and the two-lane front street.
+    expect(r.front).toBe(s.site.height + 1);
+    expect(r.lanes).toBe(2);
     expect(r.front2).toBeGreaterThan(r.front);
     expect(r.west).toBeLessThan(0);
     expect(r.north).toBeLessThan(0);

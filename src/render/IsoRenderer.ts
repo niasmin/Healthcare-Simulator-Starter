@@ -1,6 +1,6 @@
 import { Application, Container, Graphics, Sprite, Text, type Texture } from 'pixi.js';
 import { DECOR_SPRITE, EQUIP_SPRITE, ROOM_BADGE, PERSON_SPRITE_WIDTH, RENDERED_ANCHORS, figureBase, loadSpriteTextures, renderedBuilding, renderedView } from './sprites';
-import { drawWorld, townRoads, worldBounds } from './WorldBackdrop';
+import { DROP, drawWorld, townLights, townRoads, worldBounds } from './WorldBackdrop';
 import { Ambience, lightAt, type Weather } from './Ambience';
 import { TownLife } from './TownLife';
 import { EQUIPMENT, ROOMS } from '../data/rooms';
@@ -156,7 +156,7 @@ export class IsoRenderer {
   private carsLayer = new Container();
   /** Cars on the roads behind the lot (north and west), drawn before the home. */
   private carsBack = new Container();
-  private cars: Array<{ g: Graphics; x: number; speed: number; row: number; axis: 'x' | 'y'; from: number; to: number }> = [];
+  private cars: Array<{ g: Container; x: number; speed: number; row: number; axis: 'x' | 'y'; from: number; to: number }> = [];
   private amb = new Ambience();
   /** Townsfolk on the pavements around the lot (made once the sprites are loaded). */
   private town: TownLife | null = null;
@@ -451,16 +451,16 @@ export class IsoRenderer {
   }
 
   /** Ambient traffic on the streets around the block; it pauses with the game. */
-  private driveCars(dtMs: number): void {
+  private driveCars(dtMs: number, place = false): void {
     if (!this.input || !this.cars.length) return;
     const speed = this.input.game.speed;
-    if (!speed) return;
+    if (!speed && !place) return;
     for (const car of this.cars) {
       car.x += car.speed * Math.min(2, speed) * (dtMs / 1000);
       if (car.x > car.to) car.x = car.from;
       if (car.x < car.from) car.x = car.to;
-      const c = car.axis === 'x' ? cellCenter(car.x, car.row + 0.5) : cellCenter(car.row + 0.5, car.x);
-      car.g.position.set(c.x, c.y + SLAB_DEPTH - TILE_H / 2);
+      const c = car.axis === 'x' ? cellCenter(car.x, car.row) : cellCenter(car.row, car.x);
+      car.g.position.set(c.x, c.y + DROP);
       car.g.zIndex = c.y;
     }
   }
@@ -469,14 +469,17 @@ export class IsoRenderer {
     for (const c of this.carsLayer.removeChildren()) dispose(c);
     for (const c of this.carsBack.removeChildren()) dispose(c);
     const colors = [0xd9534f, 0x2f6aa5, 0xf2f2f2, 0x3f8f86, 0xe0a23b, 0x7d6aa0, 0x2b2522, 0xf2b631];
+    // Rendered vehicles, mixed the way Thai streets are: mostly cars and pickups, some tuk-tuks,
+    // a red songthaew, motorbikes and now and then an ambulance.
+    const KINDS = ['car3_sedan_red', 'car3_pickup_silver', 'car3_moto', 'car3_sedan_white', 'car3_tuktuk', 'car3_sedan_blue', 'car3_pickup_black', 'car3_songthaew', 'car3_moto', 'car3_sedan_teal', 'car3_ambulance', 'car3_moto'];
     const r = townRoads(site, this.input?.sale?.toX ?? null);
     // Roads: the front street (busiest), the ring road round the block and the second street.
     const routes: Array<{ axis: 'x' | 'y'; row: number; from: number; to: number; n: number }> = [
-      { axis: 'x', row: r.front, from: r.minX, to: r.maxX, n: 5 },
-      { axis: 'x', row: r.north, from: r.minX, to: r.maxX, n: 2 },
-      { axis: 'x', row: r.front2, from: r.minX, to: r.maxX, n: 3 },
-      { axis: 'y', row: r.west, from: r.minY, to: r.maxY, n: 2 },
-      { axis: 'y', row: r.east, from: r.minY, to: r.maxY, n: 2 },
+      { axis: 'x', row: r.front, from: r.minX, to: r.maxX, n: 6 },
+      { axis: 'x', row: r.north, from: r.minX, to: r.maxX, n: 3 },
+      { axis: 'x', row: r.front2, from: r.minX, to: r.maxX, n: 4 },
+      { axis: 'y', row: r.west, from: r.minY, to: r.maxY, n: 3 },
+      { axis: 'y', row: r.east, from: r.minY, to: r.maxY, n: 3 },
     ];
     this.carsLayer.sortableChildren = true;
     this.carsBack.sortableChildren = true;
@@ -484,20 +487,41 @@ export class IsoRenderer {
     let i = 0;
     for (const route of routes)
       for (let k = 0; k < route.n; k++, i++) {
-        const color = colors[i % colors.length];
-        const g = new Graphics();
-        // a small iso car: body, roof and windows
-        g.poly([-12, 0, 0, -6, 12, 0, 0, 6]).fill(shade(color, 0.7));
-        g.poly([-12, 0, 0, 6, 0, 1, -12, -5]).fill(shade(color, 0.85));
-        g.poly([0, 6, 12, 0, 12, -5, 0, 1]).fill(shade(color, 0.7));
-        g.poly([-12, -5, 0, -11, 12, -5, 0, 1]).fill(color);
-        g.poly([-6, -6, 0, -9, 6, -6, 0, -3]).fill({ color: 0x9cc3cf, alpha: 0.9 });
-        // Along y the car points the other way in iso.
-        if (route.axis === 'y') g.scale.x = -1;
-        (route.row === r.north || route.row === r.west ? this.carsBack : this.carsLayer).addChild(g);
+        // Thailand drives on the left: heading +x (down-right) keeps to the north lane, heading +y
+        // (down-left) to the east lane.
+        const dir = k % 2 ? -1 : 1;
+        const lane = route.axis === 'x' ? (dir > 0 ? 0.5 : 1.5) : dir > 0 ? 1.5 : 0.5;
+        const facing: Facing = route.axis === 'x' ? (dir > 0 ? 'e' : 'w') : dir > 0 ? 's' : 'n';
+        const node = new Container();
+        const view = renderedView(KINDS[i % KINDS.length], facing);
+        const tex = view ? this.tex.get(view.name) : undefined;
+        if (view && tex) {
+          const a = RENDERED_ANCHORS[view.name];
+          const sp = new Sprite(tex);
+          sp.anchor.set(a[0] / tex.width, a[1] / tex.height);
+          const kk = 1 / (a[2] ?? 1);
+          sp.scale.set(view.mirror ? -kk : kk, kk);
+          node.addChild(sp);
+        } else {
+          const color = colors[i % colors.length];
+          const g = new Graphics();
+          // a small iso car: body, roof and windows
+          g.poly([-12, 0, 0, -6, 12, 0, 0, 6]).fill(shade(color, 0.7));
+          g.poly([-12, 0, 0, 6, 0, 1, -12, -5]).fill(shade(color, 0.85));
+          g.poly([0, 6, 12, 0, 12, -5, 0, 1]).fill(shade(color, 0.7));
+          g.poly([-12, -5, 0, -11, 12, -5, 0, 1]).fill(color);
+          g.poly([-6, -6, 0, -9, 6, -6, 0, -3]).fill({ color: 0x9cc3cf, alpha: 0.9 });
+          // Along y the car points the other way in iso.
+          if (route.axis === 'y') g.scale.x = -1;
+          node.addChild(g);
+        }
+        (route.row === r.north || route.row === r.west ? this.carsBack : this.carsLayer).addChild(node);
         const span = route.to - route.from;
-        this.cars.push({ g, x: route.from + ((k + 0.5) / route.n) * span, speed: (k % 2 ? -1 : 1) * (1.4 + (i % 3) * 0.5), row: route.row, axis: route.axis, from: route.from, to: route.to });
+        const kind = KINDS[i % KINDS.length];
+        const pace = kind === 'car3_moto' ? 1.9 : kind === 'car3_tuktuk' ? 1.3 : 1.5 + (i % 3) * 0.4;
+        this.cars.push({ g: node, x: route.from + ((k + 0.5) / route.n) * span, speed: dir * pace, row: route.row + lane, axis: route.axis, from: route.from, to: route.to });
       }
+    this.driveCars(0, true);
   }
 
   // ---------- drawing ----------
@@ -514,7 +538,7 @@ export class IsoRenderer {
     const backdropKey = `${input.game.site.width}x${input.game.site.height}|${input.sale?.label ?? ''}|${this.tex.size}`;
     if (backdropKey !== this.lastBackdrop) {
       this.lastBackdrop = backdropKey;
-      drawWorld(this.backdropLayer, input.game.site, { sale: input.sale ? { fromX: input.game.site.width, toX: input.sale.toX, label: input.sale.label } : null, textures: this.tex });
+      drawWorld(this.backdropLayer, input.game.site, { sale: input.sale ? { fromX: input.game.site.width, toX: input.sale.toX, label: input.sale.label } : null, textures: this.tex, anchors: RENDERED_ANCHORS });
       this.makeCars(input.game.site);
       this.town?.build(input.game.site, input.sale?.toX ?? null);
       this.updateMinScale();
@@ -527,7 +551,7 @@ export class IsoRenderer {
       this.lastSite = input.game.site;
       this.lastStatic = staticKey;
       this.drawStatic(input);
-      this.amb.drawLights(input.game.site);
+      this.amb.drawLights(input.game.site, townLights(input.game.site, input.sale?.toX ?? null));
       this.amb.noticeRooms(input.game.site.rooms);
       this.lastPeople = '';
     }
