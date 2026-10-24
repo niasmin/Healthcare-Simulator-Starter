@@ -233,7 +233,7 @@ def car(build, x, y, rot):
 
 def mountains(rnd):
     """Faceted low-poly hills in two bands; the far band paler and bluer, as in the haze."""
-    for band, (y0, cols, hmin, hmax) in enumerate(((-210, (0xA9BCD0, 0xB4C6D8, 0x9FB4CA), 40, 70), (-140, (0x6F9A8A, 0x7FA796, 0x5F8A7C), 22, 40))):
+    for band, (y0, cols, hmin, hmax) in enumerate(((-260, (0xB4C6D8, 0xBFD0E0, 0xAABED2), 34, 56), (-170, (0x86A8A4, 0x93B3AC, 0x7A9E98), 18, 30))):
         for k in range(14):
             x = -160 + k * 24 + rnd.uniform(-8, 8)
             y = y0 - rnd.uniform(0, 30)
@@ -274,8 +274,8 @@ def campus(rnd):
     s = bpy.context.scene
     # ground: the town's lawns, the lot a touch brighter
     bpy.ops.mesh.primitive_plane_add(size=500, location=(0, 0, -0.02))
-    bpy.context.object.data.materials.append(ground_mat(0x7FA35E, 0x94B56B))
-    box(-0.5, -0.5, -0.02, 24.5, 24.5, 0.04, ground_mat(0x8DB866, 0xA3C878, 0.15))
+    bpy.context.object.data.materials.append(ground_mat(0x6F9852, 0x86AB5E))
+    box(-0.5, -0.5, -0.02, 24.5, 24.5, 0.04, ground_mat(0x7FAE58, 0x93BE68, 0.15))
     pave = mat(0xE6DCC6, 1.0, 0.7)
     # paths: the avenue from the gate, a cross walk and a ring round the fountain
     box(10.4, 9.5, 0.04, 11.6, 25, 0.06, pave)
@@ -409,7 +409,7 @@ def render_bg(name, w, h, loc, target, lens):
     sky(s)
     campus(rnd)
     camera(s, loc, target, lens, w, h, 96)
-    s.view_settings.exposure = -0.6
+    s.view_settings.exposure = -0.9
     s.render.film_transparent = False
     s.render.filepath = f"{OUT}/{name}.png"
     bpy.ops.render.render(write_still=True)
@@ -467,11 +467,10 @@ def render_logo():
         cu.font = font
         cu.size = size
         cu.extrude = depth
-        cu.bevel_depth = 0.035
+        cu.bevel_depth = 0.075  # a deep bevel makes the thick dark outline
         cu.bevel_resolution = 3
         cu.align_x = "CENTER"
         cu.align_y = "CENTER"
-        cu.offset = 0.06  # a thick outline
         o = bpy.data.objects.new("w", cu)
         bpy.context.collection.objects.link(o)
         o.location = (0, 0, z)
@@ -479,12 +478,11 @@ def render_logo():
         o.data.materials.append(mat(side, 1.0, 0.35))
         # the face of the letters a lighter colour, slightly proud of the outline
         cu2 = cu.copy()
-        cu2.offset = 0.0
-        cu2.extrude = depth + 0.03
-        cu2.bevel_depth = 0.02
+        cu2.extrude = 0.02
+        cu2.bevel_depth = 0.015
         o2 = bpy.data.objects.new("w2", cu2)
         bpy.context.collection.objects.link(o2)
-        o2.location = (0, -0.04, z)
+        o2.location = (0, -depth - 0.08, z)
         o2.rotation_euler = (math.pi / 2, 0, 0)
         o2.data.materials.clear()
         o2.data.materials.append(mat(face, 1.0, 0.25))
@@ -516,7 +514,7 @@ def render_logo():
     box(-2.95, -0.25, 1.75, -2.85, -0.22, 2.07, mat(0xFFFFFF))
     box(-3.06, -0.25, 1.86, -2.74, -0.22, 1.96, mat(0xFFFFFF))
     camera(s, (0, 14, 0.2), (0, 0, 0.1), 60, 1200, 760, 64)
-    s.camera.location = (0, -14, 0.2)
+    s.camera.location = (2.2, -14, -1.6)
     s.camera.rotation_euler = (Vector((0, 0, 0.1)) - s.camera.location).to_track_quat("-Z", "Y").to_euler()
     s.render.film_transparent = True
     s.render.filepath = f"{OUT}/logo.png"
@@ -526,7 +524,7 @@ def render_logo():
 
 if __name__ == "__main__":
     # Portrait: a high view down the avenue from the gate; wide: lower and further right.
-    render_bg("bg_portrait", 1080, 1920, (22, 38, 15), (11, 8, 0), 28)
-    render_bg("bg_wide", 2400, 1000, (28, 36, 11), (9, 9, 1), 26)
+    render_bg("bg_portrait", 1080, 1920, (21, 33, 13), (12, 10, 0), 30)
+    render_bg("bg_wide", 2400, 1000, (27, 33, 10), (10, 10, 1), 26)
     render_cast()
     render_logo()
