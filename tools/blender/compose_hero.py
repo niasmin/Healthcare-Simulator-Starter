@@ -57,16 +57,19 @@ cast = crop_alpha(Image.open(src / "cast.png").convert("RGBA"), 60)
 
 # phones
 bg = Image.open(src / "bg_portrait.png").convert("RGBA").resize((1080, 1920), Image.LANCZOS)
-lg, pad = shadowed(fit(logo, 860))
-bg.alpha_composite(lg, ((1080 - lg.width) // 2, 150 - pad))
-cs, pad = shadowed(fit(cast, 1010), 18, 0.45)
-bg.alpha_composite(cs, ((1080 - cs.width) // 2, 1600 - cs.height + pad))
+# Narrow phones crop the sides and the page puts menu buttons down both edges, so the logo stays
+# in the middle 55%; the cast stands just above where the big buttons start (about 68% down).
+lg, pad = shadowed(fit(logo, 600))
+bg.alpha_composite(lg, ((1080 - lg.width) // 2, 215 - pad))
+cs, pad = shadowed(fit(cast, 880), 18, 0.45)
+bg.alpha_composite(cs, ((1080 - cs.width) // 2, 1300 - cs.height + pad))
 bg.convert("RGB").save(out / "hero_portrait.jpg", quality=84, optimize=True, progressive=True)
 
 # wider screens
 bg = Image.open(src / "bg_wide.png").convert("RGBA").resize((2400, 1000), Image.LANCZOS)
-cs, pad = shadowed(fit(cast, 1200), 18, 0.45)
-bg.alpha_composite(cs, (-pad + 10, 1000 - cs.height + pad + 40))
+# The page covers the screen from the top-left, with menu buttons down the left edge.
+cs, pad = shadowed(fit(cast, 720), 18, 0.45)
+bg.alpha_composite(cs, (150 - pad, 640 - cs.height + pad))
 bg.convert("RGB").save(out / "hero.jpg", quality=84, optimize=True, progressive=True)
 
 fit(logo, 900).save(out / "logo3d.webp", "WEBP", quality=90, method=6)

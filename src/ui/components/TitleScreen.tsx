@@ -3,7 +3,7 @@ import { AccountChip } from "./AccountModal";
 import { PrefsList } from "./Prefs";
 import { useEffect, useState, type ReactNode } from "react";
 import hero from "../../assets/title/hero.jpg";
-import emblem from "../../assets/title/emblem.png";
+import logo3d from "../../assets/title/logo3d.webp";
 import ceoFace from "../../assets/faces/owner_f_smile.png";
 import heroPortrait from "../../assets/title/hero_portrait.jpg";
 import { formatTHB } from "../../domain/money";
@@ -483,23 +483,8 @@ export function TitleScreen() {
           <div className="relative min-h-full flex flex-col p-3 sm:p-5 gap-3">
             {/* Top row: logo, player card, figures from the latest save, language */}
             <header className="flex flex-wrap items-start gap-3">
-              <img src={emblem} alt="" className="hidden sm:block h-[7.2rem] w-auto select-none drop-shadow-[0_3px_0_rgba(0,0,0,0.25)]" draggable={false} />
-              <div className="select-none drop-shadow-[0_3px_0_rgba(0,0,0,0.25)] sm:-ml-2">
-                <div
-                  className="text-[2.1rem] sm:text-5xl font-black leading-none tracking-tight"
-                  style={{ WebkitTextStroke: "2px #1d4f7a", color: "#5fd0f2" }}
-                >
-                  Healthcare
-                </div>
-                <div
-                  className="text-[2.4rem] sm:text-6xl font-black leading-none -mt-1"
-                  style={{ WebkitTextStroke: "2px #8a4a12", color: "#ffc531" }}
-                >
-                  EMPIRE
-                </div>
-                <div className="mt-1 inline-block rounded-md bg-[#7a3f12] px-2 py-0.5 text-[11px] sm:text-xs font-bold tracking-wider">
-                  NURSING HOME TYCOON
-                </div>
+              <div className="select-none sm:-ml-1">
+                <img src={logo3d} alt="Healthcare Empire" className="h-[5.5rem] sm:h-[8.5rem] w-auto drop-shadow-[0_4px_6px_rgba(0,0,0,0.3)]" draggable={false} />
                 <div className="mt-1 text-xs sm:text-sm font-semibold text-[#3a2a12] bg-[#fff5dd]/90 rounded-full px-2.5 py-0.5 w-fit">
                   {t("home.tagline")}
                 </div>
