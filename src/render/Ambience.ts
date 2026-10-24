@@ -232,13 +232,13 @@ export class Ambience {
   }
 
   /** Night lighting: warm glows and the darkness with holes around them (rebuilt when the site changes). */
-  drawLights(site: GameState['site']): void {
+  drawLights(site: GameState['site'], town: Array<{ x: number; y: number; r: number; color: number; k: number }> = []): void {
     if (site === this.lastLightsSite) return;
     this.lastLightsSite = site;
     for (const c of this.lights.removeChildren()) if (c !== this.flyLayer) dispose(c);
     for (const c of this.dark.removeChildren()) dispose(c);
     this.dark.cacheAsTexture(false);
-    const sources = this.lightSources(site);
+    const sources = [...this.lightSources(site), ...town];
     const g = new Graphics();
     g.blendMode = 'add';
     // A soft radial glow: stacked ellipses, brighter towards the middle (iso: half as tall as wide).

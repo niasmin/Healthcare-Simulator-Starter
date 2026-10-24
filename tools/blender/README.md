@@ -34,3 +34,19 @@ python3 tools/blender/pack_sprites.py /tmp/props src/assets/sprites src/assets/s
   the door to everything. Bedside kit (call bell, monitor, pump, suction) stands at a bed's head.
 - People are rendered without a ground shadow (the game draws one that moves with them). Walking
   figures show the front view going down the screen and the back view going up.
+
+## The town
+
+```sh
+# 10 town buildings (density 1), then 10 vehicles in two views, 5 pieces of street furniture and
+# two more townsfolk (density 2): pack the two groups separately
+blender -b --python tools/blender/render_town.py -- /tmp/town
+blender -b --python tools/blender/render_props.py -- /tmp/town ch3_jogger ch3_kid
+mkdir -p /tmp/town1 /tmp/town2 && mv /tmp/town/tw_* /tmp/town1 && mv /tmp/town/* /tmp/town2
+python3 tools/blender/pack_sprites.py /tmp/town1 src/assets/sprites src/assets/sprite_anchors.json
+python3 tools/blender/pack_sprites.py /tmp/town2 src/assets/sprites src/assets/sprite_anchors.json 2
+```
+
+- Where each house, shop, tree, lamp, pole and crossing goes comes from `townLayout` in
+  `src/render/WorldBackdrop.ts` (a hash of the cell, never the game's random numbers).
+- Roads are two lanes; traffic keeps left, as in Thailand. The cables between poles are drawn.

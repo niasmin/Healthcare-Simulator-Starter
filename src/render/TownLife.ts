@@ -4,6 +4,7 @@ import { cellCenter } from './iso';
 import { DROP, townRoads } from './WorldBackdrop';
 import type { Weather } from './Ambience';
 import { dispose } from './dispose';
+import { figureBase, RENDERED_ANCHORS } from './sprites';
 
 /**
  * Life in the town around the home: people walking along the pavements, joggers, cyclists, a
@@ -41,6 +42,8 @@ interface Folk {
   phase: number;
   /** Stays in at night when this is above the night level (0..1). */
   homebody: number;
+  /** 3D figures' front and back views, swapped by the way they walk. */
+  views: Array<{ front: Sprite; back: Sprite; flip: boolean }>;
 }
 
 export class TownLife {
@@ -72,17 +75,19 @@ export class TownLife {
     const along = (row: number, wide = false) => lanes.push({ axis: 'x', at: row, from: wide ? r.minX + 2 : -near, to: wide ? r.maxX - 2 : r.eastEdge + near });
     const down = (col: number, wide = false) => lanes.push({ axis: 'y', at: col, from: wide ? r.minY + 2 : -near, to: wide ? r.maxY - 2 : site.height + near });
     // The pavements that face the home come twice, so they are the busiest.
+    // Roads are two cells wide; a pavement cell runs along each side.
     for (let k = 0; k < 2; k++) {
-      along(r.front + 1.25);
-      along(r.north + 1.25);
-      down(r.west + 1.25);
-      down(r.east - 0.75);
+      along(r.front - 0.6);
+      along(r.front + 2.4);
+      along(r.north + 2.4);
+      down(r.west + 2.4);
+      down(r.east - 0.6);
     }
-    along(r.north - 0.75, true);
-    along(r.front2 - 0.75);
-    along(r.front2 + 1.25, true);
-    down(r.west - 0.75, true);
-    down(r.east + 1.25, true);
+    along(r.north - 0.6, true);
+    along(r.front2 - 0.6);
+    along(r.front2 + 2.4, true);
+    down(r.west - 0.6, true);
+    down(r.east + 2.4, true);
     const n = Math.round(46 + Math.min(16, (r.eastEdge - 20) / 3));
     for (let i = 0; i < n; i++) {
       const lane = lanes[i % lanes.length];
@@ -92,13 +97,44 @@ export class TownLife {
     }
   }
 
+  /** A townsperson: the 3D figure (front and back views) when rendered, else the chibi sprite. */
+  private figure(name: string, into: Container, views: Folk['views'], width: number, x = 0, y = 0, flip = false): void {
+    const base = figureBase(name);
+    if (base && this.textures.has(`${base}_s`) && this.textures.has(`${base}_n`)) {
+      const pair = { front: this.view(`${base}_s`, into, x, y, flip), back: this.view(`${base}_n`, into, x, y, flip), flip };
+      pair.back.visible = false;
+      views.push(pair);
+      return;
+    }
+    const t = this.textures.get(name);
+    if (!t) return;
+    const sp = new Sprite(t);
+    sp.anchor.set(0.5, 0.97);
+    sp.scale.set((flip ? -width : width) / t.width, width / t.width);
+    sp.position.set(x, y);
+    into.addChild(sp);
+  }
+
+  private view(name: string, into: Container, x: number, y: number, flip: boolean): Sprite {
+    const t = this.textures.get(name)!;
+    const a = RENDERED_ANCHORS[name];
+    const sp = new Sprite(t);
+    sp.anchor.set(a[0] / t.width, a[1] / t.height);
+    const k = 0.9 / (a[2] ?? 1);
+    sp.scale.set(flip ? -k : k, k);
+    sp.position.set(x, y);
+    into.addChild(sp);
+    return sp;
+  }
+
   private add(lane: Lane, kind: Kind, i: number): void {
     const node = new Container();
     const body = new Container();
+    const views: Folk['views'] = [];
     node.addChild(new Graphics().ellipse(0, 0, kind === 'cyclist' ? 13 : 9, 4).fill({ color: 0x000000, alpha: 0.16 }));
     node.addChild(body);
-    const sprites = FOLK.filter((k) => this.textures.has(k));
-    const pick = (k: number) => this.textures.get(sprites[Math.floor(jitter(i * 7 + k) * sprites.length) % sprites.length]);
+    const sprites = FOLK.filter((k) => this.textures.has(k) || figureBase(k));
+    const pick = (k: number) => sprites[Math.floor(jitter(i * 7 + k) * sprites.length) % sprites.length];
     if (kind === 'cyclist') {
       // A bicycle drawn in lines, the rider on top.
       const bike = new Graphics();
@@ -107,22 +143,10 @@ export class TownLife {
       bike.circle(8, -5, 5).stroke({ width: 1.6, color: 0x2b2522 });
       bike.moveTo(-8, -5).lineTo(-1, -13).lineTo(8, -5).moveTo(-1, -13).lineTo(5, -13).lineTo(8, -5).stroke({ width: 1.8, color: frame });
       body.addChild(bike);
-      const t = pick(1);
-      if (t) {
-        const sp = new Sprite(t);
-        sp.anchor.set(0.5, 0.97);
-        sp.scale.set((PERSON_W * 0.9) / t.width);
-        sp.position.set(0, -9);
-        body.addChild(sp);
-      }
+      if (sprites.length) this.figure(pick(1), body, views, PERSON_W * 0.9, 0, -9);
     } else {
-      const t = kind === 'jogger' && this.textures.has('ch_jogger') ? this.textures.get('ch_jogger') : pick(2);
-      if (t) {
-        const sp = new Sprite(t);
-        sp.anchor.set(0.5, 0.97);
-        sp.scale.set(PERSON_W / t.width);
-        body.addChild(sp);
-      }
+      const who = kind === 'jogger' && (this.textures.has('ch_jogger') || figureBase('ch_jogger')) ? 'ch_jogger' : sprites.length ? pick(2) : null;
+      if (who) this.figure(who, body, views, PERSON_W);
       if (kind === 'dog') {
         // A small dog trotting ahead on a lead.
         const dog = new Graphics();
@@ -143,17 +167,10 @@ export class TownLife {
     body.addChild(umbrella);
     const speed = kind === 'idle' ? 0 : kind === 'cyclist' ? 3.2 : kind === 'jogger' ? 1.9 : kind === 'dog' ? 0.95 : 0.7 + jitter(i * 11) * 0.45;
     const dir = jitter(i * 13) < 0.5 ? -1 : 1;
-    const f: Folk = { node, body, umbrella, lane, pos: lane.from + jitter(i * 17 + 3) * (lane.to - lane.from), speed: speed * dir, kind, phase: jitter(i * 19) * 6.28, homebody: jitter(i * 23) };
+    const f: Folk = { node, body, umbrella, lane, pos: lane.from + jitter(i * 17 + 3) * (lane.to - lane.from), speed: speed * dir, kind, phase: jitter(i * 19) * 6.28, homebody: jitter(i * 23), views };
     if (kind === 'idle') {
       // Two neighbours chatting: a second figure facing the first.
-      const t = pick(5);
-      if (t) {
-        const sp = new Sprite(t);
-        sp.anchor.set(0.5, 0.97);
-        sp.scale.set(-PERSON_W / t.width, PERSON_W / t.width);
-        sp.position.set(16, 3);
-        body.addChild(sp);
-      }
+      if (sprites.length) this.figure(pick(5), body, views, PERSON_W, 16, 3, true);
     }
     this.folk.push(f);
     this.place(f);
@@ -177,6 +194,17 @@ export class TownLife {
     // Face the way they walk: in iso, +x heads down-right and +y down-left.
     const right = f.lane.axis === 'x' ? f.speed >= 0 : f.speed < 0;
     f.body.scale.x = right ? 1 : -1;
+    if (f.views.length && f.speed !== 0) {
+      // Heading +x (down-right) or +y (down-left) shows the front; the other two the back. The
+      // front view faces down-left and the back view up-right, so walking along x is mirrored.
+      const ahead = f.speed > 0;
+      const mirror = (f.lane.axis === 'x' ? -1 : 1) * f.body.scale.x;
+      for (const v of f.views) {
+        v.front.visible = ahead;
+        v.back.visible = !ahead;
+        for (const sp of [v.front, v.back]) sp.scale.x = Math.abs(sp.scale.x) * mirror * (v.flip ? -1 : 1);
+      }
+    }
   }
 
   /** Per frame. `pace` is 0 while the game is paused; `night` 0..1 thins the crowd after dark. */

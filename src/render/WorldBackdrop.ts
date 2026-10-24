@@ -36,6 +36,8 @@ export interface WorldOptions {
   /** Plot for sale east of the lot, when it can still be bought. */
   sale: { fromX: number; toX: number; label: string } | null;
   textures: Map<string, Texture>;
+  /** Ground anchors of the Blender-rendered sprites (sprites.ts RENDERED_ANCHORS). */
+  anchors: Record<string, [number, number] | [number, number, number]>;
 }
 
 /** Iso box with walls and a pitched roof, sitting on cell (x, y) with footprint w × h. */
@@ -94,7 +96,11 @@ function tree(container: Container, textures: Map<string, Texture>, x: number, y
   container.addChild(sp);
 }
 
-/** The town's road grid (cells): a ring road round the block, the front street and a second street south. */
+/**
+ * The town's road grid (cells). Every road is two lanes (two cells) wide, with a pavement on both
+ * sides: a ring road round the block, the front street past the gate (a pavement runs between it
+ * and the fence) and a second street south. Each value is the first cell of the road.
+ */
 export function townRoads(site: Site, saleToX: number | null) {
   const eastEdge = saleToX ?? site.width;
   return {
@@ -103,24 +109,147 @@ export function townRoads(site: Site, saleToX: number | null) {
     maxX: eastEdge + WORLD_MARGIN,
     minY: -WORLD_MARGIN,
     maxY: site.height + WORLD_MARGIN,
-    west: -3,
-    north: -3,
+    west: -4,
+    north: -4,
     east: eastEdge + 2,
-    front: site.height,
-    front2: site.height + 9,
+    front: site.height + 1,
+    front2: site.height + 10,
+    /** Lanes per road. */
+    lanes: 2,
   };
+}
+
+export type TownBuilding = 'tw_house_a1' | 'tw_house_a2' | 'tw_house_a3' | 'tw_house_b1' | 'tw_house_b2' | 'tw_shop_1' | 'tw_shop_2' | 'tw_store' | 'tw_cafe' | 'tw_temple';
+const HOUSES: TownBuilding[] = ['tw_house_a1', 'tw_house_a2', 'tw_house_a3', 'tw_house_b1', 'tw_house_b2'];
+const SHOPS: TownBuilding[] = ['tw_shop_1', 'tw_shop_2', 'tw_store', 'tw_cafe'];
+
+export interface TownLayout {
+  roads: ReturnType<typeof townRoads>;
+  isRoad: (x: number, y: number) => boolean;
+  /** 2 × 2 plots, top-left cell. `shop` marks the ones on a high street (shops, cafe, store). */
+  buildings: Array<{ x: number; y: number; kind: TownBuilding; mirror: boolean; shop: boolean }>;
+  trees: Array<{ x: number; y: number; kind: string; front: boolean }>;
+  /** Street furniture on the pavements (one cell each). */
+  props: Array<{ x: number; y: number; kind: 'st3_pole' | 'st3_lamp' | 'st3_busstop' | 'st3_spirit' | 'st3_cart' | 'car3_moto_s'; mirror: boolean }>;
+  /** Zebra crossings: the road, which way it runs and the cell along it. */
+  crossings: Array<{ axis: 'x' | 'y'; row: number; at: number }>;
+}
+
+/**
+ * Where everything in the town goes: buildings, trees, street furniture and crossings. Pure and
+ * repeatable (a hash of the cell, never the game's random numbers), shared by the backdrop and
+ * the night lights.
+ */
+export function townLayout(site: Site, saleToX: number | null): TownLayout {
+  const roads = townRoads(site, saleToX);
+  const { minX, maxX, minY, maxY, eastEdge } = roads;
+  const on = (v: number, r: number) => v === r || v === r + 1;
+  const isRoad = (x: number, y: number) => on(x, roads.west) || on(y, roads.north) || on(x, roads.east) || on(y, roads.front) || on(y, roads.front2);
+  const inLot = (x: number, y: number) => x >= 0 && y >= 0 && x < site.width && y < site.height;
+  const inSale = (x: number, y: number) => saleToX !== null && x >= site.width && x < saleToX && y >= 0 && y < site.height;
+  const inPond = (x: number, y: number) => x >= POND.x && x < POND.x + POND.w && y >= POND.y && y < POND.y + POND.h;
+  const taken = new Set<string>();
+  const free = (x: number, y: number, w: number, h: number, pad = 1) => {
+    for (let yy = y - pad; yy < y + h + pad; yy++)
+      for (let xx = x - pad; xx < x + w + pad; xx++) if (inLot(xx, yy) || inSale(xx, yy) || isRoad(xx, yy) || inPond(xx, yy) || taken.has(`${xx},${yy}`)) return false;
+    return true;
+  };
+  const take = (x: number, y: number, w: number, h: number) => {
+    for (let yy = y; yy < y + h; yy++) for (let xx = x; xx < x + w; xx++) taken.add(`${xx},${yy}`);
+  };
+  const out: TownLayout = { roads, isRoad, buildings: [], trees: [], props: [], crossings: [] };
+
+  // A small temple on the block west of the pond, where it is seen from the home.
+  let temple = false;
+  for (let by = minY + 1; by < maxY - 2; by += 3)
+    for (let bx = minX + 1; bx < maxX - 2; bx += 3) {
+      const n = hash(bx, by);
+      // In front of the lot (south / east) keep things low so they never hide the home.
+      const front = by > site.height + 1 || bx > eastEdge + 1;
+      const nearRoad = isRoad(bx, by - 2) || isRoad(bx, by + 3) || isRoad(bx - 2, by) || isRoad(bx + 3, by);
+      if (!front && n < 0.62 && free(bx, by, 2, 2)) {
+        let kind: TownBuilding;
+        const shop = n < 0.2 || (nearRoad && n < 0.3);
+        if (!temple && bx < -8 && by > -10 && by < site.height) (kind = 'tw_temple'), (temple = true);
+        else kind = shop ? SHOPS[Math.floor(hash(bx + 7, by) * SHOPS.length)] : HOUSES[Math.floor(hash(bx + 1, by) * HOUSES.length)];
+        take(bx, by, 2, 2);
+        out.buildings.push({ x: bx, y: by, kind, mirror: hash(bx, by + 11) < 0.5, shop });
+        // Most homes keep a spirit house at the front corner of the plot.
+        if (!shop && kind !== 'tw_temple' && hash(bx + 5, by + 5) < 0.45 && free(bx + 2, by + 1, 1, 1, 0)) {
+          take(bx + 2, by + 1, 1, 1);
+          out.props.push({ x: bx + 2, y: by + 1, kind: 'st3_spirit', mirror: false });
+        }
+      } else if (n < 0.9 && free(bx, by, 1, 1)) {
+        const kinds = ['dc_tree', 'dc_tree2', 'dc_sakura', 'dc_tree'];
+        take(bx, by, 1, 1);
+        out.trees.push({ x: bx, y: by, kind: kinds[Math.floor(hash(bx + 3, by + 5) * kinds.length)], front });
+      }
+    }
+  for (const [x, y] of [[POND.x - 1, POND.y + 1], [POND.x + POND.w, POND.y], [POND.x + 2, POND.y + POND.h]] as const) out.trees.push({ x, y, kind: 'dc_tree2', front: false });
+
+  // Pavement furniture. A pavement cell is beside a road and on neither the road nor the lot.
+  const pavement = (x: number, y: number) => !isRoad(x, y) && !inLot(x, y) && !inSale(x, y) && !inPond(x, y) && !taken.has(`${x},${y}`) && x >= minX && y >= minY && x < maxX && y < maxY;
+  const put = (x: number, y: number, kind: TownLayout['props'][number]['kind'], mirror = false) => {
+    if (!pavement(x, y)) return;
+    taken.add(`${x},${y}`);
+    out.props.push({ x, y, kind, mirror });
+  };
+  // Street lamps along the pavement between the gate and the front street, and the ring road's inner side.
+  for (let x = -2; x < eastEdge + 2; x += 5) put(x, roads.front - 1, 'st3_lamp');
+  for (let y = 1; y < site.height; y += 6) put(roads.west + 2, y, 'st3_lamp', true);
+  // Power poles with their cables along the far pavement of the front street and both sides of the second street.
+  for (let x = minX + 1; x < maxX - 1; x += 4) put(x, roads.front + 2, 'st3_pole');
+  for (let x = minX + 3; x < maxX - 1; x += 4) put(x, roads.front2 - 1, 'st3_pole');
+  for (let x = minX + 1; x < maxX - 1; x += 4) put(x, roads.north - 1, 'st3_pole');
+  // A bus stop by the gate, a food cart and parked motorbikes outside the shops.
+  put(site.entrance.x + 3, roads.front - 1, 'st3_busstop');
+  for (const b of out.buildings) {
+    if (!b.shop) continue;
+    const h = hash(b.x + 13, b.y + 17);
+    const spots: Array<[number, number]> = [[b.x, b.y + 2], [b.x + 1, b.y + 2], [b.x + 2, b.y], [b.x + 2, b.y + 1]];
+    const [sx, sy] = spots[Math.floor(h * spots.length)];
+    if (h < 0.5) put(sx, sy, 'st3_cart');
+    else put(sx, sy, 'car3_moto_s', h < 0.75);
+  }
+  // Zebra crossings: in front of the gate, and on each road next to the ring road's corners.
+  out.crossings.push({ axis: 'x', row: roads.front, at: site.entrance.x });
+  for (const row of [roads.front, roads.front2, roads.north]) for (const at of [roads.west + 2, roads.east - 1]) out.crossings.push({ axis: 'x', row, at });
+  for (const row of [roads.west, roads.east]) for (const at of [roads.north + 2, roads.front - 1, roads.front + 2, roads.front2 - 1]) out.crossings.push({ axis: 'y', row, at });
+  return out;
+}
+
+const POND = { x: -11, y: 4, w: 5, h: 4 };
+
+/** Where the town's windows and street lamps glow at night (world px). */
+export function townLights(site: Site, saleToX: number | null): Array<{ x: number; y: number; r: number; color: number; k: number }> {
+  const t = townLayout(site, saleToX);
+  const out: Array<{ x: number; y: number; r: number; color: number; k: number }> = [];
+  for (const p of t.props)
+    if (p.kind === 'st3_lamp') {
+      const c = cellCenter(p.x, p.y);
+      out.push({ x: c.x, y: c.y + DROP, r: 58, color: 0xffd58a, k: 0.6 });
+    }
+  for (const b of t.buildings) {
+    const c = cellToWorld(b.x + 1, b.y + 1);
+    out.push({ x: c.x, y: c.y + DROP + 18, r: b.shop ? 60 : 40, color: b.shop ? 0xffe2a8 : 0xffb350, k: b.shop ? 0.55 : 0.4 });
+  }
+  return out;
 }
 
 /** Draw the whole town into `container` (cleared first). */
 export function drawWorld(container: Container, site: Site, opts: WorldOptions): void {
   for (const c of container.removeChildren()) dispose(c);
-  const roads = townRoads(site, opts.sale ? opts.sale.toX : null);
-  const { minX, maxX, minY, maxY, eastEdge } = roads;
-  const isRoad = (x: number, y: number) => x === roads.west || y === roads.north || x === roads.east || y === roads.front || y === roads.front2;
+  const t = townLayout(site, opts.sale ? opts.sale.toX : null);
+  const { roads, isRoad } = t;
+  const { minX, maxX, minY, maxY } = roads;
   const inLot = (x: number, y: number) => x >= 0 && y >= 0 && x < site.width && y < site.height;
   const inSale = (x: number, y: number) => !!opts.sale && x >= opts.sale.fromX && x < opts.sale.toX && y >= 0 && y < site.height;
-  const pond = { x: -10, y: 4, w: 5, h: 4 };
-  const inPond = (x: number, y: number) => x >= pond.x && x < pond.x + pond.w && y >= pond.y && y < pond.y + pond.h;
+  const inPond = (x: number, y: number) => x >= POND.x && x < POND.x + POND.w && y >= POND.y && y < POND.y + POND.h;
+  const at = (gx: number, gy: number) => {
+    const p = cellToWorld(gx, gy);
+    return [p.x, p.y + DROP];
+  };
+  const quad = (g: Graphics, x0: number, y0: number, x1: number, y1: number) => g.poly([...at(x0, y0), ...at(x1, y0), ...at(x1, y1), ...at(x0, y1)]);
 
   const ground = new Graphics();
   container.addChild(ground);
@@ -128,30 +257,65 @@ export function drawWorld(container: Container, site: Site, opts: WorldOptions):
     for (let x = minX; x < maxX; x++) {
       if (inLot(x, y)) continue;
       const d = cellDiamond(x, y).map((v, i) => (i % 2 ? v + DROP : v));
+      const n = hash(x, y);
       let color: number;
-      if (isRoad(x, y)) color = 0x6f7378;
+      const road = isRoad(x, y);
+      const walk = !road && (isRoad(x + 1, y) || isRoad(x, y + 1) || isRoad(x - 1, y) || isRoad(x, y - 1) || isRoad(x + 1, y + 1) || isRoad(x - 1, y - 1) || isRoad(x + 1, y - 1) || isRoad(x - 1, y + 1)) && !inSale(x, y) && !inPond(x, y);
+      if (road) color = n < 0.5 ? 0x5b5f65 : 0x5f6369;
       else if (inPond(x, y)) color = (x + y) % 2 ? 0x6fa9c4 : 0x74aec8;
       else if (inSale(x, y)) color = (x + y) % 2 ? 0xbfcf98 : 0xb9ca92;
-      else {
-        const n = hash(x, y);
-        color = n < 0.33 ? 0x93ac70 : n < 0.66 ? 0x8ea86b : 0x98b075;
-      }
+      else if (walk) color = (x + y) % 2 ? 0xd3cdbd : 0xcdc6b5;
+      else color = n < 0.33 ? 0x93ac70 : n < 0.66 ? 0x8ea86b : 0x98b075;
       ground.poly(d).fill(color);
-      // sidewalk edge along roads
-      if (!isRoad(x, y) && (isRoad(x + 1, y) || isRoad(x, y + 1) || isRoad(x - 1, y) || isRoad(x, y - 1)) && !inSale(x, y) && !inPond(x, y)) ground.poly(d).fill({ color: 0xd9d2bf, alpha: 0.55 });
+      if (walk) {
+        // Paving slabs: four to a cell.
+        ground.moveTo(...(at(x + 0.5, y) as [number, number])).lineTo(...(at(x + 0.5, y + 1) as [number, number]));
+        ground.moveTo(...(at(x, y + 0.5) as [number, number])).lineTo(...(at(x + 1, y + 0.5) as [number, number]));
+        ground.stroke({ width: 1, color: 0xb9b2a1, alpha: 0.6 });
+        // A raised kerb where the pavement meets the road.
+        const kerb = (x0: number, y0: number, x1: number, y1: number) => quad(ground, x0, y0, x1, y1).fill(0xeeeae0);
+        if (isRoad(x, y + 1)) kerb(x, y + 0.88, x + 1, y + 1);
+        if (isRoad(x, y - 1)) kerb(x, y, x + 1, y + 0.12);
+        if (isRoad(x + 1, y)) kerb(x + 0.88, y, x + 1, y + 1);
+        if (isRoad(x - 1, y)) kerb(x, y, x + 0.12, y + 1);
+      } else if (road && hash(x + 41, y + 17) < 0.05) {
+        // the odd manhole cover
+        const c = cellCenter(x, y);
+        ground.ellipse(c.x + 6, c.y + DROP, 6, 3).fill(0x4a4e53).stroke({ width: 1, color: 0x6c7076 });
+      }
     }
-  // lane markings on the ring road and the front street
-  for (let x = minX; x < maxX; x += 2) {
-    for (const ry of [roads.north, roads.front, roads.front2]) {
-      const c = cellCenter(x, ry);
-      ground.poly([c.x - 8, c.y + DROP - 2, c.x + 8, c.y + DROP + 2, c.x + 6, c.y + DROP + 3, c.x - 10, c.y + DROP - 1]).fill({ color: 0xe8e3c9, alpha: 0.8 });
+
+  // Road markings: a dashed centre line between the two lanes and a solid white line at each edge.
+  // Not across junctions (where two roads cross) or the crossings.
+  const junction = (x: number, y: number) => {
+    const onX = y === roads.north || y === roads.north + 1 || y === roads.front || y === roads.front + 1 || y === roads.front2 || y === roads.front2 + 1;
+    const onY = x === roads.west || x === roads.west + 1 || x === roads.east || x === roads.east + 1;
+    return onX && onY;
+  };
+  const crossingAt = (axis: 'x' | 'y', row: number, v: number) => t.crossings.some((c) => c.axis === axis && c.row === row && c.at === v);
+  const marks = new Graphics();
+  for (const row of [roads.north, roads.front, roads.front2])
+    for (let x = minX; x < maxX; x++) {
+      if (junction(x, row) || crossingAt('x', row, x)) continue;
+      quad(marks, x + 0.15, row + 0.97, x + 0.6, row + 1.03).fill({ color: 0xf2d46a, alpha: 0.9 });
+      quad(marks, x, row + 0.06, x + 1, row + 0.1).fill({ color: 0xf4f1e8, alpha: 0.8 });
+      quad(marks, x, row + 1.9, x + 1, row + 1.94).fill({ color: 0xf4f1e8, alpha: 0.8 });
     }
-  }
-  for (let y = minY; y < maxY; y += 2)
-    for (const rx of [roads.west, roads.east]) {
-      const c = cellCenter(rx, y);
-      ground.poly([c.x + 8, c.y + DROP - 2, c.x - 8, c.y + DROP + 2, c.x - 6, c.y + DROP + 3, c.x + 10, c.y + DROP - 1]).fill({ color: 0xe8e3c9, alpha: 0.8 });
+  for (const row of [roads.west, roads.east])
+    for (let y = minY; y < maxY; y++) {
+      if (junction(row, y) || crossingAt('y', row, y)) continue;
+      quad(marks, row + 0.97, y + 0.15, row + 1.03, y + 0.6).fill({ color: 0xf2d46a, alpha: 0.9 });
+      quad(marks, row + 0.06, y, row + 0.1, y + 1).fill({ color: 0xf4f1e8, alpha: 0.8 });
+      quad(marks, row + 1.9, y, row + 1.94, y + 1).fill({ color: 0xf4f1e8, alpha: 0.8 });
     }
+  // Zebra crossings: white bars along the road, side by side across it, and stop lines either side.
+  for (const c of t.crossings)
+    for (let k = 0; k < 7; k++) {
+      const a = c.row + 0.12 + k * 0.26;
+      if (c.axis === 'x') quad(marks, c.at + 0.1, a, c.at + 0.9, a + 0.14).fill({ color: 0xf8f6ef, alpha: 0.92 });
+      else quad(marks, a, c.at + 0.1, a + 0.14, c.at + 0.9).fill({ color: 0xf8f6ef, alpha: 0.92 });
+    }
+  container.addChild(marks);
 
   // Plot for sale: dashed outline and a sign.
   if (opts.sale) {
@@ -162,9 +326,9 @@ export function drawWorld(container: Container, site: Site, opts: WorldOptions):
       const a = pts[i];
       const b = pts[(i + 1) % 4];
       const len = Math.hypot(b.x - a.x, b.y - a.y);
-      for (let t = 0; t < len; t += 14) {
-        const f0 = t / len;
-        const f1 = Math.min(1, (t + 7) / len);
+      for (let tt = 0; tt < len; tt += 14) {
+        const f0 = tt / len;
+        const f1 = Math.min(1, (tt + 7) / len);
         outline.moveTo(a.x + (b.x - a.x) * f0, a.y + (b.y - a.y) * f0 + DROP).lineTo(a.x + (b.x - a.x) * f1, a.y + (b.y - a.y) * f1 + DROP);
       }
     }
@@ -179,53 +343,83 @@ export function drawWorld(container: Container, site: Site, opts: WorldOptions):
     container.addChild(label);
   }
 
-  // Neighbourhood: houses and shophouses on 3-cell plots, trees in between, drawn back to front.
-  const things: Array<{ key: number; draw: () => void }> = [];
-  const free = (x: number, y: number, w: number, h: number) => {
-    for (let yy = y - 1; yy <= y + h; yy++) for (let xx = x - 1; xx <= x + w; xx++) if (inLot(xx, yy) || inSale(xx, yy) || isRoad(xx, yy) || inPond(xx, yy)) return false;
-    return true;
-  };
-  const house = (bx: number, by: number, height: number, wall: number, roof: number, shop: boolean) => () => {
-    const g = new Graphics();
-    drawHouse(g, bx, by, 2, 2, height, wall, roof, shop);
-    container.addChild(g);
-  };
-  for (let by = minY + 1; by < maxY - 2; by += 3)
-    for (let bx = minX + 1; bx < maxX - 2; bx += 3) {
-      const n = hash(bx, by);
-      // In front of the lot (south / east) keep things low so they never hide the home.
-      const front = by > site.height + 1 || bx > eastEdge + 1;
-      if (!front && n < 0.62 && free(bx, by, 2, 2)) {
-        const shop = n < 0.18;
-        const height = shop ? 30 + Math.floor(hash(bx + 7, by) * 3) * 10 : 22 + Math.floor(hash(bx, by + 3) * 2) * 6;
-        const wall = WALLS[Math.floor(hash(bx + 1, by) * WALLS.length)];
-        const roof = ROOFS[Math.floor(hash(bx, by + 1) * ROOFS.length)];
-        things.push({ key: bx + by + 4, draw: house(bx, by, height, wall, roof, shop) });
-      } else if (n < 0.9 && free(bx, by, 1, 1)) {
-        const kinds = ['dc_tree', 'dc_tree2', 'dc_sakura', 'dc_tree'];
-        const kind = kinds[Math.floor(hash(bx + 3, by + 5) * kinds.length)];
-        const width = front ? 44 : 60;
-        things.push({ key: bx + by + 1, draw: () => tree(container, opts.textures, bx + 0.5, by + 0.5, kind, width) });
-      }
-    }
   // Undergrowth: shrubs along the outside of the fence and here and there on town lawns, grass
   // tufts on most free tiles, so the town reads green and lived-in rather than a bare grid. It is
   // all low, so one shape under the houses and trees (drawn back to front) keeps it cheap.
+  const busy = new Set<string>();
+  for (const b of t.buildings) for (let yy = b.y; yy < b.y + 2; yy++) for (let xx = b.x; xx < b.x + 2; xx++) busy.add(`${xx},${yy}`);
+  for (const p of t.props) busy.add(`${p.x},${p.y}`);
   const under = new Graphics();
   for (let y = minY; y < maxY; y++)
     for (let x = minX; x < maxX; x++) {
-      if (inLot(x, y) || inSale(x, y) || isRoad(x, y) || inPond(x, y)) continue;
-      const nearLot = x >= -2 && x <= eastEdge + 1 && y >= -2 && y <= site.height + 1;
+      if (inLot(x, y) || inSale(x, y) || isRoad(x, y) || inPond(x, y) || busy.has(`${x},${y}`)) continue;
+      if (isRoad(x + 1, y) || isRoad(x, y + 1) || isRoad(x - 1, y) || isRoad(x, y - 1)) continue; // pavement
+      const nearLot = x >= -2 && x <= roads.eastEdge + 1 && y >= -2 && y <= site.height + 1;
       const n = hash(x + 911, y + 433);
-      if ((nearLot && n < 0.55) || (n < 0.05 && free(x, y, 0, 0))) shrub(under, x, y, n);
+      if ((nearLot && n < 0.55) || n < 0.05) shrub(under, x, y, n);
       else if (n < 0.5) tufts(under, x, y, n);
     }
   container.addChild(under);
-  // A few trees around the pond.
-  for (const [x, y] of [[pond.x - 1, pond.y + 1], [pond.x + pond.w, pond.y], [pond.x + 2, pond.y + pond.h]] as const)
-    things.push({ key: x + y + 1, draw: () => tree(container, opts.textures, x + 0.5, y + 0.5, 'dc_tree2', 56) });
+
+  // Buildings, trees and street furniture, back to front.
+  const things: Array<{ key: number; draw: () => void }> = [];
+  const sprite = (name: string, gx: number, gy: number, mirror: boolean): boolean => {
+    const tex = opts.textures.get(name);
+    const a = opts.anchors[name];
+    if (!tex || !a) return false;
+    const sp = new Sprite(tex);
+    sp.anchor.set(a[0] / tex.width, a[1] / tex.height);
+    const k = 1 / (a[2] ?? 1);
+    sp.scale.set(mirror ? -k : k, k);
+    const p = cellToWorld(gx, gy);
+    sp.position.set(p.x, p.y + DROP);
+    container.addChild(sp);
+    return true;
+  };
+  for (const b of t.buildings)
+    things.push({
+      key: b.x + b.y + 4,
+      draw: () => {
+        if (sprite(b.kind, b.x + 1, b.y + 1, b.mirror)) return;
+        const g = new Graphics();
+        const height = b.shop ? 30 + Math.floor(hash(b.x + 7, b.y) * 3) * 10 : 22 + Math.floor(hash(b.x, b.y + 3) * 2) * 6;
+        drawHouse(g, b.x, b.y, 2, 2, height, WALLS[Math.floor(hash(b.x + 1, b.y) * WALLS.length)], ROOFS[Math.floor(hash(b.x, b.y + 1) * ROOFS.length)], b.shop);
+        container.addChild(g);
+      },
+    });
+  for (const tr of t.trees) things.push({ key: tr.x + tr.y + 1, draw: () => tree(container, opts.textures, tr.x + 0.5, tr.y + 0.5, tr.kind, tr.front ? 44 : 60) });
+  const poles: Array<{ x: number; y: number }> = [];
+  for (const p of t.props) {
+    if (p.kind === 'st3_pole') poles.push(p);
+    things.push({ key: p.x + p.y + 1.5, draw: () => void sprite(p.kind, p.x + 0.5, p.y + 0.5, p.mirror) });
+  }
   things.sort((p, q) => p.key - q.key);
-  for (const t of things) t.draw();
+  for (const th of things) th.draw();
+
+  // Cables slung between neighbouring poles along a street (three sagging lines per span).
+  if (opts.textures.has('st3_pole')) {
+    const wires = new Graphics();
+    const POLE_TOP = 64;
+    const byRow = new Map<number, Array<{ x: number; y: number }>>();
+    for (const p of poles) byRow.set(p.y, [...(byRow.get(p.y) ?? []), p]);
+    for (const row of byRow.values()) {
+      row.sort((a, b) => a.x - b.x);
+      for (let i = 1; i < row.length; i++) {
+        const a = row[i - 1];
+        const b = row[i];
+        if (b.x - a.x > 6) continue;
+        for (const [off, lift] of [[-0.18, 0], [0.18, 0], [0, 8]] as const) {
+          const p0 = cellToWorld(a.x + 0.5 + off, a.y + 0.5);
+          const p1 = cellToWorld(b.x + 0.5 + off, b.y + 0.5);
+          const y0 = p0.y + DROP - POLE_TOP + lift;
+          const y1 = p1.y + DROP - POLE_TOP + lift;
+          wires.moveTo(p0.x, y0).quadraticCurveTo((p0.x + p1.x) / 2, (y0 + y1) / 2 + 10, p1.x, y1);
+        }
+      }
+    }
+    wires.stroke({ width: 1, color: 0x2b2f35, alpha: 0.6 });
+    container.addChild(wires);
+  }
 }
 
 /** A low shrub: a few overlapping leafy blobs, sometimes with flowers. */
