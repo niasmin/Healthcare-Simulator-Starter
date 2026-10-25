@@ -246,6 +246,7 @@ export function GameCanvas({ controls = true }: { controls?: boolean } = {}) {
           { label: '−', title: t('canvas.zoom_out'), fn: () => r?.zoomBy(1 / 1.2) },
           { label: '⌖', title: t('canvas.reset'), fn: () => r?.recenter() },
           { label: '🏠', title: t(exterior ? 'canvas.interior' : 'canvas.exterior'), fn: () => useGame.getState().setExterior(!exterior), on: exterior },
+          { label: '3D', title: t('view3d.open'), fn: () => useGame.getState().setView3d(true) },
         ].map((b) => (
           <button
             key={b.label}

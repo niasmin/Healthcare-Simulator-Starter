@@ -467,6 +467,15 @@ export function MobileShell() {
               </button>
               <button
                 type="button"
+                onClick={() => useGame.getState().setView3d(true)}
+                title={t('view3d.open')}
+                aria-label={t('view3d.open')}
+                className="pointer-events-auto size-12 rounded-2xl border-2 shadow-lg grid place-items-center text-sm font-black bg-[#14365f]/85 border-white/60 text-white"
+              >
+                3D
+              </button>
+              <button
+                type="button"
                 onClick={() => setShowLabels(!showLabels)}
                 aria-pressed={showLabels}
                 title={t('hud.labels')}
