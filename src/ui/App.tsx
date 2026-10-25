@@ -11,7 +11,8 @@ import { CityModal } from './components/CityModal';
 import { GoalsModal, useGoalToasts } from './components/GoalsModal';
 import { CommunityModal } from './components/CommunityModal';
 import { AutoModal, AwayOfferModal, AwayProgress, AwayReportModal } from './components/AutoModal';
-import { useEffect } from 'react';
+import { Suspense, useEffect } from 'react';
+import { lazyWithReload } from './lazy';
 import { SaveModal } from './components/SaveModal';
 import { ChaptersModal } from './components/ChaptersModal';
 import { useAutosave, useSaveStatus } from './saveService';
@@ -28,6 +29,9 @@ import { Toast } from './components/Toast';
 import { TopBar } from './components/TopBar';
 import { useGameLoop, useIsMobile, useKeyboard } from './hooks';
 import { useGame } from './store';
+
+/** Three.js loads only when the player opens the 3D view. */
+const View3DModal = lazyWithReload(() => import('./components/View3DModal'));
 
 export function App() {
   useGameLoop();
@@ -48,6 +52,7 @@ export function App() {
   const chaptersOpen = useGame((s) => s.chaptersOpen);
   const shopOpen = useGame((s) => s.shopOpen);
   const cityOpen = useGame((s) => s.cityOpen);
+  const view3d = useGame((s) => s.view3d);
   const goalsOpen = useGame((s) => s.goalsOpen);
   const stockOpen = useGame((s) => s.stockOpen);
   const standardsOpen = useGame((s) => s.standardsOpen);
@@ -87,6 +92,11 @@ export function App() {
       {cityOpen && <CityModal tab={cityOpen} onClose={() => useGame.getState().setCityOpen(null)} />}
       {autoOpen && <AutoModal onClose={() => useGame.getState().setAutoOpen(false)} />}
       {accountOpen && <AccountModal onClose={() => useGame.getState().setAccountOpen(false)} />}
+      {view3d && (
+        <Suspense fallback={null}>
+          <View3DModal onClose={() => useGame.getState().setView3d(false)} />
+        </Suspense>
+      )}
       <AwayProgress />
       <AwayOfferModal />
       <AwayReportModal />

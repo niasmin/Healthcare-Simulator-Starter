@@ -89,6 +89,9 @@ interface UIStore {
   setShowLabels: (v: boolean) => void;
   /** Exterior view: rooms drawn as finished buildings with roofs, seen from above. */
   exterior: boolean;
+  /** The full-screen 3D view is open. */
+  view3d: boolean;
+  setView3d: (v: boolean) => void;
   setExterior: (v: boolean) => void;
   autoOpen: boolean;
   setAutoOpen: (v: boolean) => void;
@@ -198,6 +201,8 @@ export const useGame = create<UIStore>((set, get) => ({
   setShowLabels: (showLabels) => set({ showLabels }),
   exterior: false,
   setExterior: (exterior) => set({ exterior }),
+  view3d: false,
+  setView3d: (view3d) => set({ view3d }),
   autoOpen: false,
   setAutoOpen: (autoOpen) => set({ autoOpen }),
   accountOpen: false,
