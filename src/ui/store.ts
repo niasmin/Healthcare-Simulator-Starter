@@ -60,6 +60,8 @@ interface UIStore {
   chaptersOpen: boolean;
   shopOpen: boolean;
   setShopOpen: (v: boolean) => void;
+  pathsOpen: boolean;
+  setPathsOpen: (v: boolean) => void;
   /** The town window (city map or ranking tab), or null. */
   cityOpen: 'city' | 'ranking' | null;
   setCityOpen: (v: 'city' | 'ranking' | null) => void;
@@ -291,6 +293,8 @@ export const useGame = create<UIStore>((set, get) => ({
   chaptersOpen: false,
   shopOpen: false,
   setShopOpen: (shopOpen) => set({ shopOpen }),
+  pathsOpen: false,
+  setPathsOpen: (pathsOpen) => set({ pathsOpen }),
   cityOpen: null,
   setCityOpen: (cityOpen) => set({ cityOpen }),
   goalsOpen: false,

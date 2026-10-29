@@ -32,6 +32,7 @@ import { issue } from './billing';
 import { EXHAUSTED_ENERGY, makeResidentCandidate } from './staffing';
 import { dayOf } from './time';
 
+import { withFeeBonus } from '../../data/paths';
 /**
  * Neuro hospital (Chapter 6). The clinic books consultations per examination desk every morning;
  * a doctor on shift sees each patient at a free desk. Some consultations end in a referral for a
@@ -233,7 +234,9 @@ function reputation(state: GameState, delta: number): GameState {
 
 function discharge(state: GameState, p: Inpatient, closingDay: number): GameState {
   let s = state;
-  const line: InvoiceLine = { stream: 'hospital', memo: 'invoice.line.ipd_stay', qty: p.stayDays, unitSatang: IPD_FEE_PER_DAY, amountSatang: p.stayDays * IPD_FEE_PER_DAY };
+  // The neuro path raises what the clinic and stroke unit earn.
+  const fee = withFeeBonus(s, 'hospital', IPD_FEE_PER_DAY);
+  const line: InvoiceLine = { stream: 'hospital', memo: 'invoice.line.ipd_stay', qty: p.stayDays, unitSatang: fee, amountSatang: p.stayDays * fee };
   s = issue(s, p, 'ipd', monthOfDay(closingDay), [line]);
   const outcome = p.roundsMissed > MAX_MISSED_ROUNDS ? 'complicated' : 'recovered';
   const busy = new Set(s.hospital.tasks.filter((t) => t.patientId === p.id && t.status === 'in_progress').map((t) => t.assigneeId));
@@ -263,7 +266,8 @@ export function hospitalDayEnd(state: GameState, closingDay: number, newDayStart
   let s = state;
   const h = s.hospital;
   if (h.today.consults) {
-    const line: InvoiceLine = { stream: 'hospital', memo: 'invoice.line.consult', qty: h.today.consults, unitSatang: CONSULT_FEE, amountSatang: h.today.consults * CONSULT_FEE };
+    const fee = withFeeBonus(s, 'hospital', CONSULT_FEE);
+    const line: InvoiceLine = { stream: 'hospital', memo: 'invoice.line.consult', qty: h.today.consults, unitSatang: fee, amountSatang: h.today.consults * fee };
     s = issue(s, OPD_CLIENT, 'opd', monthOfDay(closingDay), [line]);
   }
   if (h.inpatients.length) s = post(s, -IPD_SUPPLIES_PER_DAY * h.inpatients.length, 'supplies', 'ledger.ipd_supplies', { memoParams: { n: h.inpatients.length } });

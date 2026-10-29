@@ -27,6 +27,8 @@ import { nextPlot } from '../data/chapters';
 import { prefabCost, prefabDef, prefabRect } from '../data/prefabs';
 import { GROUP_WARD_EQUIPMENT } from '../data/patients';
 import { FAMILY_APP_REPUTATION, FAMILY_APP_SATISFACTION_LINE, UPGRADES, hasUpgrade } from '../data/shop';
+import { perkBlocker, perkDef, perkPerDay } from '../data/paths';
+import { empireDayEnd } from './systems/empire';
 import { admitInpatient, hospitalDayEnd, hospitalTick } from './systems/hospital';
 import { supportDayEnd } from './systems/support';
 import { cityBlocker, cityCost, visitPlace } from './systems/city';
@@ -82,6 +84,7 @@ export type Command =
   | { type: 'supportBranch'; branchId: string }
   | { type: 'closeBranch'; branchId: string }
   | { type: 'buyUpgrade'; upgrade: UpgradeId }
+  | { type: 'buyPerk'; perk: string }
   | { type: 'visitPlace'; place: CityPlace }
   | { type: 'setAuto'; settings: Partial<AutoSettings> }
   | { type: 'takeLoan'; amount: number }
@@ -530,6 +533,16 @@ export function applyCommand(state: GameState, cmd: Command): CommandOutcome {
       return { state: s, result: { ok: true, costSatang: def.costSatang } };
     }
 
+    case 'buyPerk': {
+      const why = perkBlocker(state, cmd.perk);
+      if (why) return fail(state, why);
+      const def = perkDef(cmd.perk)!;
+      let s: GameState = { ...state, perks: [...(state.perks ?? []), cmd.perk] };
+      s = post(s, -def.costSatang, 'equipment', 'ledger.perk', { memoParams: { perk: cmd.perk } });
+      s = log(s, 'good', 'log.perk', { perk: cmd.perk });
+      return { state: s, result: { ok: true, costSatang: def.costSatang } };
+    }
+
     case 'startChapter': {
       const next = startNextChapter(state);
       return next ? { state: next, result: { ok: true } } : fail(state, 'chapter_locked');
@@ -647,7 +660,9 @@ function closeDay(state: GameState): GameState {
     const missedPenalty = missedRepPenalty(state.today.done, state.today.missed);
     // Shop upgrade: a family app keeps families informed, which helps the name while they are content.
     const app = hasUpgrade(state, 'family_app') && sat >= FAMILY_APP_SATISFACTION_LINE ? FAMILY_APP_REPUTATION : 0;
-    reputation = Math.max(0, Math.min(100, Math.round((reputation + (sat - 60) / 15 - missedPenalty + app) * 10) / 10));
+    // Business-path upgrades that build the name.
+    const paths = perkPerDay(state, 'reputation');
+    reputation = Math.max(0, Math.min(100, Math.round((reputation + (sat - 60) / 15 - missedPenalty + app + paths) * 10) / 10));
   }
   return { ...state, history, today: { done: 0, missed: 0 }, perfToday: {}, perfDays: [...(state.perfDays ?? []), state.perfToday ?? {}].slice(-PERF_DAYS), organization: { ...state.organization, reputation } };
 }
@@ -677,6 +692,7 @@ export function step(state: GameState): GameState {
         s = closeDay(s);
         s = residentDepartures(s);
         s = judgeChapter(s, closingDay);
+        s = empireDayEnd(s, closingDay);
         // The new day starts: bill the month in advance on its first day.
         const newDay = closingDay + 1;
         if (dayInMonth(newDay) === 1) s = billMonth(s, monthOfDay(newDay));

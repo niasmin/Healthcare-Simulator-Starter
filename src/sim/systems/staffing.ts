@@ -1,5 +1,6 @@
 import { RECEPTION_EXTRA_ENQUIRIES, supportActive, supportApplicants } from './support';
 import { hasUpgrade, MARKETING_EXTRA_ENQUIRIES, WELFARE_MORALE_PER_DAY } from '../../data/shop';
+import { perkEnquiries, perkPerDay } from '../../data/paths';
 import { GROUP_LEVELS, RESIDENT_NAMES, SPECIALIST_GROUPS } from '../../data/patients';
 import { freeBeds } from '../../domain/rules/beds';
 import { chapterDef, PREMIUM_SHARE } from '../../data/chapters';
@@ -132,6 +133,8 @@ export function refreshCandidates(state: GameState): GameState {
   if (s.organization.reputation >= 70) add++;
   // Shop upgrade: online marketing brings more enquiries.
   if (hasUpgrade(s, 'online_marketing')) add += MARKETING_EXTRA_ENQUIRIES;
+  // Business-path upgrades that bring families in.
+  add += perkEnquiries(s);
   // A staffed front desk answers more calls.
   if (supportActive(s, 'receptionist')) add += RECEPTION_EXTRA_ENQUIRIES;
   if (s.organization.reputation < ENQUIRY_LOW_REP) add = Math.max(0, add - 1);
@@ -189,6 +192,7 @@ export function staffMoraleDaily(state: GameState): GameState {
   const statuses = allRoomStatuses(state.site);
   const hasStaffRoom = state.site.rooms.some((r) => r.type === 'staff_room' && statuses.get(r.id)?.operational);
   const welfare = hasUpgrade(state, 'staff_welfare');
+  const pathMorale = perkPerDay(state, 'morale');
   const employees = state.employees.map((e) => {
     const minutes = state.shifts.filter((s) => s.employeeId === e.id).reduce((a, s) => a + shiftMinutes(s.start, s.end), 0);
     let d = e.morale < 70 ? 1 : e.morale > 70 ? -1 : 0;
@@ -196,6 +200,7 @@ export function staffMoraleDaily(state: GameState): GameState {
     if (e.energy < 30) d -= 3;
     if (hasStaffRoom) d += 1;
     if (welfare) d += WELFARE_MORALE_PER_DAY;
+    d += pathMorale;
     return { ...e, morale: r2(clamp(e.morale + d)) };
   });
   return { ...state, employees };

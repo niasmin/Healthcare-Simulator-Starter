@@ -1,4 +1,5 @@
 import { hasUpgrade, LOUNGE_SATISFACTION_PER_DAY } from '../../data/shop';
+import { perkPerDay } from '../../data/paths';
 import { allRoomStatuses } from '../../domain/rules/rooms';
 import type { GameState, RoomType, StaffRole } from '../../domain/types';
 import { clamp, r2 } from '../helpers';
@@ -64,7 +65,8 @@ export function supportDayEnd(state: GameState): GameState {
   const sat =
     (supportActive(state, 'nutritionist') ? NUTRITIONIST_SATISFACTION_PER_DAY : 0) +
     (supportActive(state, 'security') ? SECURITY_SATISFACTION_PER_DAY : 0) +
-    (hasUpgrade(state, 'family_lounge') ? LOUNGE_SATISFACTION_PER_DAY : 0);
+    (hasUpgrade(state, 'family_lounge') ? LOUNGE_SATISFACTION_PER_DAY : 0) +
+    perkPerDay(state, 'satisfaction');
   const happy = supportActive(state, 'cleaner') ? CLEANER_HAPPINESS_PER_DAY : 0;
   if (!sat && !happy) return state;
   return {
