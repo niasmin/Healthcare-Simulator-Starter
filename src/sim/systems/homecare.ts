@@ -1,4 +1,5 @@
 import { VISIT_PRICE } from '../../data/finance';
+import { withFeeBonus } from '../../data/paths';
 import { RESIDENT_NAMES } from '../../data/patients';
 import { allRoomStatuses } from '../../domain/rules/rooms';
 import { isOnShift } from '../../domain/rules/shifts';
@@ -184,7 +185,8 @@ export function homecareDayEnd(state: GameState, closingDay: number, newDayStart
   for (const c of hc.clients) {
     const n = hc.doneToday[c.id] ?? 0;
     if (!n) continue;
-    const line: InvoiceLine = { stream: 'homecare', memo: `invoice.line.visit_${c.plan}`, qty: n, unitSatang: VISIT_PRICE[c.plan], amountSatang: n * VISIT_PRICE[c.plan] };
+    const unit = withFeeBonus(s, 'homecare', VISIT_PRICE[c.plan]);
+    const line: InvoiceLine = { stream: 'homecare', memo: `invoice.line.visit_${c.plan}`, qty: n, unitSatang: unit, amountSatang: n * unit };
     s = issue(s, c, 'homecare', monthOfDay(closingDay), [line]);
   }
   // 2. Families below the churn line cancel.

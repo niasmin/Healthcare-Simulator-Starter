@@ -441,6 +441,7 @@ export function MobileShell() {
                     label={t('hud.shop')}
                     onClick={() => useGame.getState().setShopOpen(true)}
                   />
+                  <FloatButton emoji="🧭" label={t('paths.short')} onClick={() => useGame.getState().setPathsOpen(true)} />
                 </div>
               </>
             )}

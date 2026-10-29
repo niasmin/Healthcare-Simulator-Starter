@@ -7,6 +7,7 @@ import { useSound } from './sound';
 import { useTelemetry } from './telemetry';
 import { useAlerts } from './alerts';
 import { ShopModal } from './components/ShopModal';
+import { PathsModal } from './components/PathsModal';
 import { CityModal } from './components/CityModal';
 import { GoalsModal, useGoalToasts } from './components/GoalsModal';
 import { CommunityModal } from './components/CommunityModal';
@@ -51,6 +52,7 @@ export function App() {
   const setSaveOpen = useGame((s) => s.setSaveOpen);
   const chaptersOpen = useGame((s) => s.chaptersOpen);
   const shopOpen = useGame((s) => s.shopOpen);
+  const pathsOpen = useGame((s) => s.pathsOpen);
   const cityOpen = useGame((s) => s.cityOpen);
   const view3d = useGame((s) => s.view3d);
   const goalsOpen = useGame((s) => s.goalsOpen);
@@ -83,6 +85,7 @@ export function App() {
       {started && saveOpen && <SaveModal mode="game" onClose={() => setSaveOpen(false)} />}
       {chaptersOpen && <ChaptersModal onClose={() => setChaptersOpen(false)} />}
       {shopOpen && <ShopModal onClose={() => useGame.getState().setShopOpen(false)} />}
+      {pathsOpen && <PathsModal onClose={() => useGame.getState().setPathsOpen(false)} />}
       {started && goalsOpen && <GoalsModal onClose={() => useGame.getState().setGoalsOpen(false)} />}
       {started && stockOpen && <InventoryModal onClose={() => useGame.getState().setStockOpen(false)} />}
       {started && standardsOpen && <StandardsModal onClose={() => useGame.getState().setStandardsOpen(false)} />}

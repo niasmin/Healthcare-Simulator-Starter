@@ -19,6 +19,7 @@ import { MALL_SUPPLIES_PERCENT } from '../../data/city';
 import { mallDeal } from './city';
 import { dayOf } from './time';
 import { stockCostPerDay } from './inventory';
+import { withFeeBonus } from '../../data/paths';
 
 /**
  * Billing rules (fictional):
@@ -31,13 +32,23 @@ import { stockCostPerDay } from './inventory';
 type Services = GameState['unbilled'][string];
 const EMPTY: Services = { therapy: 0, activity: 0, special: 0 };
 
-function serviceLines(sv: Services): InvoiceLine[] {
+function serviceLines(state: GameState, sv: Services): InvoiceLine[] {
   const out: InvoiceLine[] = [];
   for (const stream of ['therapy', 'activity', 'special'] as const) {
     const qty = sv[stream];
-    if (qty > 0) out.push({ stream, memo: `invoice.line.${stream}`, qty, unitSatang: SERVICE_PRICE[stream], amountSatang: qty * SERVICE_PRICE[stream] });
+    // The rehabilitation path raises what therapy sessions earn.
+    const unit = stream === 'therapy' ? withFeeBonus(state, 'therapy', SERVICE_PRICE[stream]) : SERVICE_PRICE[stream];
+    if (qty > 0) out.push({ stream, memo: `invoice.line.${stream}`, qty, unitSatang: unit, amountSatang: qty * unit });
   }
   return out;
+}
+
+/** A resident's monthly room & care with the business-path upgrades that apply to them. */
+function roomFee(state: GameState, r: Pick<Resident, 'careLevel' | 'group' | 'premium'>): number {
+  const base = monthlyFee(r.careLevel, state.priceLevel, r.group, r.premium);
+  if (r.premium) return withFeeBonus(state, 'villa', base);
+  const ward = withFeeBonus(state, 'ward', base);
+  return r.group === 'dementia' || r.group === 'advanced_dementia' ? ward + (withFeeBonus(state, 'memory', base) - base) : ward;
 }
 
 export function hasInvoice(state: GameState, clientId: string, month: number, kind: Invoice['kind']): boolean {
@@ -96,7 +107,7 @@ export function refundUnusedDays(state: GameState, resident: Resident): GameStat
 export function billAdmission(state: GameState, resident: Resident): GameState {
   const day = dayOf(state.minute);
   const days = DAYS_PER_MONTH - dayInMonth(day) + 1;
-  const fee = monthlyFee(resident.careLevel, state.priceLevel, resident.group, resident.premium);
+  const fee = roomFee(state, resident);
   const amount = Math.floor((fee * days) / DAYS_PER_MONTH / 100) * 100;
   const line: InvoiceLine = { stream: 'room_care', memo: 'invoice.line.room_care_days', memoParams: { days, level: resident.careLevel }, qty: days, unitSatang: Math.floor(fee / DAYS_PER_MONTH), amountSatang: amount };
   return issue(state, resident, 'admission', monthOfDay(day), [line]);
@@ -106,10 +117,10 @@ export function billAdmission(state: GameState, resident: Resident): GameState {
 export function billMonth(state: GameState, month: number): GameState {
   let s = state;
   for (const r of state.residents) {
-    const fee = monthlyFee(r.careLevel, s.priceLevel, r.group, r.premium);
+    const fee = roomFee(s, r);
     const lines: InvoiceLine[] = [
       { stream: 'room_care', memo: 'invoice.line.room_care', memoParams: { level: r.careLevel }, qty: 1, unitSatang: fee, amountSatang: fee },
-      ...serviceLines(s.unbilled[r.id] ?? EMPTY),
+      ...serviceLines(s, s.unbilled[r.id] ?? EMPTY),
     ];
     const before = s.invoices.length;
     s = issue(s, r, 'monthly', month, lines);
@@ -120,7 +131,7 @@ export function billMonth(state: GameState, month: number): GameState {
 
 /** On discharge: bill outstanding services once. */
 export function billFinal(state: GameState, resident: Resident): GameState {
-  const lines = serviceLines(state.unbilled[resident.id] ?? EMPTY);
+  const lines = serviceLines(state, state.unbilled[resident.id] ?? EMPTY);
   let s = issue(state, resident, 'final', monthOfDay(dayOf(state.minute)), lines);
   const { [resident.id]: _drop, ...rest } = s.unbilled;
   void _drop;

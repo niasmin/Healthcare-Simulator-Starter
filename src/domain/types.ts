@@ -766,6 +766,22 @@ export interface Loan {
   startDay: number;
 }
 
+/** One judged empire year. */
+export interface EmpireYear {
+  year: number;
+  won: boolean;
+  /** Day it was judged. */
+  day: number;
+  stars: number;
+}
+
+/** Endless yearly goals (sim/systems/empire.ts): the running year and the ones before it. */
+export interface EmpireState {
+  year: number;
+  startDay: number;
+  past: EmpireYear[];
+}
+
 export interface GameState {
   schemaVersion: 10;
   auto?: AutoSettings;
@@ -774,6 +790,10 @@ export interface GameState {
   challenge?: ChallengeId;
   /** Shop upgrades owned (missing in older saves = none). */
   upgrades?: UpgradeId[];
+  /** Business-path upgrades owned (data/paths.ts; missing in older saves = none). */
+  perks?: string[];
+  /** Endless empire years (absent until they begin). */
+  empire?: EmpireState;
   seed: number;
   /** Current PRNG state (mulberry32). Advancing the RNG updates this. */
   rngState: number;
@@ -875,6 +895,9 @@ export type ReasonCode =
   | 'support_cooldown'
   | 'branch_limit'
   | 'already_owned'
+  | 'path_closed'
+  | 'needs_previous'
+  | 'needs_unmet'
   | 'already_today'
   | 'not_enough_stars'
   | 'inventory_off'
